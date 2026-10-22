@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 430" width="940" height="430" role="img" aria-labelledby="t d">
+<title id="t">When things happen</title><desc id="d">The schedule the household keeps without being asked: the relay every fifteen seconds, the spend page every ten minutes, the Today card twice a day, prep packets each morning, the Sunday digest, a nightly backup, and the notices that come days or weeks ahead.</desc>
+<style>
+:root{--bg:#f4f7ff;--card:#ffffff;--line:#bcc8f0;--ink:#14204a;--mute:#56628c;--royal:#2346d8;--onroyal:#ffffff;--gold:#e8b84a;--ongold:#14204a;--soft:#e6ecff;--warm:#fff6df}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1530;--card:#17224b;--line:#3a4b86;--ink:#eef2ff;--mute:#a9b4da;--royal:#7b95ff;--onroyal:#0d1530;--gold:#e8b84a;--ongold:#14204a;--soft:#1f2d63;--warm:#2b2a3a}}
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--ink);font-size:14px}
+.t{font-size:13px}.s{font-size:12px;fill:var(--mute)}.h{font-size:16px;font-weight:700}.b{font-weight:700}
+.bg{fill:var(--bg)}.card{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+.soft{fill:var(--soft);stroke:var(--line);stroke-width:1.5}.warm{fill:var(--warm);stroke:var(--gold);stroke-width:1.5}
+.dash{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 5}
+.royal{fill:var(--royal)}.gold{fill:var(--gold)}
+.onroyal{fill:var(--onroyal)}.ongold{fill:var(--ongold)}
+.ln{stroke:var(--royal);stroke-width:2;fill:none}.lg{stroke:var(--gold);stroke-width:2;fill:none}
+.mt{fill:var(--mute)}
+</style>
+<defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--royal)"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--gold)"/></marker>
+</defs>
+<rect width="940" height="430" rx="18" class="bg"/>
+<rect x="24" y="22" width="230" height="40" rx="20" class="warm"/>
+<text x="139" y="47" class="t b" text-anchor="middle">Every 15 s, and on change</text>
+<rect x="262" y="22" width="654" height="40" rx="20" class="card"/>
+<text x="284" y="47" class="t" text-anchor="start">The relay carries the family room between the two gateways</text>
+<rect x="24" y="72" width="230" height="40" rx="20" class="warm"/>
+<text x="139" y="97" class="t b" text-anchor="middle">Every 10 min</text>
+<rect x="262" y="72" width="654" height="40" rx="20" class="card"/>
+<text x="284" y="97" class="t" text-anchor="start">The Spend page is rebuilt from both assistants' costs</text>
+<rect x="24" y="122" width="230" height="40" rx="20" class="warm"/>
+<text x="139" y="147" class="t b" text-anchor="middle">4:45 and 16:45</text>
+<rect x="262" y="122" width="654" height="40" rx="20" class="card"/>
+<text x="284" y="147" class="t" text-anchor="start">The Today card: what is next, and a verse for the day</text>
+<rect x="24" y="172" width="230" height="40" rx="20" class="warm"/>
+<text x="139" y="197" class="t b" text-anchor="middle">8:00 each day</text>
+<rect x="262" y="172" width="654" height="40" rx="20" class="card"/>
+<text x="284" y="197" class="t" text-anchor="start">A prep packet for an event 36 to 60 hours away</text>
+<rect x="24" y="222" width="230" height="40" rx="20" class="warm"/>
+<text x="139" y="247" class="t b" text-anchor="middle">Sunday 19:00</text>
+<rect x="262" y="222" width="654" height="40" rx="20" class="card"/>
+<text x="284" y="247" class="t" text-anchor="start">The digest: the week at a glance, what is slipping, what needs a decision</text>
+<rect x="24" y="272" width="230" height="40" rx="20" class="warm"/>
+<text x="139" y="297" class="t b" text-anchor="middle">Every night</text>
+<rect x="262" y="272" width="654" height="40" rx="20" class="card"/>
+<text x="284" y="297" class="t" text-anchor="start">Both gateways are backed up, and a restore is rehearsed</text>
+<rect x="24" y="322" width="230" height="40" rx="20" class="warm"/>
+<text x="139" y="347" class="t b" text-anchor="middle">30 days before</text>
+<rect x="262" y="322" width="654" height="40" rx="20" class="card"/>
+<text x="284" y="347" class="t" text-anchor="start">A saved document expires or renews: one notice, no model run</text>
+<rect x="24" y="372" width="230" height="40" rx="20" class="warm"/>
+<text x="139" y="397" class="t b" text-anchor="middle">3 weeks before</text>
+<rect x="262" y="372" width="654" height="40" rx="20" class="card"/>
+<text x="284" y="397" class="t" text-anchor="start">A birthday or Christmas: the gift ideas kept for that person reach the right parent</text>
+</svg>
