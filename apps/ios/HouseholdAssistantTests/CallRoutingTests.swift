@@ -6,8 +6,8 @@ import XCTest
 @testable import HouseholdAssistant
 
 final class CallRoutingTests: XCTestCase {
-    private let airPods = CallAudioRoutes.Device(id: "F0:5C:77:12:34:56-tsco", name: "Franco\u{2019}s AirPods Pro", kind: .bluetooth)
-    private let car = CallAudioRoutes.Device(id: "CarPlay-0001", name: "Gia\u{2019}s Highlander", kind: .car)
+    private let airPods = CallAudioRoutes.Device(id: "F0:5C:77:12:34:56-tsco", name: "Leo\u{2019}s AirPods Pro", kind: .bluetooth)
+    private let car = CallAudioRoutes.Device(id: "CarPlay-0001", name: "Rosa\u{2019}s Highlander", kind: .car)
 
     func testACallStartsOnTheSpeaker() {
         let routing = CallRouting()

@@ -1,12 +1,12 @@
 #if DEBUG
-// A made-up household, kept the way the household-app plugin keeps one: Franco and Gia,
-// and their assistants Corey and Denise, in the family room and in Franco's own thread
+// A made-up household, kept the way the household-app plugin keeps one: Leo and Rosa,
+// and their assistants Corey and Denise, in the family room and in Leo's own thread
 // with Corey. The demo and the screenshot tests both show it, so the film and the
 // pictures are of the same family. Every word and picture in it is invented here.
 //
 // It says what the approved mockups say, at the clock times they show whatever day it
 // is drawn, so each screen can sit beside its mockup: dinner in the family room at 6:12
-// PM, and in Franco's thread Monday's soccer schedule, last night's reminder and the
+// PM, and in Leo's thread Monday's soccer schedule, last night's reminder and the
 // permission slip he has not opened yet.
 //
 // It answers the plugin's methods with the payloads the plugin sends, built from one
@@ -107,6 +107,19 @@ final class DemoRoom {
     ]
     nonisolated static let participants = everyone(faces: [:])
 
+    /// What the made-up household calls each of its two people. They keep the real
+    /// household's ids, which the app matches on (HouseholdMember) and never draws; the
+    /// screenshot tests give these names to the screens that name a person before any
+    /// gateway does.
+    nonisolated static func memberName(_ member: HouseholdMember) -> String {
+        switch member {
+        case .franco:
+            return "Leo"
+        case .gia:
+            return "Rosa"
+        }
+    }
+
     private(set) var entries: [Entry] = []
     private(set) var media: [String: Data] = [:]
     /// The faces chosen so far, by participant, from photos `keep` was given, for a scene
@@ -116,11 +129,11 @@ final class DemoRoom {
     /// Corey and Denise on their direct line, which every page says the last move of.
     private let pair: DemoPair
 
-    /// What Gia says in her voice note, which the demo and the screenshots show under it
+    /// What Rosa says in her voice note, which the demo and the screenshots show under it
     /// in place of a recognizer's hearing.
     static let voiceNoteWords = "Come home soon, the pasta is getting cold."
-    /// How the family room's scene ends: Denise's answer, then Franco's, which Gia hearts.
-    static let flightWords = "Gia's flight lands at 4:10. I put it on the family calendar \u{2708}\u{FE0F}"
+    /// How the family room's scene ends: Denise's answer, then Leo's, which Rosa hearts.
+    static let flightWords = "Rosa's flight lands at 4:10. I put it on the family calendar \u{2708}\u{FE0F}"
     static let pickUpWords = "I'll pick you up. Text me when you land!"
 
     /// The photo, the voice note and the file the scene carries, to send again later.
@@ -132,7 +145,7 @@ final class DemoRoom {
 
     /// `isFinished` false leaves off how the family room's scene ends, for the film to play
     /// it and for the widgets, whose mockup is drawn just before it. `longThread` puts that
-    /// many older messages in Franco's own thread first, for the hitch tests.
+    /// many older messages in Leo's own thread first, for the hitch tests.
     init(now: @escaping () -> Date = Date.init, isFinished: Bool = true, longThread: Int = 0) {
         self.now = now
         // On the phone's own clock, so the family room's marker shows however the demo's
@@ -340,7 +353,7 @@ final class DemoRoom {
         ))
     }
 
-    /// A step of Corey's run waiting for Franco's yes, as a card in his own thread.
+    /// A step of Corey's run waiting for Leo's yes, as a card in his own thread.
     @discardableResult
     func askApproval(_ title: String, detail: String, isCommand: Bool = false) -> Entry {
         let approvalId = (isCommand ? "" : "plugin:") + UUID().uuidString.lowercased()
@@ -413,7 +426,7 @@ final class DemoRoom {
         case "household-app.card.tick":
             return .object(["kept": .bool(true)])
         case "household-app.approval.answer":
-            // OpenClaw takes Franco's answer at once, so the card ends the way he answered.
+            // OpenClaw takes Leo's answer at once, so the card ends the way he answered.
             guard let messageId = params["messageId"]?.stringValue, let decision = params["decision"]?.stringValue else {
                 return nil
             }
@@ -436,10 +449,10 @@ final class DemoRoom {
 
     // MARK: - The scene
 
-    /// Both conversations up to dinner. Franco has read the family room up to Corey's
+    /// Both conversations up to dinner. Leo has read the family room up to Corey's
     /// answer about the list, which leaves three new there, and his own thread up to
     /// Monday's, which leaves last night's reminder and the slip new.
-    /// `count` older messages in Franco's own thread, one every 45 minutes up to two hours
+    /// `count` older messages in Leo's own thread, one every 45 minutes up to two hours
     /// ago: his questions and Corey's answers, plain, with lists and in paragraphs, as a
     /// thread that has been used for weeks reads.
     private func fillLongThread(_ count: Int) {
@@ -448,7 +461,7 @@ final class DemoRoom {
             "Can you move the dentist to Thursday?",
             "What do we need from the store?",
             "Remind me about the recital",
-            "How long to Gia's office?",
+            "How long to Rosa's office?",
         ]
         let answers = [
             "Here is the week:\n\n- **Monday** soccer at 5:45\n- **Tuesday** dentist at 3:30\n- **Thursday** recital at 6\n\nWant reminders for each?",
@@ -506,8 +519,8 @@ final class DemoRoom {
         )
     }
 
-    /// The family room's last moments, as the mockup ends it: Denise puts Gia's flight on
-    /// the calendar, Franco reads it and answers, and Gia hearts his answer and reads it.
+    /// The family room's last moments, as the mockup ends it: Denise puts Rosa's flight on
+    /// the calendar, Leo reads it and answers, and Rosa hearts his answer and reads it.
     private func finishTheScene() {
         let flight = sayTheFlight(minutesAgo: minutesAgo(at: 18, 13))
         read(flight.id, by: "franco")
@@ -516,20 +529,20 @@ final class DemoRoom {
         read(pickUp.id, by: "gia")
     }
 
-    /// Denise's answer that ends the scene, with the chip for what her run did: Gia's
+    /// Denise's answer that ends the scene, with the chip for what her run did: Rosa's
     /// landing on the family calendar, tomorrow at 4:10 PM.
     @discardableResult
     func sayTheFlight(minutesAgo: Double = 0) -> Entry {
         let calendar = Calendar.current
         let landing = calendar.date(byAdding: DateComponents(day: 1, hour: 16, minute: 10), to: calendar.startOfDay(for: now()))
-        return say(Self.flightWords, by: "denise", minutesAgo: minutesAgo, did: [Self.change("event", "added", title: "Gia lands", at: landing)])
+        return say(Self.flightWords, by: "denise", minutesAgo: minutesAgo, did: [Self.change("event", "added", title: "Rosa lands", at: landing)])
     }
 
     // MARK: - The cart
 
     /// Ordered on a cart card, answered the way the plugin answers it (cards.js,
     /// createCartOrdered): every item the card showed leaves the cart, the conversation gets
-    /// the cart as it now stands, and Franco's own thread the order. Here that empties it.
+    /// the cart as it now stands, and Leo's own thread the order. Here that empties it.
     private func cartOrdered(_ messageId: String, in conversation: RoomConversation) -> JSONValue? {
         guard let card = entries.first(where: { $0.id == messageId && $0.conversation == conversation }) else {
             return nil
@@ -652,7 +665,7 @@ final class DemoRoom {
         return .object(["ring": ring, "appearance": appearance, "background": background])
     }
 
-    /// Franco's change to the family room's color or appearance, as the plugin keeps it.
+    /// Leo's change to the family room's color or appearance, as the plugin keeps it.
     private func setLook(_ params: JSONValue) -> JSONValue? {
         guard let change = params["change"]?.stringValue, change == "color" || change == "appearance" else {
             return nil
@@ -684,7 +697,7 @@ final class DemoRoom {
         ])
     }
 
-    /// Denise, as Gia's gateway carries her across the relay for her page in the family room.
+    /// Denise, as Rosa's gateway carries her across the relay for her page in the family room.
     private static let peerAssistant: JSONValue = .object([
         "name": .string("Denise"),
         "voiceName": .string("Jessica"),
@@ -753,8 +766,8 @@ final class DemoRoom {
     /// Everyone in the room, as the plugin lists them, each with their face if one is chosen.
     nonisolated private static func everyone(faces: [String: RoomMedia]) -> JSONValue {
         .array([
-            participant("franco", "Franco", kind: "person", isOwner: true, face: faces["franco"]),
-            participant("gia", "Gia", kind: "person", face: faces["gia"]),
+            participant("franco", memberName(.franco), kind: "person", isOwner: true, face: faces["franco"]),
+            participant("gia", memberName(.gia), kind: "person", face: faces["gia"]),
             participant("corey", "Corey", kind: "assistant", emoji: "\u{1F989}", face: faces["corey"]),
             participant("denise", "Denise", kind: "assistant", emoji: "\u{1F338}", face: faces["denise"]),
         ])

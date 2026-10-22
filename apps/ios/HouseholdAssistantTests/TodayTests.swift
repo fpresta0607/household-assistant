@@ -69,7 +69,7 @@ final class TodayTests: XCTestCase {
         {"day":"2026-10-15","at":1792064700000,"items":[
         {"start":"2026-10-15T07:45:00-05:00","title":"School drop off","detail":"Leave by 7:30, the roads are light"},
         {"start":"2026-10-15T09:00:00-05:00","title":"Dentist"},
-        {"start":"2026-10-15T12:30:00-05:00","title":"Lunch with Gia"},
+        {"start":"2026-10-15T12:30:00-05:00","title":"Lunch with Rosa"},
         {"start":"2026-10-15T17:45:00-05:00","title":"Soccer pickup"},
         {"start":"2026-10-16T08:00:00-05:00","title":"Soccer"}],
         "verse":{"text":"Be still, and know that I am God.","reference":"Psalm 46:10",
@@ -162,7 +162,7 @@ final class TodayTests: XCTestCase {
         XCTAssertEqual(glance.next?.title, "School drop off")
         XCTAssertEqual(glance.next?.time, "7:45")
         XCTAssertEqual(glance.next?.detail, "Leave by 7:30, the roads are light")
-        XCTAssertEqual(glance.more.map(\.title), ["Dentist", "Lunch with Gia"])
+        XCTAssertEqual(glance.more.map(\.title), ["Dentist", "Lunch with Rosa"])
         XCTAssertEqual(glance.more.map(\.time), ["9:00", "12:30"])
         XCTAssertEqual(glance.verse?.reference, "Psalm 46:10")
     }
@@ -174,7 +174,7 @@ final class TodayTests: XCTestCase {
 
         // Assert
         XCTAssertEqual(under.next?.title, "Dentist")
-        XCTAssertEqual(after.next?.title, "Lunch with Gia", "a quarter of an hour in, it is no longer next")
+        XCTAssertEqual(after.next?.title, "Lunch with Rosa", "a quarter of an hour in, it is no longer next")
         XCTAssertEqual(after.more.map(\.title), ["Soccer pickup", "Soccer"])
     }
 
@@ -251,7 +251,7 @@ final class TodayTests: XCTestCase {
         let lines = TodayGlance.lines(of: try card(), at: at(10, 0), calendar: calendar)
 
         // Assert
-        XCTAssertEqual(lines.map(\.title), ["School drop off", "Dentist", "Lunch with Gia", "Soccer pickup", "Soccer"])
+        XCTAssertEqual(lines.map(\.title), ["School drop off", "Dentist", "Lunch with Rosa", "Soccer pickup", "Soccer"])
         XCTAssertEqual(lines.map(\.isPast), [true, true, false, false, false])
     }
 

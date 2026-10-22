@@ -5,12 +5,12 @@
 // settings a real pairing keeps.
 //
 // The link comes up the way a gateway's does, then a short scene plays the way the
-// approved mockups move: Denise types on the family room's pin and answers, Franco
-// replies, Gia's heart pops on his reply and she reads it, then Franco asks Corey what
+// approved mockups move: Denise types on the family room's pin and answers, Leo
+// replies, Rosa's heart pops on his reply and she reads it, then Leo asks Corey what
 // is on tonight and the answer streams in with its follow-ups.
 //
 // Launched with `-StewardMotionDemo YES` as well, it plays the motion film's scene
-// instead (MotionDemoTests): nothing happens until Franco opens his own thread, and then
+// instead (MotionDemoTests): nothing happens until Leo opens his own thread, and then
 // Corey streams in tonight's plan with its card and sends a picture, the same every run.
 
 import Foundation
@@ -19,7 +19,7 @@ import Foundation
 final class DemoGateway: GatewayTransport {
     static let launchArgument = "StewardDemo"
     static let motionArgument = "StewardMotionDemo"
-    /// With `-StewardLongThread YES` as well, Franco's own thread holds 150 older messages,
+    /// With `-StewardLongThread YES` as well, Leo's own thread holds 150 older messages,
     /// and every message he sends there is answered at length, streamed word by word: the
     /// thread the hitch tests measure (ScrollHitchTests).
     static let longThreadArgument = "StewardLongThread"
@@ -29,13 +29,13 @@ final class DemoGateway: GatewayTransport {
     /// so the threads open from what the run before kept (ChatSpeedTests).
     static let keepThreadsArgument = "StewardKeepThreads"
     static let offlineArgument = "StewardOffline"
-    /// With `-StewardNewRowsControl <name>`, Franco's own thread holds 150 older messages,
+    /// With `-StewardNewRowsControl <name>`, Leo's own thread holds 150 older messages,
     /// and each kind of row that joins its bottom arrives on a UI test's cue `<name>.<kind>`
     /// (NewRowsLandInPlaceTests): Corey typing, a reply streaming in, a calendar card, and a
     /// photo kept with no size, whose shape is known only once its picture is; a reply
     /// taller than the screen (ReplyArrivesWholeTests); and three tools done in a blink
     /// before a short reply (ToolStepsHoldTests). Each posts `<name>.<kind>.done` once all
-    /// of it has arrived. What Franco sends there is kept a moment later, as a gateway over
+    /// of it has arrived. What Leo sends there is kept a moment later, as a gateway over
     /// the network keeps it (SentMessageLandsSmoothlyTests).
     static let newRowsControlArgument = "StewardNewRowsControl"
     private static let newRowKinds = ["typing", "stream", "card", "photo", "longReply", "steps"]
@@ -45,7 +45,7 @@ final class DemoGateway: GatewayTransport {
     /// With `-StewardNetworkControl <name>`, the demo's link is cut on a UI test's cue
     /// `<name>.cut`, and opens again only after `<name>.restore` (NetworkCutTests).
     static let networkControlArgument = "StewardNetworkControl"
-    /// With `-StewardSharingLocation YES`, Franco shares where he is with Corey and the
+    /// With `-StewardSharingLocation YES`, Leo shares where he is with Corey and the
     /// family room until midnight (LighterChatsTests).
     static let sharingLocationArgument = "StewardSharingLocation"
     /// With `-StewardDemoClock HH:MM`, the demo household lives as if the app had started at
@@ -96,7 +96,7 @@ final class DemoGateway: GatewayTransport {
     private var inbox: [String] = []
     private var waiting: CheckedContinuation<String, Error>?
     private var seq = 0
-    /// Whether Franco has opened his own thread, which the app says by marking it read.
+    /// Whether Leo has opened his own thread, which the app says by marking it read.
     private var hasOpenedDirect = false
     /// Whether a UI test has cut the link, which opens again only once it is restored.
     private var isCut = false
@@ -353,7 +353,7 @@ final class DemoGateway: GatewayTransport {
         typing(DemoRoom.assistant, in: .direct, active: true)
         await pause(0.6)
         let runId = "demo-run-" + UUID().uuidString.lowercased()
-        let reply = DemoFlingThread.isRequested ? DemoFlingThread.reply(to: asked) : "Here is what I found.\n\n- **Morning:** standup at 9, then the school run at 10:15.\n- **Afternoon:** lunch with Gia at 12:30 and the dentist at 3:30.\n- **Evening:** soccer pickup at 5:45, dinner at home at 6:30.\n\nTraffic should be light all day, and the weather stays dry until late evening, when a little rain moves in. I can set reminders for any of these, move something, or tell Gia. That was your question \(asked)."
+        let reply = DemoFlingThread.isRequested ? DemoFlingThread.reply(to: asked) : "Here is what I found.\n\n- **Morning:** standup at 9, then the school run at 10:15.\n- **Afternoon:** lunch with Rosa at 12:30 and the dentist at 3:30.\n- **Evening:** soccer pickup at 5:45, dinner at home at 6:30.\n\nTraffic should be light all day, and the weather stays dry until late evening, when a little rain moves in. I can set reminders for any of these, move something, or tell Rosa. That was your question \(asked)."
         if Self.isThreadLayoutRequested {
             // The UI test advances the reply only after measuring each incomplete stage.
             threadLayoutReply = (
@@ -393,7 +393,7 @@ final class DemoGateway: GatewayTransport {
         }
     }
 
-    /// One row joining the bottom of Franco's own thread on a UI test's cue, and then
+    /// One row joining the bottom of Leo's own thread on a UI test's cue, and then
     /// `<control>.<kind>.done` once all of it has arrived and its picture with it.
     private func addNewRow(_ kind: String) async {
         let directKey = DemoRoom.sessionKeys[.direct] ?? ""
@@ -459,7 +459,7 @@ final class DemoGateway: GatewayTransport {
 
     /// The reply that streams in on a test's cue, long enough to grow over several lines.
     private static let newRowReply = "Here is the day.\n\n- **Morning:** school run at 7:45, then the dentist at 9.\n"
-        + "- **Afternoon:** lunch with Gia at 12:30.\n- **Evening:** soccer pickup at 5:45 and dinner at home at 6:30.\n\n"
+        + "- **Afternoon:** lunch with Rosa at 12:30.\n- **Evening:** soccer pickup at 5:45 and dinner at home at 6:30.\n\n"
         + "The weather stays dry until late, and traffic should be light. That is the whole plan for today."
 
     /// A reply taller than the screen, as a morning's reading is, streamed in three words at a time.
@@ -586,8 +586,8 @@ final class DemoGateway: GatewayTransport {
         let runId = "demo-run-" + UUID().uuidString.lowercased()
         typing(DemoRoom.assistant, in: .direct, active: true)
         await pause(1.0)
-        let followups = #"{"type":"followups","items":[{"text":"Remind me at 3:45","icon":"reminder"},{"text":"Text Gia"},{"text":"Add movie night","icon":"calendar"}]}"#
-        let reply = "**Tonight**\n- 4:10 PM Gia lands\n- 6:30 PM Dinner at home\n- 8:00 PM Movie night\n\n"
+        let followups = #"{"type":"followups","items":[{"text":"Remind me at 3:45","icon":"reminder"},{"text":"Text Rosa"},{"text":"Add movie night","icon":"calendar"}]}"#
+        let reply = "**Tonight**\n- 4:10 PM Rosa lands\n- 6:30 PM Dinner at home\n- 8:00 PM Movie night\n\n"
             + "Want a reminder to leave at 3:45?\n\n```steward-card\n\(followups)\n```"
         var shown = ""
         for word in reply.split(separator: " ", omittingEmptySubsequences: false) {
@@ -602,7 +602,7 @@ final class DemoGateway: GatewayTransport {
         changed()
     }
 
-    /// The motion film's scene. Once Franco opens his own thread, Corey types, streams in
+    /// The motion film's scene. Once Leo opens his own thread, Corey types, streams in
     /// tonight's plan with dinner as a card, keeps it with the chip saying he put dinner on
     /// the calendar, and then sends a picture of the sunset, which is read from the gateway
     /// the way any new picture is.
@@ -616,7 +616,7 @@ final class DemoGateway: GatewayTransport {
         typing(DemoRoom.assistant, in: .direct, active: true)
         await pause(0.9)
         let runId = "demo-run-" + UUID().uuidString.lowercased()
-        let reply = "Tonight is easy. Gia lands at 4:10, and dinner is at home:\n\n" + Self.dinnerCard(at: dinner)
+        let reply = "Tonight is easy. Rosa lands at 4:10, and dinner is at home:\n\n" + Self.dinnerCard(at: dinner)
         var isFirst = true
         for word in reply.split(separator: " ", omittingEmptySubsequences: false) {
             chat(runId: runId, sessionKey: directKey, state: "delta", delta: (isFirst ? "" : " ") + word)

@@ -8,6 +8,7 @@ struct AppleSignInWaitingView: View {
     let member: HouseholdMember
 
     @Environment(AppModel.self) private var model
+    @Environment(\.memberName) private var memberName
 
     /// Every five seconds for an hour, then the person taps to look again.
     private static let checks = 720
@@ -19,9 +20,9 @@ struct AppleSignInWaitingView: View {
             ProgressView()
                 .controlSize(.large)
                 .opacity(hasStoppedChecking ? 0 : 1)
-            Text("Waiting for Franco")
+            Text("Waiting for \(memberName(.franco))")
                 .font(.title.weight(.bold))
-            Text("Franco sees this iPhone in Steward AI on his own iPhone, under Settings. Once he lets it in, it joins as \(member.name) by itself.")
+            Text("\(memberName(.franco)) sees this iPhone in Steward AI on his own iPhone, under Settings. Once he lets it in, it joins as \(memberName(member)) by itself.")
                 .font(.body)
                 .foregroundStyle(Palette.secondaryText)
                 .multilineTextAlignment(.center)

@@ -8,9 +8,9 @@ import XCTest
 final class SpeakQueueTests: XCTestCase {
     func testTheFirstSentenceAndTheNextAreFetchedAtOnce() {
         var queue = SpeakQueue()
-        XCTAssertEqual(queue.add(["Standup at 9.", "Then lunch with Gia.", "Then the dentist."]), [
+        XCTAssertEqual(queue.add(["Standup at 9.", "Then lunch with Rosa.", "Then the dentist."]), [
             .fetch(id: 0, text: "Standup at 9."),
-            .fetch(id: 1, text: "Then lunch with Gia."),
+            .fetch(id: 1, text: "Then lunch with Rosa."),
         ])
     }
 

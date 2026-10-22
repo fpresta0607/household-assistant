@@ -598,14 +598,14 @@ final class SettingsTests: XCTestCase {
     func testARefusalSpringsBackAndSaysWhyInOnePlainLine() async throws {
         let gateway = Gateway()
         let model = try await loaded(gateway)
-        gateway.answers["household-app.settings.change"] = { Self.refused($0, "Only Franco's iPhone can change Corey.") }
+        gateway.answers["household-app.settings.change"] = { Self.refused($0, "Only Leo's iPhone can change Corey.") }
 
         await model.change(.length, to: "detailed")
 
         XCTAssertEqual(model.length, .balanced, "springs back to what the gateway holds")
         XCTAssertFalse(model.isPending(.length))
-        XCTAssertEqual(model.refusal, SettingsRefusal(field: .length, reason: "Only Franco's iPhone can change Corey."))
-        XCTAssertEqual(model.refusal(for: [.length, .name]), "Only Franco's iPhone can change Corey.")
+        XCTAssertEqual(model.refusal, SettingsRefusal(field: .length, reason: "Only Leo's iPhone can change Corey."))
+        XCTAssertEqual(model.refusal(for: [.length, .name]), "Only Leo's iPhone can change Corey.")
         XCTAssertNil(model.refusal(for: [.tone]))
 
         gateway.answers["household-app.settings.change"] = { Self.ok($0, Self.settings()) }

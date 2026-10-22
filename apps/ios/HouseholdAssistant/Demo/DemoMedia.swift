@@ -181,7 +181,7 @@ enum DemoMedia {
         return image.jpegData(compressionQuality: 0.8) ?? Data()
     }
 
-    /// The picture on the recipe page Gia links to: a bowl of green pasta.
+    /// The picture on the recipe page Rosa links to: a bowl of green pasta.
     static func pestoPicture() -> UIImage {
         let size = CGSize(width: 600, height: 315)
         let format = UIGraphicsImageRendererFormat()

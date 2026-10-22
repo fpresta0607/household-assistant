@@ -35,7 +35,7 @@ final class MotionDemoTests: XCTestCase {
 
         // Corey's thread zooms out of his face, and his answer arrives: it rises with a
         // glimmer along its rim, then its card and a picture come into focus. The picture
-        // is the thread's only one, and Chats' "Photo from Gia" is behind it.
+        // is the thread's only one, and Chats' "Photo from Rosa" is behind it.
         corey.tap()
         let picture = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS %@ AND NOT (label CONTAINS %@)", "Photo", "from"))

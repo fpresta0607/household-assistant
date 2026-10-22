@@ -85,12 +85,12 @@ final class FamilyLookTests: XCTestCase {
     func testEachChangeSaysWhatItChangedAndWho() {
         // Arrange
         let said: [(change: FamilyLookChange, words: String)] = [
-            (.photo, "Gia changed the group photo"),
-            (.color(Self.white), "Gia changed the group color"),
-            (.color(nil), "Gia set the group color back to white"),
-            (.appearance(.auto, background: nil), "Gia set the group's appearance to Auto"),
-            (.appearance(.custom, background: nil), "Gia set the group's appearance to Custom"),
-            (.appearance(.custom, background: .night), "Gia changed the group's background to Night"),
+            (.photo, "Rosa changed the group photo"),
+            (.color(Self.white), "Rosa changed the group color"),
+            (.color(nil), "Rosa set the group color back to white"),
+            (.appearance(.auto, background: nil), "Rosa set the group's appearance to Auto"),
+            (.appearance(.custom, background: nil), "Rosa set the group's appearance to Custom"),
+            (.appearance(.custom, background: .night), "Rosa changed the group's background to Night"),
         ]
 
         for (change, words) in said {
@@ -98,7 +98,7 @@ final class FamilyLookTests: XCTestCase {
             let line = FamilyLookLine(id: "look", author: "gia", sentAt: Date(), rev: 1, change: change)
 
             // Assert
-            XCTAssertEqual(line.words(by: "Gia"), words)
+            XCTAssertEqual(line.words(by: "Rosa"), words)
         }
     }
 

@@ -35,7 +35,7 @@ final class CartCardTests: XCTestCase {
         "```steward-card\n{\"type\":\"cart\",\"id\":\"household\",\"items\":[\(items)],\"skill\":\"lists\"}\n```"
     }
 
-    private static let candles = #"{"id":"ci-90ad3e44","name":"Birthday candles","quantity":1,"by":"Corey","for":"Franco"}"#
+    private static let candles = #"{"id":"ci-90ad3e44","name":"Birthday candles","quantity":1,"by":"Corey","for":"Leo"}"#
 
     // MARK: - The cart
 
@@ -52,13 +52,13 @@ final class CartCardTests: XCTestCase {
                     name: "Paper towels, 12 rolls",
                     quantity: 1,
                     by: "Denise",
-                    forPerson: "Gia",
+                    forPerson: "Rosa",
                     url: URL(string: "https://www.amazon.com/dp/B07XYZ1234"),
                     image: URL(string: "https://m.media-amazon.com/images/I/71example.jpg")
                 ),
-                CartCard.Item(id: "ci-1b84d0f6", name: "Dish soap, 3 pack", quantity: 1, by: "Denise", forPerson: "Gia", url: URL(string: "https://www.amazon.com/dp/B08ABC5678"), image: nil),
-                CartCard.Item(id: "ci-c2e95a17", name: "Coffee filters #4", quantity: 2, by: "Corey", forPerson: "Franco", url: URL(string: "https://www.amazon.com/dp/B000DEF901"), image: nil),
-                CartCard.Item(id: "ci-90ad3e44", name: "Birthday candles", quantity: 1, by: "Corey", forPerson: "Franco", url: nil, image: nil),
+                CartCard.Item(id: "ci-1b84d0f6", name: "Dish soap, 3 pack", quantity: 1, by: "Denise", forPerson: "Rosa", url: URL(string: "https://www.amazon.com/dp/B08ABC5678"), image: nil),
+                CartCard.Item(id: "ci-c2e95a17", name: "Coffee filters #4", quantity: 2, by: "Corey", forPerson: "Leo", url: URL(string: "https://www.amazon.com/dp/B000DEF901"), image: nil),
+                CartCard.Item(id: "ci-90ad3e44", name: "Birthday candles", quantity: 1, by: "Corey", forPerson: "Leo", url: nil, image: nil),
             ],
             checkout: URL(string: "https://www.amazon.com/gp/aws/cart/add.html?ASIN.1=B07XYZ1234&Quantity.1=1&ASIN.2=B08ABC5678&Quantity.2=1&ASIN.3=B000DEF901&Quantity.3=2")
         )))
@@ -74,11 +74,11 @@ final class CartCardTests: XCTestCase {
     func testACartWithALinkThatIsNotHttpsOrAnItemMissingWhatItNeedsIsShownAsItsJSON() {
         let cards = [
             #"{"type":"cart","id":"household","items":[],"checkout":"http://www.amazon.com/gp/aws/cart/add.html"}"#,
-            #"{"type":"cart","id":"household","items":[{"id":"ci-1","name":"Soap","quantity":1,"by":"Denise","for":"Gia","url":"amazon://dp/B08ABC5678"}]}"#,
-            #"{"type":"cart","id":"household","items":[{"id":"ci-1","name":"Soap","quantity":1,"by":"Denise","for":"Gia","image":"http://m.media-amazon.com/soap.jpg"}]}"#,
-            #"{"type":"cart","id":"household","items":[{"id":"ci-1","name":"Soap","quantity":0,"by":"Denise","for":"Gia"}]}"#,
-            #"{"type":"cart","id":"household","items":[{"id":"ci-1","name":"","quantity":1,"by":"Denise","for":"Gia"}]}"#,
-            #"{"type":"cart","id":"household","items":[{"id":"ci-1","name":"Soap","quantity":1,"for":"Gia"}]}"#,
+            #"{"type":"cart","id":"household","items":[{"id":"ci-1","name":"Soap","quantity":1,"by":"Denise","for":"Rosa","url":"amazon://dp/B08ABC5678"}]}"#,
+            #"{"type":"cart","id":"household","items":[{"id":"ci-1","name":"Soap","quantity":1,"by":"Denise","for":"Rosa","image":"http://m.media-amazon.com/soap.jpg"}]}"#,
+            #"{"type":"cart","id":"household","items":[{"id":"ci-1","name":"Soap","quantity":0,"by":"Denise","for":"Rosa"}]}"#,
+            #"{"type":"cart","id":"household","items":[{"id":"ci-1","name":"","quantity":1,"by":"Denise","for":"Rosa"}]}"#,
+            #"{"type":"cart","id":"household","items":[{"id":"ci-1","name":"Soap","quantity":1,"for":"Rosa"}]}"#,
             #"{"type":"cart","id":"","items":[]}"#,
         ]
         for json in cards {
@@ -93,10 +93,10 @@ final class CartCardTests: XCTestCase {
         Added candles.
 
         Household cart
-        1 Paper towels, 12 rolls, for Gia, added by Denise
-        1 Dish soap, 3 pack, for Gia, added by Denise
-        2 Coffee filters #4, for Franco, added by Corey
-        1 Birthday candles, for Franco, added by Corey
+        1 Paper towels, 12 rolls, for Rosa, added by Denise
+        1 Dish soap, 3 pack, for Rosa, added by Denise
+        2 Coffee filters #4, for Leo, added by Corey
+        1 Birthday candles, for Leo, added by Corey
         """)
     }
 

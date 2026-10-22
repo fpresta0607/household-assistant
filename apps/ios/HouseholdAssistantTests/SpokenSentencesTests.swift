@@ -31,14 +31,14 @@ final class SpokenSentencesTests: XCTestCase {
         XCTAssertEqual(sentences.take(from: "Standup at 9. Then lunch", .arriving), ["Standup at 9."])
         XCTAssertEqual(sentences.take(from: "Standup at 9. Then lunch", .arriving), [])
         XCTAssertEqual(
-            sentences.take(from: "Standup at 9. Then lunch with Gia at 12:30. Want a", .arriving),
-            ["Then lunch with Gia at 12:30."]
+            sentences.take(from: "Standup at 9. Then lunch with Rosa at 12:30. Want a", .arriving),
+            ["Then lunch with Rosa at 12:30."]
         )
         XCTAssertEqual(
-            sentences.take(from: "Standup at 9. Then lunch with Gia at 12:30. Want a reminder?", .finished),
+            sentences.take(from: "Standup at 9. Then lunch with Rosa at 12:30. Want a reminder?", .finished),
             ["Want a reminder?"]
         )
-        XCTAssertEqual(sentences.take(from: "Standup at 9. Then lunch with Gia at 12:30. Want a reminder?", .finished), [])
+        XCTAssertEqual(sentences.take(from: "Standup at 9. Then lunch with Rosa at 12:30. Want a reminder?", .finished), [])
     }
 
     func testOnlyACertainEndEndsASentenceWhileTheReplyArrives() {
@@ -78,7 +78,7 @@ final class SpokenSentencesTests: XCTestCase {
         var sentences = SpokenSentences()
         let reply = """
             **Tonight**
-            - 16:10 Gia lands
+            - 16:10 Rosa lands
             * 18:30 Dinner *at home*
             1. Bring the [slides](https://example.com/slides)
             2) Check `the` ~~old~~ plan
@@ -89,7 +89,7 @@ final class SpokenSentencesTests: XCTestCase {
             """
         XCTAssertEqual(sentences.take(from: reply, .finished), [
             "Tonight",
-            "16:10 Gia lands",
+            "16:10 Rosa lands",
             "18:30 Dinner at home",
             "Bring the slides",
             "Check the old plan",
@@ -126,8 +126,8 @@ final class SpokenSentencesTests: XCTestCase {
     func testEmojiAreNotReadOutByName() {
         var sentences = SpokenSentences()
         XCTAssertEqual(
-            sentences.take(from: "Done \u{1F9B7}. Gia lands at 4:10 \u{2708}\u{FE0F}\u{2764}\u{FE0F}! \u{1F44D}\u{1F3FD}", .finished),
-            ["Done.", "Gia lands at 4:10!"]
+            sentences.take(from: "Done \u{1F9B7}. Rosa lands at 4:10 \u{2708}\u{FE0F}\u{2764}\u{FE0F}! \u{1F44D}\u{1F3FD}", .finished),
+            ["Done.", "Rosa lands at 4:10!"]
         )
     }
 

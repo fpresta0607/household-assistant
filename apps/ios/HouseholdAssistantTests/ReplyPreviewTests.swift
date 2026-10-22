@@ -20,10 +20,10 @@ final class ReplyPreviewTests: XCTestCase {
     func testAnAssistantsCardReadsAsItsLinesWithoutJSON() {
         // Arrange
         let message = """
-        Here is a text for Gia.
+        Here is a text for Rosa.
 
         ```steward-card
-        {"type":"message","to":"Gia","text":"Running late."}
+        {"type":"message","to":"Rosa","text":"Running late."}
         ```
         """
 
@@ -31,7 +31,7 @@ final class ReplyPreviewTests: XCTestCase {
         let preview = String(ReplyPreview.text(of: message, isAssistant: true).characters)
 
         // Assert
-        XCTAssertEqual(preview, "Here is a text for Gia.\n\nTo Gia: Running late.")
+        XCTAssertEqual(preview, "Here is a text for Rosa.\n\nTo Rosa: Running late.")
     }
 
     func testAPersonsPlainWordsStayAsWritten() {

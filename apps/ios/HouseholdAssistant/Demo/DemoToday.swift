@@ -32,7 +32,7 @@ enum DemoToday {
             "at": .number((now.timeIntervalSince1970 * 1000).rounded()),
             "items": .array([
                 item(dentist, "Dentist", detail: "Leave by \(leave), the roads are light"),
-                item(base.addingTimeInterval(3 * 3600), "Lunch with Gia"),
+                item(base.addingTimeInterval(3 * 3600), "Lunch with Rosa"),
                 item(base.addingTimeInterval(5 * 3600), "Soccer pickup"),
                 item(soccer, "Soccer"),
             ].sorted { ($0["start"]?.stringValue ?? "") < ($1["start"]?.stringValue ?? "") }),

@@ -83,7 +83,7 @@ final class MapsTests: XCTestCase {
         return calendar
     }()
 
-    /// Franco on Maple Street, `secondsAgo` before the clock, `north` metres further on.
+    /// Leo on Maple Street, `secondsAgo` before the clock, `north` metres further on.
     private func fix(north metres: Double = 0, accuracy: Double = 12, secondsAgo: TimeInterval = 0) -> LocationFix {
         LocationFix(latitude: 39.768403 + metres / 111_195, longitude: -86.158068, accuracy: accuracy, at: clock - secondsAgo)
     }
@@ -367,7 +367,7 @@ final class MapsTests: XCTestCase {
 
     func testAPlaceReminderCardReadsWhatWhenAndWhere() async throws {
         let trash = try card(#"{"type":"place-reminder","text":"Take the trash out","place":{"label":"home","latitude":39.7684,"longitude":-86.1581},"when":"arrive"}"#)
-        let work = try card(#"{"type":"place-reminder","text":"Tell Franco","place":{"label":"work","latitude":39.7817,"longitude":-86.1478,"radius":200},"when":"leave","for":"Gia"}"#)
+        let work = try card(#"{"type":"place-reminder","text":"Tell Leo","place":{"label":"work","latitude":39.7817,"longitude":-86.1478,"radius":200},"when":"leave","for":"Rosa"}"#)
 
         XCTAssertEqual(trash, .placeReminder(PlaceReminderCard(
             text: "Take the trash out",
@@ -379,7 +379,7 @@ final class MapsTests: XCTestCase {
             return XCTFail("not a place reminder")
         }
         XCTAssertEqual(leaving.place.radius, 200)
-        XCTAssertEqual(leaving.for, "Gia")
+        XCTAssertEqual(leaving.for, "Rosa")
         XCTAssertTrue(isCode(#"{"type":"place-reminder","text":"x","place":{"label":"home","latitude":1,"longitude":2,"radius":20},"when":"arrive"}"#), "too small to watch")
         XCTAssertTrue(isCode(#"{"type":"place-reminder","text":"x","place":{"label":"home","latitude":1,"longitude":2},"when":"pass"}"#))
         XCTAssertTrue(isCode(#"{"type":"place-reminder","text":" ","place":{"label":"home","latitude":1,"longitude":2},"when":"arrive"}"#))
@@ -387,8 +387,8 @@ final class MapsTests: XCTestCase {
     }
 
     private static let participants = [
-        RoomParticipant(id: "franco", name: "Franco", kind: .person, isOwner: true),
-        RoomParticipant(id: "gia", name: "Gia", kind: .person, isOwner: false),
+        RoomParticipant(id: "franco", name: "Leo", kind: .person, isOwner: true),
+        RoomParticipant(id: "gia", name: "Rosa", kind: .person, isOwner: false),
         RoomParticipant(id: "corey", name: "Corey", kind: .assistant, isOwner: false),
         RoomParticipant(id: "denise", name: "Denise", kind: .assistant, isOwner: false),
     ]
@@ -417,20 +417,20 @@ final class MapsTests: XCTestCase {
     }
 
     func testAReminderByPlaceShowsWhatThisPhoneMayDoWithIt() {
-        // Franco's own, from Corey: set it, watched, gone off.
+        // Leo's own, from Corey: set it, watched, gone off.
         XCTAssertEqual(state(for: nil, by: "corey"), .readyToSet)
         XCTAssertEqual(state(for: "franco", by: "corey", isWatching: true), .watching)
-        XCTAssertEqual(state(for: "Franco", by: "corey", hasFired: true), .done)
-        // Denise asking to watch Franco: his yes or no, on his own phone only.
-        XCTAssertEqual(state(for: "Franco", by: "denise"), .askingYou(asker: "Denise"))
+        XCTAssertEqual(state(for: "Leo", by: "corey", hasFired: true), .done)
+        // Denise asking to watch Leo: his yes or no, on his own phone only.
+        XCTAssertEqual(state(for: "Leo", by: "denise"), .askingYou(asker: "Denise"))
         XCTAssertEqual(state(for: "franco", by: "denise", answers: ["franco": .yes]), .youSaidYes(asker: "Denise"))
         XCTAssertEqual(state(for: "FRANCO", by: "denise", answers: ["franco": .no, "gia": .yes]), .youSaidNo(asker: "Denise"))
-        // Corey asking to watch Gia: her answer, as her phone gave it.
-        XCTAssertEqual(state(for: "Gia", by: "corey"), .waitingFor("Gia"))
-        XCTAssertEqual(state(for: "gia", by: "corey", answers: ["gia": .yes]), .theySaidYes("Gia"))
-        XCTAssertEqual(state(for: "Gia", by: "corey", answers: ["gia": .no, "franco": .yes]), .theySaidNo("Gia"))
-        // Denise's reminder for Gia herself, and one for somebody nobody knows: only shown.
-        XCTAssertEqual(state(for: nil, by: "denise"), .theirs("Gia"))
+        // Corey asking to watch Rosa: her answer, as her phone gave it.
+        XCTAssertEqual(state(for: "Rosa", by: "corey"), .waitingFor("Rosa"))
+        XCTAssertEqual(state(for: "gia", by: "corey", answers: ["gia": .yes]), .theySaidYes("Rosa"))
+        XCTAssertEqual(state(for: "Rosa", by: "corey", answers: ["gia": .no, "franco": .yes]), .theySaidNo("Rosa"))
+        // Denise's reminder for Rosa herself, and one for somebody nobody knows: only shown.
+        XCTAssertEqual(state(for: nil, by: "denise"), .theirs("Rosa"))
         XCTAssertEqual(state(for: "Mom", by: "corey"), .theirs("Mom"))
     }
 
@@ -463,7 +463,7 @@ final class MapsTests: XCTestCase {
         let store = Store()
         let reminders = PlaceReminders(store: store)
         let home = PlaceWatch(id: "a-1", text: "Take the trash out", label: "home", center: MapPoint(latitude: 1, longitude: 2), radius: 150, when: .arrive, repliesInRoom: false)
-        let work = PlaceWatch(id: "a-2", text: "Tell Franco", label: "work", center: MapPoint(latitude: 1, longitude: 2), radius: 200, when: .leave, repliesInRoom: true)
+        let work = PlaceWatch(id: "a-2", text: "Tell Leo", label: "work", center: MapPoint(latitude: 1, longitude: 2), radius: 200, when: .leave, repliesInRoom: true)
         reminders.watch(home)
         reminders.watch(work)
 
@@ -479,7 +479,7 @@ final class MapsTests: XCTestCase {
 
     func testWhatAReminderSaysWhenItGoesOff() {
         let home = PlaceWatch(id: "a-1", text: "Take the trash out", label: "home", center: MapPoint(latitude: 1, longitude: 2), radius: 150, when: .arrive, repliesInRoom: false)
-        let work = PlaceWatch(id: "a-2", text: "Tell Franco", label: "work", center: MapPoint(latitude: 1, longitude: 2), radius: 200, when: .leave, repliesInRoom: true)
+        let work = PlaceWatch(id: "a-2", text: "Tell Leo", label: "work", center: MapPoint(latitude: 1, longitude: 2), radius: 200, when: .leave, repliesInRoom: true)
 
         XCTAssertEqual(home.happened, "Arrived at home")
         XCTAssertEqual(work.happened, "Left work")

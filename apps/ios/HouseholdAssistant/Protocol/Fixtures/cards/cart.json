@@ -8,7 +8,7 @@
       "name": "Paper towels, 12 rolls",
       "quantity": 1,
       "by": "Denise",
-      "for": "Gia",
+      "for": "Rosa",
       "url": "https://www.amazon.com/dp/B07XYZ1234",
       "image": "https://m.media-amazon.com/images/I/71example.jpg"
     },
@@ -17,7 +17,7 @@
       "name": "Dish soap, 3 pack",
       "quantity": 1,
       "by": "Denise",
-      "for": "Gia",
+      "for": "Rosa",
       "url": "https://www.amazon.com/dp/B08ABC5678"
     },
     {
@@ -25,7 +25,7 @@
       "name": "Coffee filters #4",
       "quantity": 2,
       "by": "Corey",
-      "for": "Franco",
+      "for": "Leo",
       "url": "https://www.amazon.com/dp/B000DEF901"
     },
     {
@@ -33,7 +33,7 @@
       "name": "Birthday candles",
       "quantity": 1,
       "by": "Corey",
-      "for": "Franco"
+      "for": "Leo"
     }
   ],
   "checkout": "https://www.amazon.com/gp/aws/cart/add.html?ASIN.1=B07XYZ1234&Quantity.1=1&ASIN.2=B08ABC5678&Quantity.2=1&ASIN.3=B000DEF901&Quantity.3=2",

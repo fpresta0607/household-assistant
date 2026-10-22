@@ -41,7 +41,7 @@ final class CallPlacementTests: XCTestCase {
         XCTAssertFalse(placement.isThroughCallKit, "mute and end no longer go through iOS")
     }
 
-    /// A reset before the sound came used to end the call at once, the way Gia's ended 67 ms
+    /// A reset before the sound came used to end the call at once, the way Rosa's ended 67 ms
     /// after her tap on 17 October.
     func testAResetBeforeTheSoundCameCarriesTheCallOnInTheApp() {
         var placement = placed()

@@ -1,5 +1,5 @@
 #if DEBUG
-// Texts Corey drafted in Franco's own thread, for the UI tests of the Contacts connector and
+// Texts Corey drafted in Leo's own thread, for the UI tests of the Contacts connector and
 // the message card (ContactsAndTextsTests): one for Kate and one for Anna with an event,
 // people the Simulator's sample contacts have, and one for Zed, whom they do not. With it
 // the demo may read and ask for Contacts (AppModel's shouldAskForContacts), and the tests

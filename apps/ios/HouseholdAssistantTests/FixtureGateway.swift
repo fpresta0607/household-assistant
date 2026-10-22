@@ -4,7 +4,7 @@
 //
 // Each method the app calls is answered by one closure: the connect methods from the
 // captured fixtures, the household-app methods from `DemoRoom` with Corey's and
-// Denise's Telegram photos as their faces, as the mockups show them, its settings from
+// Denise's drawn faces (Fixtures.face) where the mockups show photos, its settings from
 // `DemoSettings` and Account's iPhones from `DemoPhones`, in the shape the plugin's
 // contract gives them. Replace an answer to change a state, or remove it to leave that
 // request hanging, which is how every "loading" state is reached.
@@ -68,7 +68,7 @@ final class FixtureGateway {
     ]
 
     /// The routes a phone signs in with Apple through, answered here so no screenshot
-    /// reaches a gateway: a nonce, and a sign-in still waiting for Franco.
+    /// reaches a gateway: a nonce, and a sign-in still waiting for Leo.
     static let applePost: AppleSignInGateway.Post = { url, _ in
         if url.lastPathComponent == "nonce" {
             return (200, Data(#"{"nonce":"fixture-nonce","expiresAtMs":4102444800000}"#.utf8))
@@ -95,7 +95,7 @@ final class FixtureGateway {
         longThread: Int = 0
     ) {
         let room = DemoRoom(isFinished: isSceneFinished, longThread: longThread)
-        // Corey and Denise wear their Telegram photos, as both gateways start them.
+        // Corey and Denise wear faces, as both gateways start them with their Telegram photos.
         for assistant in ["corey", "denise"] {
             guard let photo = try? Fixtures.face(assistant) else {
                 XCTFail("the fixtures have no face for \(assistant)")
@@ -134,13 +134,13 @@ final class FixtureGateway {
             let isSettingUp = request.params["auth"]?["bootstrapToken"] != nil
             return try Fixtures.text(isSettingUp ? "hello-ok-bootstrap" : "hello-ok-device-token", answering: request.id)
         }
-        // The captured identity is Denise's, and the demo room is Franco's phone with Corey.
+        // The captured identity is Denise's, and the demo room is Leo's phone with Corey.
         answers["agent.identity.get"] = { request in
             try Fixtures.text("agent-identity-response", answering: request.id) { frame in
                 frame["payload"] = ["agentId": "main", "name": "Corey", "emoji": "\u{1F989}"]
             }
         }
-        // Nobody waits for Franco unless a test says so.
+        // Nobody waits for Leo unless a test says so.
         answers["household-app.apple.waiting"] = { try Self.ok($0, .object(["waiting": .array([])])) }
         // Corey has written no Today card unless a test writes one.
         answers["household-app.today"] = { try Self.ok($0, .object(["today": .null])) }

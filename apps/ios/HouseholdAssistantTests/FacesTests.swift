@@ -58,7 +58,7 @@ final class FacesTests: XCTestCase {
     private static let face = #"{"id":"\#(hash)","kind":"photo","mime":"image/jpeg","bytes":2048,"width":512,"height":512}"#
 
     func testAParticipantsFaceIsReadWithTheParticipants() async throws {
-        let json = #"[{"id":"corey","name":"Corey","kind":"assistant","isOwner":false,"emoji":"🦉","avatar":\#(Self.face)},{"id":"gia","name":"Gia","kind":"person","isOwner":false}]"#
+        let json = #"[{"id":"corey","name":"Corey","kind":"assistant","isOwner":false,"emoji":"🦉","avatar":\#(Self.face)},{"id":"gia","name":"Rosa","kind":"person","isOwner":false}]"#
         let participants = try JSONDecoder().decode([RoomParticipant].self, from: Data(json.utf8))
         XCTAssertEqual(participants[0].avatar?.id, Self.hash)
         XCTAssertEqual(participants[0].avatar?.kind, .photo)

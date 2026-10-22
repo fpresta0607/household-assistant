@@ -28,7 +28,7 @@ final class StewardCardTests: XCTestCase {
     // MARK: - Splitting
 
     func testAPlainReplyIsOneMarkdownSegment() {
-        let text = "**Tomorrow**\n- 9:00 Team standup\n- 12:30 Lunch with Gia"
+        let text = "**Tomorrow**\n- 9:00 Team standup\n- 12:30 Lunch with Rosa"
 
         XCTAssertEqual(segments(text), [.markdown(text)])
         XCTAssertEqual(segments(text, isStreaming: true), [.markdown(text)])
@@ -329,7 +329,7 @@ final class StewardCardTests: XCTestCase {
 
     func testAnEventReadsItsTimes() throws {
         let movie = try card(#"{"type":"event","title":"Movie night","start":"2026-10-16T20:00:00-04:00","end":"2026-10-16T22:00:00-04:00","location":"Living room","skill":"calendar"}"#)
-        let dentist = try card(#"{"type":"event","title":"Dentist, Gia","start":"2026-10-15T19:30:00.000Z"}"#)
+        let dentist = try card(#"{"type":"event","title":"Dentist, Rosa","start":"2026-10-15T19:30:00.000Z"}"#)
 
         let movieNight = EventCard(
             title: "Movie night",
@@ -349,14 +349,14 @@ final class StewardCardTests: XCTestCase {
     }
 
     func testAnEmailReadsLikeAnEmail() throws {
-        let school = try card(#"{"type":"email","from":"Maple Elementary <office@maple.example>","to":["Gia","Franco"],"subject":"Field trip on Friday","body":"The bus leaves at 9:00."}"#)
+        let school = try card(#"{"type":"email","from":"Maple Elementary <office@maple.example>","to":["Rosa","Leo"],"subject":"Field trip on Friday","body":"The bus leaves at 9:00."}"#)
         guard case .email(let email) = school.content else {
             return XCTFail("not an email: \(school)")
         }
 
         XCTAssertEqual(email.senderName, "Maple Elementary")
         XCTAssertEqual(email.senderAddress, "office@maple.example")
-        XCTAssertEqual(email.plainText, "From: Maple Elementary <office@maple.example>\nTo: Gia, Franco\nSubject: Field trip on Friday\n\nThe bus leaves at 9:00.")
+        XCTAssertEqual(email.plainText, "From: Maple Elementary <office@maple.example>\nTo: Rosa, Leo\nSubject: Field trip on Friday\n\nThe bus leaves at 9:00.")
         let reply = try XCTUnwrap(email.replyURL.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) })
         XCTAssertEqual(reply.scheme, "mailto")
         XCTAssertEqual(reply.path, "office@maple.example")
@@ -521,7 +521,7 @@ final class StewardCardTests: XCTestCase {
 
     func testAnAnswerWearsTheSkillOfItsFirstCardThatNamesOne() {
         let gate = block(#"{"type":"copy","text":"4821"}"#)
-        let dentist = block(#"{"type":"event","title":"Dentist, Gia","start":"2026-10-15T15:30:00-04:00","skill":"calendar"}"#)
+        let dentist = block(#"{"type":"event","title":"Dentist, Rosa","start":"2026-10-15T15:30:00-04:00","skill":"calendar"}"#)
         let beach = block(#"{"type":"checklist","id":"beach","items":[{"text":"Towels","done":false}],"skill":"lists"}"#)
 
         XCTAssertEqual(StewardCardParser.skill(in: "Thursday at 3:30.\n\(gate)\n\(dentist)\n\(beach)", isStreaming: false), .calendar)
@@ -559,19 +559,19 @@ final class StewardCardTests: XCTestCase {
 
     // MARK: - Follow-ups
 
-    private static let tonight = #"{"type":"followups","items":[{"text":"Remind me at 3:45","icon":"reminder"},{"text":"Text Gia"},{"text":"Add movie night","icon":"calendar"}]}"#
+    private static let tonight = #"{"type":"followups","items":[{"text":"Remind me at 3:45","icon":"reminder"},{"text":"Text Rosa"},{"text":"Add movie night","icon":"calendar"}]}"#
 
     func testFollowUpsAreOfferedUnderTheAnswerAndNotDrawnInIt() throws {
         let text = "Movie night is at 8.\n\n\(block(Self.tonight))"
 
         XCTAssertEqual(segments(text), [.markdown("Movie night is at 8.")])
         let offered = try XCTUnwrap(StewardCardParser.followups(in: text))
-        XCTAssertEqual(offered.items.map(\.text), ["Remind me at 3:45", "Text Gia", "Add movie night"])
+        XCTAssertEqual(offered.items.map(\.text), ["Remind me at 3:45", "Text Rosa", "Add movie night"])
         XCTAssertEqual(offered.items.map(\.symbol), ["bell", "sparkles", "calendar"])
     }
 
     func testEachFollowUpsIconHasItsSymbolAndAnyOtherIsASparkle() throws {
-        let json = #"{"type":"followups","items":[{"text":"Add milk","icon":"list"},{"text":"Text Gia","icon":"message"},{"text":"Look it up","icon":"search"}]}"#
+        let json = #"{"type":"followups","items":[{"text":"Add milk","icon":"list"},{"text":"Text Rosa","icon":"message"},{"text":"Look it up","icon":"search"}]}"#
         let offered = try XCTUnwrap(StewardCardParser.followups(in: block(json)))
 
         XCTAssertEqual(offered.items.map(\.symbol), ["checklist", "message", "magnifyingglass"])
@@ -605,7 +605,7 @@ final class StewardCardTests: XCTestCase {
 
         XCTAssertEqual(
             StewardCardParser.followups(in: "\(block(Self.tonight))\n\(block(later))")?.items.map(\.text),
-            ["Remind me at 3:45", "Text Gia", "Add movie night"]
+            ["Remind me at 3:45", "Text Rosa", "Add movie night"]
         )
     }
 
