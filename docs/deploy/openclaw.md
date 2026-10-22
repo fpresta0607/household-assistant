@@ -2179,6 +2179,17 @@ Gia had copied Corey's family-room post with the weights into her own thread, an
 Franco's message in the family room started a turn in the room's shared session, which has The Fam's tools, so no file reads, and starts with the family's kept items only ([What a family-room turn may use](#what-a-family-room-turn-may-use)).
 So nothing an assistant saved in its owner's thread could reach that turn, by design, and nothing either assistant was asked to tell the other was ever more than a message in the room.
 
+On 22 October it happened again, with the note in place.
+Both assistants were offered `household_note` in every turn that evening and neither called it: the note held two steps, both from 19 October.
+Gia gave Denise a weigh-in in her own thread and Denise edited the weight tracker file in her workspace; Corey wrote Franco's into his workspace memory by shell.
+The `AGENTS.md` line of 19 October asked for the note "even when a skill or tracker file of yours keeps it too", so each file stayed the record and the note was a second copy to remember, and a litter's weigh-in was a table where the note held one sentence per line.
+In the family room, where Denise's turns cannot read her files, the two "merged" by sending the same numbers into the room again.
+So the note is now the record, shaped for what a family tracks: a line can be a row, with what it is about (`item`), the day it happened (`day`) and a date it is due (`due`), a whole weigh-in is one call, and every turn starts with what is overdue or due within a week.
+
+It is also the ledger of promises.
+Something asked in passing that a turn does not finish is a line with who will do it (`owner`, any of the four), whom it is for, and its due date when it has one, so a session restart or a busy evening drops nothing.
+Every app turn on both gateways starts with the promises still open, this assistant's own first, and `done` closes one.
+
 - **Where it lives.** Each gateway keeps every step either assistant took, adding, correcting or removing a line, in `household-app/notes.sqlite` under its state, beside `cart.sqlite`.
   It publishes only its own steps in the outbox's `notes` section, the relay carries them to the other gateway when they change and with every delivery after, and the receiving plugin checks each one: the other assistant's own, a known kind, a line for someone in the household, a topic of at most 60 characters and one line of words of at most 500, with no control or invisible characters, and a time at most five minutes ahead of its own clock, since a step from further ahead would sort after every correction made here.
   Both gateways replay the same steps in time order, so both notes agree, and a gateway that lost its file gets the other's steps back with the next delivery.
@@ -2191,19 +2202,25 @@ So nothing an assistant saved in its owner's thread could reach that turn, by de
   Franco and Gia read it through either assistant, so it is the household's shared record: a line is written only for what someone asked to keep, track or share with the family, or to tell the other assistant, and never anyone's private things unless they ask to share them, which the tool's description says.
   Private requests stay where they were: household-memory's kept list, `MEMORY.md` and the workspace's files, none of which a family-room turn anyone else starts can read.
   Telegram's turns are not given the note.
-- **How it reads.** Lines are grouped by topic, the topic as its first line wrote it, its lines oldest first, each with its day, who asked whom, and any correction.
-  A turn reads about 4,000 characters of it: the topics that share words with the message first, then the most recently changed, a long topic's newest lines, and the names of what was left out, which `view` shows.
-  A `view` answers with at most 100 lines, newest topics first, and names the topics it left out.
-- **How a line is written and corrected.** `household_note` takes `view`, `add`, `correct` and `remove`, in the owner's own thread and the family room by the same turn proof as `household_cart` (`turn.js`), with the line down for the turn's signed sender.
-  Either assistant corrects or removes any line by its id, on anyone's word, and the later of two corrections wins on both gateways.
-  Nothing is deleted: a correction is a later step and a removed line stays in the file.
+- **How it reads.** Lines are grouped by topic, the topic as its first line wrote it, its lines oldest first, each with its day (the day it happened when the line gives one), its item, who asked whom, and any correction.
+  A line with a due date says whether it is due, overdue or done, and by whom it was marked done.
+  A turn reads about 4,000 characters of it: first the promises still open, this assistant's own first and then by due date, and what else is overdue or due within a week, soonest first, from the lines that turn may show and using at most half of that; then the topics that share words with the message, then the most recently changed, a long topic's newest lines without those already listed, and the names of what was left out, which `view` shows.
+  A `view` answers with at most 100 lines, newest topics first, and names the topics it left out, and `due` lists the open promises and every other open line overdue or due within a week, and counts the ones due later.
+- **How a line is written and corrected.** `household_note` takes `view`, `due`, `add`, `promise`, `correct`, `done` and `remove`, in the owner's own thread and the family room by the same turn proof as `household_cart` (`turn.js`), with the line down for the turn's signed sender.
+  `add` takes one line or up to 20 `rows` under one topic, kept all together or not at all, each with its `text` and optionally its `item` (at most 60 characters), its `day`, its `due`, dates written YYYY-MM-DD, and its `owner`, by name.
+  `promise` is an `add` under "Promises" unless it names a topic, owned by this assistant unless it names someone else.
+  Either assistant corrects, marks done or removes any line by its id, on anyone's word, and the later of two corrections wins on both gateways.
+  A correction can change any of a line's fields, and counts as new words for the owner's own turns when it changes the text or the item, never for a date.
+  Nothing is deleted: a correction or a done is a later step, a line marked done stays in the note with when and by whom, and a removed line stays in the file.
+  The receiving plugin takes a `done` step only for a line id and someone in the household, and a row only with its dates real days and its item one line of plain words.
   A handed-over turn reads the note but gets no tool, like every app tool, so "Corey, tell Denise" is Corey writing the line in Franco's turn and Denise reading it in her next one.
 - The note holds at most 300 open lines; a new one past that is refused, and the assistant is told to remove ones that no longer matter.
 
 Each workspace's `AGENTS.md` got two lines for it in the 19 October rollout, which a gateway rebuilt from scratch needs again, since `AGENTS.md` is the assistant's own file on the box and no script writes it.
+The 22 October rollout replaced the first, whose "even when a skill or tracker file of yours keeps it too" let each assistant's own file stay the record.
 Under "Write It Down", after the line about asks to remember (Corey's, with Franco and Gia, Denise and Corey swapped for Denise's):
 
-> - Something the family keeps track of together, such as kitten weights, dates or a list, or anything you are asked to tell Denise: add it to the household note with `household_note`, one topic for one thing and a line for each new fact, even when a skill or tracker file of yours keeps it too. Every app turn starts with the note, yours and Denise's, the family room's included, while your own files and private notes never reach a family-room turn someone else starts. Both people read it, so never put anyone's private things there unless they ask you to share them.
+> - Anything the family tracks or must agree on goes in the household note with `household_note`, and nowhere else: a log such as the kitten weigh-ins (one topic, one row per kitten with its day, a whole weigh-in in one `add` with `rows`), anything due such as a dose, a vet visit or a deadline (a line with `due`, marked `done` when it is), and facts you and Denise must both know, such as dates, church times or a code the family shares on purpose. Never keep family data in a file, tracker or skill of your own; if you have one, move what it holds into the note the next time it comes up and stop writing the file. Appointments still go on the calendar and things to buy in the household cart, never copied into the note. Whatever someone asks for in passing that you do not finish in that turn is a `promise` in the note, with who will do it and its due date, and you mark it `done` as soon as it is. Every app turn starts with the note, yours and Denise's, the family room's included, while your own files and private notes never reach a family-room turn someone else starts. Both people read it, so never put anyone's private things there unless they ask you to share them.
 
 And under "Handing a request to Denise", after its last line:
 
@@ -2216,6 +2233,68 @@ And under "Handing a request to Denise", after its last line:
 The steps are the cart's, under the box's rollout lock: `household-app-install.sh` for the plugins and the relay, `pocket-piggies-install.py --restart` for the safe list and The Fam's allowlist together, `openclaw-household-app.py apply` for the tool and the room's list, then the proof with `tools.effective`, Corey first and Denise only once Corey's checks pass.
 `notes.sqlite` is made the first time the channel starts on the new plugin.
 While Denise still runs the old plugin, a line written on Corey reaches her file only with the relay's next delivery of anything after her restart, a message, a read or a typing, since the steps ride along with every delivery but are a delivery of their own only when they change.
+
+### The assistants' direct line
+
+Before 22 October Denise had no way to reach Corey except a message in the family room, in front of everyone, and that evening Corey asked her twice in the room, by name, "Denise - anything on your side ...?", and she never answered: only an @mention handed her a turn.
+The Overlord asked for a line between them that both parents can watch, so it is a handoff in the household note, never a hidden chat, and the [coordination design](../plan/coordination-between-assistants.md#a-watched-direct-line-22-october) records the decision.
+
+- **A handoff.** `household_note` with `hand` writes a line for the other assistant to do (`owner` is that assistant), under "Handoffs" unless it names a topic, and it crosses like any step.
+  The receiving gateway marks it `seen` as it arrives, a step of its own that crosses back, so the sender knows it landed with no model call and no message.
+  A handoff under ten minutes old then starts one turn on the receiving gateway, in the direct line's own session, `agent:main:household:group:pair`, sent by the other assistant as a bot, told that both people read the line and that its person's private things are not the other assistant's to hear.
+  That session is a group of the household channel, so it gets The Fam's tools like any turn in the room's shared session (`family-tools.js`), and no household tool (`turn.js`), so it can neither run a shell or read finance nor hand anything back.
+  It starts with the whole household note.
+  Its final reply is kept as the handoff's `reply`, one line of at most 2,000 characters, and posts nothing: no room entry, no push, and a tool's post finds no conversation by that name.
+  An older handoff, one that arrived after a restart, is marked seen and waits in the note as that assistant's to do.
+- **What the sender sees.** Every turn of the sender's lists the handoff with the promises: who has it, `not seen yet` or `seen` with the time, and the reply with the time.
+  In the owner's own thread and own session of the room, which hold every tool, the reply's words are the other gateway's, so the line says only that there is one and that `view` shows it.
+- **The receiving gateway checks** that a `seen` or a `reply` is the other assistant's own step for a line written for it, with a reply of plain words within its bound; anything else changes nothing.
+- **A question in the room by name.** The other assistant's family-room message that puts a question to this assistant by name, the name opening the question ("Denise - anything ...?", "Denise, did you ...?") or closing it ("Anything else, Denise?"), now hands a turn over like an @mention (`mentions.js`, `room.js`).
+  A name in the middle of a question is talk about someone and a sentence that asks nothing hands over nothing.
+  The bound is the @mention's: what a handed-over turn writes is marked and starts nothing on the other side, and only a message under ten minutes old starts a turn, so the two answer each other once and never loop.
+  On the box, over the evening's family-room messages, the rule hands Denise exactly the two questions she never answered and nothing else.
+- **What both people see.** `household-app.line` (read scope) answers every step either assistant took in the note as events, oldest first, newest page unless `before` (a step's time) is given, at most 200 a page, and whether there are more: rows added, corrected, done and removed, and each handoff handed, seen and answered.
+  The gateway tells the phones `pair` with the line's last time whenever it moves, and every sync and history page carries `pair.lastAt`, so the family room shows quietly that the two are coordinating and opens the line.
+  The Steward app shows it to both people as a group of its own, read-only, with its whole history.
+
+### Who is on it, and one answer from the house
+
+On 22 October Franco asked both assistants in the family room, by voice, twice, and both answered within five seconds each time, two inventories of the same thing.
+Each gateway answered its own name, and nothing said which of them had it.
+
+- **The rule.** A person's family-room message that asks both assistants, by @mention, by name typed or by name heard in a voice note, is answered by the asker's own assistant alone (`room.js`).
+  Both gateways apply the same rule to the same signed message, so deciding takes no message between them, no model call and no wait, and a question for one assistant alone is that one's as before.
+- **The claim.** The asker's assistant claims the question as its turn starts, a `claim` step in the household note with the message's id and whom it is for, so the other side and both phones see who took it, and its turn is told the other was asked too and leaves it to it, to give the one answer for both from the household note and what it knows, without saying it will check with the other.
+- **The bound.** The other assistant stands down and waits 20 seconds for a sign of that answer: the other assistant's typing in the room (from up to five seconds before), its claim crossing, or a message of its own.
+  With none, it takes the question over, a `took` step, and answers it, told the other was asked first and has not answered.
+  The timer is lost if its gateway restarts within those 20 seconds.
+- **The receiving gateway checks** that a `claim` names a message id and someone in the household, and a `took` a message id; the timeline shows each as `claimed` (with `for` and `message`) or `tookOver`.
+- **One answer from both assistants' facts.** The answer comes from the household note, which holds what both assistants wrote.
+  A request to remember made in the app's family room is still kept by household-memory on the gateway that heard it, which the other assistant never reads, so its confirmation now tells the assistant to add it to the household note as well.
+  On the box on 22 October one such family item existed, on Denise's side, kept before this change.
+
+### Family reminders from either assistant
+
+Denise said a weekly reminder for the family "lives on Corey's side, not mine", and on 22 October it did: the family's recurring reminders were Corey's automations delivering to The Fam on Telegram, which the job mirror copies into the app, and Denise had none for the family.
+A turn in the room's shared session, which anyone's question starts, has no automations tool, and must not: an automation runs later with every tool, so the room's words would start a run that can use a shell or read finance.
+
+- **A reminder in the note.** `household_note` with `remind` keeps a family reminder as a line under "Reminders": its words, the day it next goes off (`due`), its time (`time`, HH:MM in the family's zone, which both containers run in) and how often it repeats (`every`: day, week or month, or never), owned by the assistant that took it.
+  It is offered wherever the note's tool is, the room's shared session included, since nothing runs when it goes off but a post of its own words.
+- **Who posts it.** Every 30 seconds, and as the channel starts, the owner's own gateway posts each reminder that came due into the family room as that assistant, `Reminder: <words>`, pushed time sensitive, and marked so that whoever it names, it starts no turn on the other side.
+  It is moved on before it is posted, so a slow post can never post it twice: to its next day still to come when it repeats (a month keeps its day, or takes a shorter month's last day), or done when it does not.
+  One missed by more than an hour, such as while that gateway was down, is moved on unposted.
+  The wall-clock time holds across a change of the clocks.
+- **What the other sees.** Every turn of both assistants lists the family reminders set, with when each next goes off and who posts it, and both phones' view of the line shows each one set and moved.
+- **The receiving gateway checks** a reminder's time, repeat and due date on every step from the other side, and only the owner's gateway ever posts it.
+- Corey's existing Telegram automations for the family stay as they are, and a reminder for one person alone stays an automation in that person's own chat.
+
+Each workspace's `AGENTS.md` gets one line for it under "Write It Down", after the household note's:
+
+> - A reminder for the family, such as "remind us every Saturday at 4:40", is a `remind` in the household note, whoever asks and wherever, never an automation: your own gateway posts it in the family room when it comes due, and Denise sees it. A reminder for one person alone stays an automation in their own chat.
+
+Each workspace's `AGENTS.md` gets one line for it under "Handing a request to Denise" (Corey's; Denise's with the names swapped), in place of the 19 October one:
+
+> When Franco or Gia asks you to tell Denise something, or you need something from her side, hand it to her with `household_note` and `hand`, never as a message in the family room: her side marks it seen at once and answers in a turn of her own, and your turns show where it stands. Franco and Gia can read that line, so hand over only what the family shares. In the family room, when Denise puts a question to you by name, answer it once, in the room. When someone asks you both, the asker's own assistant answers for both and the other stays quiet; the turn says which you are.
 
 ### The house
 

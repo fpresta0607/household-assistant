@@ -59,6 +59,7 @@ def node_or_skip() -> str:
         "household_app_note_turns.test.mjs",
         "household_app_notes.test.mjs",
         "household_app_notion_connect.test.mjs",
+        "household_app_pair.test.mjs",
         "household_app_pairing.test.mjs",
         "household_app_phone_metrics.test.mjs",
         "household_app_phones.test.mjs",

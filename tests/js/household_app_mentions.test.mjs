@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { isMentioned, mentionedIds, withAppMentions } from "../../deploy/openclaw/plugins/household-app/mentions.js";
+import { isAskedByName, isMentioned, mentionedIds, withAppMentions } from "../../deploy/openclaw/plugins/household-app/mentions.js";
 
 const ROOM = [
   { id: "franco", name: "Franco" },
@@ -9,6 +9,24 @@ const ROOM = [
   { id: "corey", name: "Corey" },
   { id: "denise", name: "Denise" },
 ];
+
+for (const [text, isAsked] of [
+  ["Denise - anything on your side that I'd miss because it's Gia's?", true],
+  ["Here are the numbers.\nDenise, did you log them too?", true],
+  ["**Denise** — anything to add?", true],
+  ["Hey Denise: what time is church?", true],
+  ["Anything else, Denise?", true],
+  ["@Denise, anything else?", true],
+  ["Did Denise log it?", false],
+  ["Denise, Gia says we need milk.", false],
+  ["Denise's list is done?", false],
+  ["Denisea, are you there?", false],
+  ["", false],
+]) {
+  test(`${JSON.stringify(text)} ${isAsked ? "asks" : "does not ask"} Denise by name`, () => {
+    assert.equal(isAskedByName(text, "Denise"), isAsked);
+  });
+}
 
 for (const [text, name, isExpected] of [
   ["@Corey can you check?", "Corey", true],

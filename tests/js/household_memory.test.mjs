@@ -457,8 +457,11 @@ test("a request in the owner's app thread joins the one kept list the Telegram c
 
 test("a request in the app's family room is kept for the family under the sender's name", async (context) => {
   const setup = await gateway(context, { config: APP_CONFIG });
-  await setup.turn("Remember that my shoe size is 10", { sessionKey: APP_PRIVATE_SESSION, senderId: "sam" });
-  await setup.turn("Don't forget we owe the neighbours a casserole dish", { sessionKey: APP_FAMILY_SESSION, senderId: "household:alex" });
+  const privately = await setup.turn("Remember that my shoe size is 10", { sessionKey: APP_PRIVATE_SESSION, senderId: "sam" });
+  const forTheFamily = await setup.turn("Don't forget we owe the neighbours a casserole dish", { sessionKey: APP_FAMILY_SESSION, senderId: "household:alex" });
+  // Kept here alone, it would be one assistant's: the household note is the one both read.
+  assert.match(forTheFamily.prependContext, /kept this as #2 for Alex\. Confirm briefly that you will remember it\. It is for the family, so also add it to the household note with household_note/);
+  assert.doesNotMatch(privately.prependContext, /household note/);
   const [, item] = await setup.stored();
   assert.deepEqual(
     { who: item.who, whoId: item.whoId, scope: item.scope, where: item.where },

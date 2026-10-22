@@ -123,3 +123,61 @@ test("a line crosses to the other gateway in the outbox, and the other gateway's
     await channel.stop();
   }
 });
+
+// The 22 October duplicate: Gia gave Denise the weigh-in in her own thread, and Corey's turn in
+// the family room had to say the same numbers without anyone sending them again.
+test("a weigh-in Denise keeps as rows reaches Corey's family-room turn through the inbox, with what is due", async () => {
+  // Arrange
+  const channel = await runningChannel(CFG);
+  const at = Date.now();
+  const step = (index, line) => ({ id: `ns-00000000-0000-4000-8000-00000000000${index}`, at: at + index, author: "denise", kind: "add", line });
+  const fromDenise = [
+    step(1, { id: "hn-1a000001", topic: "Kitten weights", item: "Mochi", text: "212 g", day: "2026-10-21", for: "gia" }),
+    step(2, { id: "hn-1a000002", topic: "Kitten weights", item: "Pepper", text: "198 g", day: "2026-10-21", for: "gia" }),
+    step(3, { id: "hn-1a000003", topic: "Kitten milestones", text: "Second deworming dose", due: "2026-10-01", for: "gia" }),
+  ];
+
+  try {
+    // Act
+    await writeFile(
+      path.join(channel.stateDir, "household-app", "inbox", "0001-from-denise.json"),
+      JSON.stringify({ from: "denise", batch: { entries: [], notes: fromDenise } }),
+    );
+    await until("Denise's weigh-in in the note", async () =>
+      (await channel.promptBuild({ prompt: "" }, { agentId: "main", ...FAMILY_ROOM })).prependContext?.includes("198 g") === true);
+    const room = (await channel.promptBuild({ prompt: "What did the kittens weigh?" }, { agentId: "main", ...FAMILY_ROOM })).prependContext;
+
+    // Assert
+    assert.match(room, /\nDue now or within a week:\n- hn-1a000003, "Kitten milestones", [A-Z][a-z]{2}, [A-Z][a-z]{2} \d+: "Second deworming dose", overdue since Thu, Oct 1 \(Gia asked Denise\)/);
+    assert.match(room, /\nKitten weights\n- hn-1a000001, Wed, Oct 21: "Mochi": "212 g" \(Gia asked Denise\)\n- hn-1a000002, Wed, Oct 21: "Pepper": "198 g"/);
+  } finally {
+    await channel.stop();
+  }
+});
+
+test("a promise made in the owner's thread survives a restart and starts the family room's next turn until it is done", async () => {
+  // Arrange: Franco asks Corey in passing, in his own thread, and the gateway restarts.
+  const first = await runningChannel(CFG);
+  let promise;
+  try {
+    promise = (await run(noteTool(first, OWNERS_THREAD), { action: "promise", text: "Book the litter's first shots", due: "2026-10-30" })).lines[0].id;
+  } finally {
+    await first.stop();
+  }
+  const channel = await runningChannel(CFG, { stateDir: first.stateDir });
+
+  try {
+    // Act
+    const room = (await channel.promptBuild({ prompt: "Anything open?" }, { agentId: "main", ...FAMILY_ROOM })).prependContext;
+    await run(noteTool(channel, OWNERS_THREAD), { action: "done", line: promise });
+    const after = (await channel.promptBuild({ prompt: "Anything open?" }, { agentId: "main", ...FAMILY_ROOM })).prependContext;
+
+    // Assert
+    assert.match(room, new RegExp(`\\nPromises still open:\\n- ${promise}, "Promises", [A-Z][a-z]{2}, [A-Z][a-z]{2} \\d+: "Book the litter's first shots", due Fri, Oct 30, Corey to do \\(Franco asked Corey\\)\\n`));
+    assert.equal(room.split(promise).length, 2, "a promise listed above is not shown again under its topic");
+    assert.doesNotMatch(after, /Promises still open/);
+    assert.match(after, /\nPromises\n- hn-[0-9a-f]{8}, [A-Z][a-z]{2}, [A-Z][a-z]{2} \d+: "Book the litter's first shots", due Fri, Oct 30, done [A-Z][a-z]{2}, [A-Z][a-z]{2} \d+ by Corey, Corey to do/);
+  } finally {
+    await channel.stop();
+  }
+});

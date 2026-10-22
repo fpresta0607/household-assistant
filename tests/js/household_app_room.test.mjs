@@ -48,6 +48,9 @@ async function setup({
   assistantNames,
   now = () => NOW,
   store: kept,
+  peerAddressed,
+  claims,
+  schedule,
 } = {}) {
   const directory = await mkdtemp(path.join(tmpdir(), "household-app-room-"));
   const store = kept ?? openRoomStore(path.join(directory, "room.sqlite"));
@@ -68,6 +71,9 @@ async function setup({
     ...(runInChannel ? { runInChannel } : {}),
     ...(notificationChoices ? { notificationChoices } : {}),
     ...(assistantNames ? { assistantNames } : {}),
+    ...(peerAddressed ? { isPeerAddressed: async (message) => peerAddressed(message) } : {}),
+    ...(claims ? { claims } : {}),
+    ...(schedule ? { schedule } : {}),
     store,
     media,
     now,
@@ -1293,8 +1299,29 @@ test("a handed-over turn's sender is the other assistant, never a household pers
   assert.ok(!["franco", "gia"].includes(turn.author.id));
 });
 
+// The 22 October bug: Corey asked Denise in the room by name, twice, and she never answered.
+for (const [label, text] of [
+  ["opens a question with its name", "Here is what I have.\nCorey - anything on your side that I'd miss because it's Franco's?"],
+  ["closes a question with its name", "Is the vet visit on the calendar, Corey?"],
+  ["puts a question to its bold name", "**Corey**, did the second dose happen?"],
+]) {
+  test(`the other assistant's message that ${label} starts one family-room turn`, async () => {
+    const { room, seen } = await setup();
+    await room.acceptPeer({ entries: [fromDenise("a-00000020", text)] });
+    assert.equal(seen.dispatched.length, 1);
+    assert.equal(seen.dispatched[0].handedOver, true);
+  });
+}
+
+test("a question by name that a handed-over turn wrote starts nothing, so the two answer each other once", async () => {
+  const { room, seen } = await setup();
+  await room.acceptPeer({ entries: [fromDenise("a-00000020", "Corey, what do you have on your side?", { handedOver: true })] });
+  assert.equal(seen.dispatched.length, 0);
+});
+
 for (const [label, text] of [
   ["names it without the @", "Corey, Gia says we need milk"],
+  ["asks about it rather than asking it", "Did Corey log the weights?"],
   ["mentions someone else", "@Gia the milk is on the list"],
   ["has an @ inside a word", "write to corey@example.com"],
   ["mentions a longer name", "@Coreyann is that you?"],
@@ -1614,4 +1641,93 @@ test("a picture the assistant sends keeps its width and height, so the phone dra
 
   const unknown = await room.reply({ conversation: "direct", text: "", files: [{ bytes: Buffer.from("no header here"), mime: "image/png" }] });
   assert.equal(unknown.media[0].width, undefined);
+});
+
+// MARK: - Who is on it: one answer to a question both assistants were asked
+
+// The household note's claim steps, as notes.js keeps them, and the bound's task, run by hand.
+function claimsKept({ claimedBy = null } = {}) {
+  const taken = [];
+  return {
+    taken,
+    claims: {
+      claim: (message, { forWho }) => taken.push(["claim", message, forWho]) > 0,
+      took: (message) => taken.push(["took", message]) > 0,
+      claimOf: () => ({ claimedBy, tookBy: null }),
+    },
+  };
+}
+
+const BOTH = (message) => /corey/i.test(message.text) && /denise/i.test(message.text);
+
+test("a question the owner asks both assistants is claimed and answered by the owner's own, for both", async () => {
+  // Arrange
+  const { claims, taken } = claimsKept();
+  const { room, seen } = await setup({ peerAddressed: BOTH, claims });
+
+  // Act
+  await room.send(signedBy(FRANCO, said("m-00000001", "Corey and Denise, what do the kittens weigh?")));
+
+  // Assert
+  assert.deepEqual(taken, [["claim", "m-00000001", "franco"]]);
+  assert.equal(seen.dispatched.length, 1);
+  assert.equal(seen.dispatched[0].claim, "claimed");
+});
+
+test("a question the other person asks both assistants is left to theirs, and taken over only when no sign of it comes in time", async () => {
+  // Arrange
+  const later = [];
+  const { claims, taken } = claimsKept();
+  const { room, seen } = await setup({ peerAddressed: BOTH, claims, schedule: (task, milliseconds) => later.push({ task, milliseconds }) });
+  const asked = { kind: "message", author: "gia", ...signedBy(GIA, said("m-00000020", "Corey and Denise, is church at ten?")) };
+
+  // Act
+  await room.acceptPeer({ entries: [asked] });
+
+  // Assert: Corey stands down, with a bound.
+  assert.equal(seen.dispatched.length, 0);
+  assert.deepEqual(later.map(({ milliseconds }) => milliseconds), [20_000]);
+
+  // Act: the bound passes with no sign of Denise.
+  later[0].task();
+
+  // Assert
+  assert.deepEqual(taken, [["took", "m-00000020"]]);
+  assert.equal(seen.dispatched.length, 1);
+  assert.deepEqual({ claim: seen.dispatched[0].claim, author: seen.dispatched[0].author.id }, { claim: "tookOver", author: "gia" });
+});
+
+for (const [sign, signal] of [
+  ["her typing", (room) => room.acceptPeer({ typing: { denise: { conversation: "family", until: NOW + 30_000 } } })],
+  ["her answer", (room) => room.acceptPeer({ entries: [fromDenise("a-00000021", "Church is at ten.")] })],
+]) {
+  test(`the assistant that stood down does not take over once ${sign} arrives within the bound`, async () => {
+    const later = [];
+    const { claims, taken } = claimsKept();
+    const { room, seen } = await setup({ peerAddressed: BOTH, claims, schedule: (task) => later.push(task) });
+    await room.acceptPeer({ entries: [{ kind: "message", author: "gia", ...signedBy(GIA, said("m-00000020", "Corey and Denise, is church at ten?")) }] });
+    await signal(room);
+    later[0]();
+    assert.deepEqual(taken, []);
+    assert.equal(seen.dispatched.length, 0);
+  });
+}
+
+test("the assistant that stood down does not take over once the other's claim has crossed", async () => {
+  const later = [];
+  const { claims, taken } = claimsKept({ claimedBy: "denise" });
+  const { room, seen } = await setup({ peerAddressed: BOTH, claims, schedule: (task) => later.push(task) });
+  await room.acceptPeer({ entries: [{ kind: "message", author: "gia", ...signedBy(GIA, said("m-00000020", "Corey and Denise, is church at ten?")) }] });
+  later[0]();
+  assert.deepEqual(taken, []);
+  assert.equal(seen.dispatched.length, 0);
+});
+
+test("a question for one assistant alone is that one's, with no claim", async () => {
+  const { claims, taken } = claimsKept();
+  const { room, seen } = await setup({ peerAddressed: BOTH, claims });
+  await room.acceptPeer({ entries: [{ kind: "message", author: "gia", ...signedBy(GIA, said("m-00000020", "Corey, is church at ten?")) }] });
+  assert.deepEqual(taken, []);
+  assert.equal(seen.dispatched.length, 1);
+  assert.equal(seen.dispatched[0].claim, undefined);
 });

@@ -19,12 +19,19 @@
 // Who answers: the owner's direct messages always reach the assistant. A person's
 // family message reaches it only when it names the assistant or replies to one of its
 // messages, which is how the household's Telegram group works; a voice note names it by
-// its words, heard once on this gateway (voice-notes.js). The other assistant hands
-// it a request by @mentioning it (mentions.js), and that starts one family-room turn whose
-// sender is that assistant, never a person, so nothing that answers only a person is
-// reachable from it. What such a turn writes is marked `handedOver`, and a marked message,
+// its words, heard once on this gateway (voice-notes.js). The other assistant hands it a
+// request by @mentioning it, or puts a question to it by name (mentions.js), and that
+// starts one family-room turn whose sender is that assistant, never a person, so nothing
+// that answers only a person is reachable from it. What such a turn writes is marked `handedOver`, and a marked message,
 // one ten minutes old or older, or one already kept starts nothing, so the two can never
 // answer each other in a loop.
+//
+// Who is on it: a person's message that asks both assistants gets one answer, from the asker's
+// own assistant, which claims it as its turn starts (a step of the household note, notes.js,
+// that the other side and both phones see). The other assistant stands down. Both gateways
+// apply the same rule to the same signed message, so deciding takes no message between them
+// and no wait. Only when no sign of the claimer reaches the other side within CLAIM_BOUND_MS,
+// its typing, its claim or its reply, does the other take the question over.
 //
 // Who is told: the owner's phones are pushed every message the owner did not write, each
 // by its own choice for that conversation in Settings (push.js). A scheduled reminder's is
@@ -65,7 +72,7 @@ import { cleanDid } from "./did.js";
 import { cleanLookChange, foldLook } from "./family-look.js";
 import { cleanLiveUpdate, cleanSharedLocation, liveText } from "./map-share.js";
 import { isMediaId, photoSize } from "./media.js";
-import { isMentioned, withAppMentions } from "./mentions.js";
+import { isAskedByName, isMentioned, withAppMentions } from "./mentions.js";
 import { asksFor, cleanPlaceAnswer, placeAnswerText } from "./place-consent.js";
 import { RoomError } from "./room-error.js";
 import { callEndSignedText, isPhoneKey, isSignedBy, isTextSignedBy } from "./signature.js";
@@ -93,6 +100,10 @@ const OLDEST_MS = 7 * DAY_MS;
 const NEWEST_MS = 5 * 60_000;
 // The other assistant's @mention starts a turn only while it is this fresh.
 const HANDOVER_WITHIN_MS = 10 * 60_000;
+// How long the assistant that stood down waits for a sign of the other's answer, and how far
+// back a sign counts, since the other side's typing can arrive a delivery before its claim.
+const CLAIM_BOUND_MS = 20_000;
+const CLAIM_SIGN_MS = 5000;
 const TYPING_MS = 30_000;
 const MAX_AVATAR_BYTES = 1024 * 1024;
 const AVATAR_MIMES = new Set(["image/jpeg", "image/png"]);
@@ -177,10 +188,21 @@ function modelName(value) {
 //
 // `ownersFamilySession` is the owner's own session of the family room (turn.js), where the
 // owner's own family-room turns run, so their replies stream from there to the owner's phones.
+//
+// `pairLastAt` answers with when the two assistants' direct line last moved, or null, which
+// every page carries so the family room can show, quietly, that they are coordinating.
+//
+// `isPeerAddressed` says whether a family message also asks the other assistant, and
+// `claims` keeps who took a question both were asked (notes.js claim, took and claimOf).
+// `schedule` runs a task later, for the bound on a claim.
 export function createRoom({
   identity,
   sessionKeys = {},
   ownersFamilySession,
+  pairLastAt = () => null,
+  isPeerAddressed = async () => false,
+  claims = { claim: () => false, took: () => false, claimOf: () => ({ claimedBy: null, tookBy: null }) },
+  schedule = (task, milliseconds) => setTimeout(task, milliseconds).unref(),
   phoneKeys = async () => [],
   notificationChoices = () => ({}),
   assistantNames = () => [],
@@ -212,6 +234,7 @@ export function createRoom({
   const orientation = () => {
     const familyAvatar = store.avatars()[FAMILY_FACE];
     const looks = store.looks();
+    const pairAt = pairLastAt();
     return {
       self: { person: owner.id, assistant: assistant.id },
       sessionKeys,
@@ -220,6 +243,7 @@ export function createRoom({
       peerAssistant: peerPage(),
       ...(familyAvatar ? { familyAvatar } : {}),
       ...(looks.length > 0 ? { familyLook: foldLook(looks) } : {}),
+      ...(pairAt ? { pair: { lastAt: pairAt } } : {}),
     };
   };
   const peerAssistant = { ...peer.assistant };
@@ -227,6 +251,8 @@ export function createRoom({
   // Who on the other side the phones were last told is typing. The other gateway says one
   // stopped by leaving them out of its list, so this is how the phones hear that they did.
   let peerTypers = new Set();
+  // When the other assistant last showed it was answering in the family room, for a claim.
+  let peerAssistantActiveAt = 0;
   // Whether this assistant's page was shared since the channel started. The first share
   // after a start is written afresh even when nothing changed, since the other gateway
   // refuses a page while it runs an older plugin during a rollout, and an unchanged page
@@ -403,9 +429,18 @@ export function createRoom({
   // A call never leaves the owner's own thread, so the mark means nothing in the family room.
   async function consider(entry, { isCall = false } = {}) {
     let addressed = entry.conversation === "direct";
+    let claim;
     if (!addressed) {
       const repliedTo = entry.replyTo ? store.message(entry.replyTo) : null;
       addressed = await isAddressed(entry, { isReplyToAssistant: repliedTo?.author === assistant.id });
+      if (addressed && await isPeerAddressed(entry)) {
+        if (entry.author !== owner.id) {
+          standDown(entry);
+          return;
+        }
+        claims.claim(entry.id, { forWho: entry.author });
+        claim = "claimed";
+      }
     }
     if (!addressed) return;
     start({
@@ -413,15 +448,30 @@ export function createRoom({
       message: entry,
       author: { id: entry.author, name: names()[entry.author] },
       isCall: isCall && entry.conversation === "direct",
+      ...(claim ? { claim } : {}),
     });
   }
 
-  // The other assistant's family message, just kept: a fresh @mention of this assistant
-  // that no handed-over turn wrote starts one family-room turn, sent by that assistant.
+  // The other person asked both assistants, so the other assistant has it. This one takes it
+  // over once the bound passes with no sign of that one's answer: its typing in the room, its
+  // claim, or a message of its own.
+  function standDown(entry) {
+    const since = now() - CLAIM_SIGN_MS;
+    schedule(() => {
+      if (peerAssistantActiveAt >= since || claims.claimOf(entry.id).claimedBy === peerAssistant.id) return;
+      if (!claims.took(entry.id)) return;
+      start({ conversation: "family", message: entry, author: { id: entry.author, name: names()[entry.author] }, claim: "tookOver" });
+    }, CLAIM_BOUND_MS);
+  }
+
+  // The other assistant's family message, just kept: a fresh @mention of this assistant, or
+  // a question put to it by name, that no handed-over turn wrote starts one family-room
+  // turn, sent by that assistant. The turn's own messages are marked, so it can answer once
+  // and never start one back.
   function considerHandover(entry) {
     if (entry.handedOver === true || now() - entry.at >= HANDOVER_WITHIN_MS) return;
     const answersTo = new Set([assistant.name, ...assistantNames()]);
-    if (![...answersTo].some((name) => isMentioned(entry.text, name))) return;
+    if (![...answersTo].some((name) => isMentioned(entry.text, name) || isAskedByName(entry.text, name))) return;
     start({
       conversation: "family",
       message: entry,
@@ -462,7 +512,10 @@ export function createRoom({
     changed(entry);
     await notifyOwner(entry);
     if (isPerson) await consider(entry);
-    else considerHandover(entry);
+    else {
+      peerAssistantActiveAt = now();
+      considerHandover(entry);
+    }
   }
 
   async function acceptPeerAvatar(raw) {
@@ -689,6 +742,7 @@ export function createRoom({
         if (author !== peer.person.id && author !== peerAssistant.id) continue;
         if (state?.conversation !== "family") continue;
         const active = Number(state.until) > now();
+        if (active && author === peerAssistant.id) peerAssistantActiveAt = now();
         if (active || peerTypers.has(author)) told.set(author, active);
       }
       for (const author of peerTypers) if (!told.has(author)) told.set(author, false);

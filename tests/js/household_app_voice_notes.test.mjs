@@ -113,7 +113,8 @@ const considered = async (channel, isAnswered) => {
 const NOTES = [
   { said: "Corey, what's for dinner tonight?", answeredBy: ["corey"] },
   { said: "Denise, can you grab milk on the way home?", answeredBy: ["denise"] },
-  { said: "Corey and Denise, are we free on Saturday?", answeredBy: ["corey", "denise"] },
+  // Franco asked both, so his own assistant gives the one answer and Denise stands down.
+  { said: "Corey and Denise, are we free on Saturday?", answeredBy: ["corey"] },
   { said: "Running ten minutes late, start without me.", answeredBy: [] },
   // What OpenRouter's whisper-large-v3-turbo wrote for a spoken "Corey, what is the
   // weather like tomorrow morning?" on 17 October.
@@ -143,6 +144,14 @@ for (const { said, answeredBy } of NOTES) {
         assert.equal(turn.message.bodyForAgent, forAgent(said));
         assert.equal(turn.media[0].transcribed, true, "OpenClaw is told the note is heard, so it never hears it again");
         assert.equal(turn.sender.id, "franco");
+        const isClaimed = /denise/i.test(said);
+        assert.equal(/They asked Denise too, who leaves it to you/.test(turn.supplemental.groupSystemPrompt), isClaimed);
+        if (isClaimed) {
+          const outbox = path.join(channel.stateDir, "household-app", "outbox.json");
+          await until("the claim in the outbox", async () => (await readFile(outbox, "utf8").catch(() => "")).includes('"claim"'));
+          const { notes } = JSON.parse(await readFile(outbox, "utf8"));
+          assert.deepEqual(notes.map((step) => [step.kind, step.message, step.for]), [["claim", message.id, "franco"]]);
+        }
       }
     } finally {
       await channel.stop();

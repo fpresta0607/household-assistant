@@ -32,6 +32,16 @@ function familyTurn(cfg, change = {}) {
   return { cfg, groupId: "family", accountId: "default", senderId: "gia", senderName: "Gia", ...change };
 }
 
+// The two assistants' direct line is a group of its own, and a handoff's turn there, sent by
+// the other assistant, gets The Fam's tools like any turn in the room's shared session.
+test("a handoff's turn in the assistants' direct line gets the tools The Fam allows, even sent as the owner", () => {
+  const cfg = configWith({ familyTools: THE_FAMS_TOOLS });
+  for (const change of [{ senderId: "denise", senderName: "Denise" }, { senderId: "franco", senderName: "Franco", senderPolicyMode: "always" }]) {
+    assert.deepEqual(familyToolPolicy(familyTurn(cfg, { groupId: "pair", ...change })), { allow: THE_FAMS_TOOLS }, JSON.stringify(change));
+  }
+  assert.deepEqual(familyToolPolicy(familyTurn(configWith({}), { groupId: "pair", senderId: "denise" })), NO_TOOLS);
+});
+
 test("anyone else's family-room turn gets the tools The Fam allows", () => {
   const cfg = configWith({ familyTools: THE_FAMS_TOOLS });
   for (const change of [
