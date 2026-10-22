@@ -654,6 +654,30 @@ test("a claim of a family-room question crosses to the other gateway once, and s
   assert.equal(corey.prompt(""), "", "and adds nothing to a turn");
 });
 
+test("a question stood down from is kept in the note's file until settled, and never crosses to the other gateway", () => {
+  // Arrange
+  const file = path.join(mkdtempSync(path.join(ROOT, "gateway-")), "notes.sqlite");
+  const open = () => {
+    const notes = createNotes({ file, assistant: COREY, peerAssistant: DENISE, people: [FRANCO, GIA], now: () => NOW, newId });
+    opened.push(notes);
+    return notes;
+  };
+  const before = open();
+
+  // Act
+  before.standDown("m-00000020", { since: NOW - 5000, deadline: NOW + 20_000 });
+  before.standDown("m-00000020", { since: NOW, deadline: NOW + 60_000 });
+  before.standDown("not a message id", { since: NOW, deadline: NOW });
+  const after = open();
+  const kept = after.standingDown();
+  after.settled("m-00000020");
+
+  // Assert
+  assert.deepEqual(kept, [{ message: "m-00000020", since: NOW - 5000, deadline: NOW + 20_000 }], "the first bound holds");
+  assert.deepEqual(after.standingDown(), []);
+  assert.deepEqual(before.outbox(), { notes: [] });
+});
+
 for (const [why, step] of [
   ["a claim of no message", { kind: "claim", message: "x", for: "gia" }],
   ["a claim for nobody", { kind: "claim", message: "m-00000001", for: "mallory" }],

@@ -104,6 +104,8 @@ const HANDOVER_WITHIN_MS = 10 * 60_000;
 // back a sign counts, since the other side's typing can arrive a delivery before its claim.
 const CLAIM_BOUND_MS = 20_000;
 const CLAIM_SIGN_MS = 5000;
+// How many of the family room's newest messages are searched for the other's answer.
+const ROOM_SIGN_MESSAGES = 50;
 const TYPING_MS = 30_000;
 const MAX_AVATAR_BYTES = 1024 * 1024;
 const AVATAR_MIMES = new Set(["image/jpeg", "image/png"]);
@@ -193,7 +195,9 @@ function modelName(value) {
 // every page carries so the family room can show, quietly, that they are coordinating.
 //
 // `isPeerAddressed` says whether a family message also asks the other assistant, and
-// `claims` keeps who took a question both were asked (notes.js claim, took and claimOf).
+// `claims` keeps who took a question both were asked (notes.js claim, took and claimOf), and
+// the questions this assistant stood down from until their bound is checked (standDown,
+// standingDown and settled).
 // `schedule` runs a task later, for the bound on a claim.
 export function createRoom({
   identity,
@@ -201,7 +205,14 @@ export function createRoom({
   ownersFamilySession,
   pairLastAt = () => null,
   isPeerAddressed = async () => false,
-  claims = { claim: () => false, took: () => false, claimOf: () => ({ claimedBy: null, tookBy: null }) },
+  claims = {
+    claim: () => false,
+    took: () => false,
+    claimOf: () => ({ claimedBy: null, tookBy: null }),
+    standDown: () => {},
+    standingDown: () => [],
+    settled: () => {},
+  },
   schedule = (task, milliseconds) => setTimeout(task, milliseconds).unref(),
   phoneKeys = async () => [],
   notificationChoices = () => ({}),
@@ -455,13 +466,39 @@ export function createRoom({
   // The other person asked both assistants, so the other assistant has it. This one takes it
   // over once the bound passes with no sign of that one's answer: its typing in the room, its
   // claim, or a message of its own.
+  // The bound is kept in the household note's file, so a restart inside it still checks it
+  // once (resumeStandDowns).
   function standDown(entry) {
-    const since = now() - CLAIM_SIGN_MS;
+    const bound = { since: now() - CLAIM_SIGN_MS, deadline: now() + CLAIM_BOUND_MS };
+    claims.standDown(entry.id, bound);
+    takeOverAfter(entry, bound);
+  }
+
+  // A sign of the other assistant's answer since `since`: its typing or a message of its own
+  // while this channel ran, its message kept before a restart, or its claim.
+  function takeOverAfter(entry, { since, deadline }) {
     schedule(() => {
-      if (peerAssistantActiveAt >= since || claims.claimOf(entry.id).claimedBy === peerAssistant.id) return;
+      claims.settled(entry.id);
+      const hasAnswered = store.history("family", { limit: ROOM_SIGN_MESSAGES }).messages
+        .some((message) => message.author === peerAssistant.id && message.at >= since);
+      if (peerAssistantActiveAt >= since || hasAnswered || claims.claimOf(entry.id).claimedBy === peerAssistant.id) return;
       if (!claims.took(entry.id)) return;
       start({ conversation: "family", message: entry, author: { id: entry.author, name: names()[entry.author] }, claim: "tookOver" });
-    }, CLAIM_BOUND_MS);
+    }, Math.max(0, deadline - now()));
+  }
+
+  // The questions this assistant stood down from before the channel last stopped, each checked
+  // once when its bound passes, or at once when it already has. One whose question is past the
+  // handover bound, or no longer here, is let go.
+  function resumeStandDowns() {
+    for (const { message, since, deadline } of claims.standingDown()) {
+      const entry = store.message(message);
+      if (!entry || now() - entry.at >= HANDOVER_WITHIN_MS) {
+        claims.settled(message);
+        continue;
+      }
+      takeOverAfter(entry, { since, deadline });
+    }
   }
 
   // The other assistant's family message, just kept: a fresh @mention of this assistant, or
@@ -609,6 +646,7 @@ export function createRoom({
     participants,
     accept,
     consider,
+    resumeStandDowns,
     refreshPhoneKeys,
     peerKeys,
     publishOutbox,
