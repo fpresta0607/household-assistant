@@ -104,7 +104,9 @@ test("the owner's question in the family room gets the same tools and answer sha
     // Assert
     assert.equal(inRoom.route.dispatchSessionKey, "agent:main:household:group:family:sender:franco", "the owner's own session of the room");
     assert.equal(restrictsNothing(tools[0].group) && restrictsNothing(tools[1].group), true, "every tool the thread has, none held back by The Fam's list");
-    assert.deepEqual(tools[1].plugin, tools[0].plugin);
+    // The document vault alone keeps to the thread: a photo in the room has reached the other side.
+    assert.deepEqual(tools[1].plugin, tools[0].plugin.filter((name) => name !== "household_vault"));
+    assert.ok(tools[0].plugin.includes("household_vault"));
     assert.ok(tools[1].plugin.includes("household_today") && tools[1].plugin.includes("household_brief"));
     const shape = (ctx) => ({ sender: ctx.sender, access: { commands: ctx.access.commands }, extra: ctx.extra });
     assert.deepEqual(shape(inRoom), shape(inThread));

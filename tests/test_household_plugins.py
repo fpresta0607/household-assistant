@@ -82,6 +82,7 @@ def node_or_skip() -> str:
         "household_app_tapbacks.test.mjs",
         "household_app_today.test.mjs",
         "household_app_turns.test.mjs",
+        "household_app_vault.test.mjs",
         "household_app_voice_notes.test.mjs",
         "household_app_wishes.test.mjs",
         "household_app_video.test.mjs",

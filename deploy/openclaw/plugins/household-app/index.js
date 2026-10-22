@@ -132,6 +132,8 @@ import { createSpend, mediaSpentSince } from "./spend.js";
 import { openRoomStore } from "./store.js";
 import { ownersFamilySession } from "./turn.js";
 import { createVideoSummaries, videoSource } from "./video-summary.js";
+import { createVault } from "./vault.js";
+import { VAULT_TOOL, createVaultTool } from "./vault-tool.js";
 import { VOICE_NOTE_INSTRUCTION, createHearing, isNameSpoken } from "./voice-notes.js";
 import { WISH_TOOL, createWishTool } from "./wish-tool.js";
 import { createWishes } from "./wishes.js";
@@ -159,6 +161,8 @@ const OLD_CALLS_MS = 6 * 3_600_000;
 const REMINDERS_MS = 30_000;
 // How often the wishlist is checked for gift ideas due to be handed over.
 const WISHES_MS = 60 * 60_000;
+// How often the document vault is checked for a day thirty days away.
+const VAULT_MS = 60 * 60_000;
 const execFileAsync = promisify(execFile);
 // One mail binary's run: no shell, a minute at most, the bytes as they came, and stopped
 // with the channel.
@@ -839,6 +843,10 @@ function startRoom(ctx) {
     changed: () => room.publishOutbox(),
   });
 
+  // The owner's document and deadline vault (vault.js): which of the owner's own thread's
+  // pictures each document is, and its day, on this side alone. Nothing of it is in the outbox.
+  const vault = createVault({ file: path.join(directory, "vault.sqlite") });
+
   // The week's dinners the assistant proposed, until one is accepted into the cart (meals.js).
   // Only the cart's own steps cross.
   const meals = createMeals({ file: path.join(directory, "meals.sqlite") });
@@ -954,7 +962,7 @@ function startRoom(ctx) {
 
   return {
     room, media, store, inbox, drain, owner, peerPerson, pairing, nonces, appleSignIn, tick, location, approvals, cart, cartOrdered,
-    notes, videos, images, stopBounds, sends, wishes, meals,
+    notes, videos, images, stopBounds, sends, wishes, vault, meals,
     canEmail: Boolean(config.orderMail?.account),
     orderMail,
     log,
@@ -1159,6 +1167,21 @@ export const householdChannel = createChatChannelPlugin({
         handWishes();
         const wishesTimer = setInterval(handWishes, WISHES_MS);
         wishesTimer.unref();
+        // The owner's documents whose day is thirty days away, posted in their own thread, each
+        // once for its day (vault.js).
+        const noticeDocuments = () => {
+          try {
+            for (const text of started.vault.due()) {
+              void started.room.reply({ conversation: "direct", text })
+                .catch((error) => ctx.log?.warn?.(`${PLUGIN_ID}: a document notice was not posted: ${error?.message ?? error}`));
+            }
+          } catch (error) {
+            ctx.log?.warn?.(`${PLUGIN_ID}: the document vault was not checked: ${error?.message ?? error}`);
+          }
+        };
+        noticeDocuments();
+        const vaultTimer = setInterval(noticeDocuments, VAULT_MS);
+        vaultTimer.unref();
         void started.drain();
         try {
           ctx.setStatus(channelReadyPatch({ accountId: ctx.accountId }));
@@ -1171,6 +1194,7 @@ export const householdChannel = createChatChannelPlugin({
           clearInterval(callsTimer);
           clearInterval(remindersTimer);
           clearInterval(wishesTimer);
+          clearInterval(vaultTimer);
           started.stopBounds();
           await reading;
           await started.drain();
@@ -1182,6 +1206,7 @@ export const householdChannel = createChatChannelPlugin({
           started.cart.close();
           started.notes.close();
           started.wishes.close();
+          started.vault.close();
           started.meals.close();
           ctx.setStatus(channelStoppedPatch({ accountId: ctx.accountId }));
         }
@@ -1555,6 +1580,19 @@ function registerFull(api) {
       wishes: live.wishes,
     }),
     { names: [WISH_TOOL], optional: true },
+  );
+  // The document and deadline vault, in the owner's own thread only (vault-tool.js).
+  api.registerTool(
+    (context) => live && createVaultTool({
+      context,
+      owner: live.owner.id,
+      ownerName: live.owner.name,
+      people: [live.owner.id, live.peerPerson.id],
+      vault: live.vault,
+      notes: live.notes,
+      store: live.store,
+    }),
+    { names: [VAULT_TOOL], optional: true },
   );
   // A draft the owner sends with one tap, in the owner's own turns only, and the yes it
   // waits for, which freezes the draft (send-tool.js). Without a running channel there is
