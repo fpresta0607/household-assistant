@@ -67,7 +67,20 @@ struct ThreadList: View {
             #endif
         }
         .gesture(ThreadTimestampGesture(
+            onBegin: { point in
+                // The swipe reveals the timestamp of the message it began on, and no other.
+                timestampReturn?.cancel()
+                timestampReturn = nil
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    state.timestampReveal = 0
+                    state.showsTimestamps = false
+                    state.revealedRow = state.rowAt(point)
+                }
+            },
             onChange: { distance in
+                guard state.revealedRow != nil else { return }
                 timestampReturn?.cancel()
                 timestampReturn = nil
                 // Follow the finger directly, including when a second swipe interrupts
@@ -96,11 +109,13 @@ struct ThreadList: View {
                 // A new drag cancels this cleanup before it can hide the new timestamps.
                 if reducesMotion {
                     state.showsTimestamps = false
+                    state.revealedRow = nil
                 } else {
                     timestampReturn = Task { @MainActor in
                         do { try await Task.sleep(for: .milliseconds(200)) }
                         catch { return }
                         state.showsTimestamps = false
+                        state.revealedRow = nil
                         timestampReturn = nil
                     }
                 }
@@ -111,6 +126,7 @@ struct ThreadList: View {
             timestampReturn = nil
             state.timestampReveal = 0
             state.showsTimestamps = false
+            state.revealedRow = nil
         }
     }
 }

@@ -102,6 +102,11 @@ final class ThreadCollectionCoordinator: NSObject, UICollectionViewDelegate {
             collectionView.dequeueConfiguredReusableCell(using: registration, for: indexPath, item: row)
         }
         view.delegate = self
+        list.state.rowAt = { [weak self, weak view] point in
+            guard let self, let view, let path = view.indexPathForItem(at: view.convert(point, from: nil)),
+                  let id = self.dataSource?.itemIdentifier(for: path), case .message? = self.rows[id]?.content else { return nil }
+            return id
+        }
         jump.safeAreaRegions = []
         jump.view.backgroundColor = .clear
         view.jumpControl = jump.view
@@ -683,7 +688,8 @@ final class ThreadCollectionCoordinator: NSObject, UICollectionViewDelegate {
     }
 }
 
-/// One row as its cell hosts it, following the timestamps the person drags out.
+/// One row as its cell hosts it. Only the row the person is swiping reads how far its
+/// timestamp is out, so the other cells are not redrawn while the finger moves.
 private struct ThreadCell: View {
     let row: ThreadRow
     let conversation: RoomConversation
@@ -691,8 +697,10 @@ private struct ThreadCell: View {
     let state: ThreadListState
 
     var body: some View {
+        let isSwiped = state.revealedRow == row.id
         ThreadRowView(row: row, conversation: conversation, actions: actions,
-                      timestampReveal: state.timestampReveal, showsTimestamps: state.showsTimestamps)
+                      timestampReveal: isSwiped ? state.timestampReveal : 0,
+                      showsTimestamps: isSwiped && state.showsTimestamps)
             .equatable()
     }
 }

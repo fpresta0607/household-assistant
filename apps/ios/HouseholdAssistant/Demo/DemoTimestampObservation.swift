@@ -27,7 +27,8 @@ final class DemoTimestampObservation {
             // actual recognizer still owns the finger. The UI test cannot poll mid-drag.
             let visible = frames.values.filter { !$0.isEmpty && viewport.contains($0) }
             print("thread.list timestamps held \(self.isHeld), viewport \(viewport), inside \(visible.count) of \(frames.count)")
-            guard self.isHeld, visible.count >= 2 else { return }
+            // A swipe shows the timestamp of the message it is on, and only that one.
+            guard self.isHeld, visible.count == 1 else { return }
             CFNotificationCenterPostNotification(
                 CFNotificationCenterGetDarwinNotifyCenter(),
                 CFNotificationName((control + ".timestamps-held") as CFString), nil, nil, true
