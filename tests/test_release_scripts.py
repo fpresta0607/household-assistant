@@ -152,6 +152,7 @@ def run_mac_script(
         "uname": "echo Darwin\n",
         "xcodegen": 'echo "xcodegen must not run in a dry run" >&2\nexit 99\n',
         "xcodebuild": 'echo "xcodebuild must not run in a dry run" >&2\nexit 99\n',
+        "sudo": 'echo "sudo must not run in a dry run" >&2\nexit 99\n',
         "xcrun": f"echo '{simulator}'\n",
         **(shims or {}),
     }
@@ -297,7 +298,7 @@ def test_a_failed_test_step_still_runs_every_step_after_it(tmp_path: Path) -> No
         tmp_path,
         TEST,
         env={"HA_IOS_RECORDING": recording.as_posix()},
-        shims={"xcodegen": "exit 0\n", "xcodebuild": xcodebuild},
+        shims={"xcodegen": "exit 0\n", "xcodebuild": xcodebuild, "sudo": "exit 0\n"},
     )
 
     # Assert: the UI tests and both takes still ran, and the run still fails, naming why.
@@ -445,6 +446,27 @@ def test_the_screenshots_step_says_which_states_it_renders(
     assert result.returncode == 0, result.stdout + result.stderr
     lines = [line for line in result.stderr.splitlines() if line.startswith("screenshots  ")]
     assert lines == ([said] if said else [])
+
+
+def test_the_screenshots_are_drawn_on_the_households_clock(tmp_path: Path) -> None:
+    # Arrange: sudo and xcodebuild that write down how they were called, and the zone
+    # the test host would be handed.
+    calls = tmp_path / "calls"
+    sudo = f'echo "sudo $*" >> "{calls.as_posix()}"\n'
+    xcodebuild = f'echo "xcodebuild TEST_RUNNER_TZ=$TEST_RUNNER_TZ $*" >> "{calls.as_posix()}"\n'
+
+    # Act: a real run of the screenshots step, not a dry run, against the shims.
+    result = run_mac_script(
+        tmp_path, TEST, "screenshots", shims={"sudo": sudo, "xcodebuild": xcodebuild}
+    )
+
+    # Assert: the Mac is moved to the household's zone first, and the test host draws in it.
+    assert result.returncode == 0, result.stdout + result.stderr
+    ran = calls.read_text(encoding="utf-8").splitlines()
+    assert ran[0] == "sudo -n systemsetup -settimezone America/New_York", ran
+    shots = ran[1]
+    assert shots.startswith("xcodebuild TEST_RUNNER_TZ=America/New_York test-without-building"), ran
+    assert "-only-testing:HouseholdAssistantTests/ScreenshotTests" in shots, ran
 
 
 def test_the_films_step_is_refused_without_a_path_for_the_film(tmp_path: Path) -> None:

@@ -70,7 +70,8 @@ ha_run() {
 }
 
 # Voicebox install locations. Everything lives under the invoking user's home;
-# no script in this directory writes outside it or asks for sudo.
+# no script in this directory writes outside it or asks for sudo, except the
+# screenshots step of test-ios.sh, which sets the Mac's time zone.
 HA_VOICEBOX_LABEL="${HA_VOICEBOX_LABEL:-com.example.householdassistant.voicebox}"
 HA_VOICEBOX_ROOT="${HA_VOICEBOX_ROOT:-${HOME}/Library/Application Support/Voicebox}"
 HA_VOICEBOX_LOGS="${HA_VOICEBOX_LOGS:-${HOME}/Library/Logs/Voicebox}"

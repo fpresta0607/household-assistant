@@ -10,9 +10,12 @@
 #          Run scripts/macos/bootstrap.sh first if any of that is missing.
 # Changes: writes apps/ios/HouseholdAssistant.xcodeproj (regenerated from
 #          apps/ios/project.yml every build, and ignored by git), the build in
-#          apps/ios/build/DerivedData and result bundles under apps/ios/build/.
-#          Touches nothing else. Needs no signing identity, no team and no
-#          credential: the simulator build runs with code signing switched off.
+#          apps/ios/build/DerivedData and result bundles under apps/ios/build/,
+#          and the screenshots step sets the Mac's time zone to the household's,
+#          America/New_York, with sudo, which must not ask for a password, as on
+#          GitHub's Macs. Touches nothing else. Needs no signing identity, no team
+#          and no credential: the simulator build runs with code signing switched
+#          off.
 #
 # Usage:
 #   test-ios.sh [--dry-run] [--help] [step ...]
@@ -256,6 +259,14 @@ if wants screenshots; then
     export TEST_RUNNER_STEWARD_SCREENSHOTS="${HA_IOS_SCREENSHOTS// /,}"
     ha_log "screenshots  ${HA_IOS_SCREENSHOTS}"
   fi
+  # On the household's clock: the demo's times are written at its offset, -04:00,
+  # and GitHub's Macs run in UTC, where a 5:30 PM reminder was drawn as 9:30 PM. The
+  # Mac's own zone, which the simulator follows, and the test host's, which
+  # xcodebuild hands it from TEST_RUNNER_TZ. systemsetup prints an "Error:-99" line
+  # even when it sets the zone.
+  household_zone="America/New_York"
+  ha_run sudo -n systemsetup -settimezone "${household_zone}"
+  export TEST_RUNNER_TZ="${household_zone}"
   ha_run rm -rf "${ios}/build/screenshot-results.xcresult"
   ha_run xcodebuild test-without-building "$@" \
     -only-testing:HouseholdAssistantTests/ScreenshotTests \
