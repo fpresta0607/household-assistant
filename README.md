@@ -17,10 +17,10 @@ They are one household's helpers, so they keep one household's records: a shared
 
 <table>
   <tr>
-    <td align="center" width="25%"><img src="docs/images/app-chats.jpg" alt="The Chats list with a thread for each assistant, the family room and the Today card" width="200"><br><sub><b>Chats</b><br>one thread each, plus the family room</sub></td>
-    <td align="center" width="25%"><img src="docs/images/app-today.jpg" alt="The Today card: the next things on the calendar and a verse for the day" width="200"><br><sub><b>Today</b><br>what is next, and a verse</sub></td>
-    <td align="center" width="25%"><img src="docs/images/app-cart.jpg" alt="The shared household cart as a card in the family room" width="200"><br><sub><b>The cart</b><br>one list for the whole house</sub></td>
-    <td align="center" width="25%"><img src="docs/images/app-approval.jpg" alt="An approval card asking for a tap before anything is sent" width="200"><br><sub><b>Approvals</b><br>nothing goes out without a tap</sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-approval.jpg" alt="An approval card asking for a tap before anything is added to the calendar" width="200"><br><sub><b>Approvals</b><br>nothing goes out without a tap</sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-order.jpg" alt="An order card tracking a delivery from ordered to delivered" width="200"><br><sub><b>Orders</b><br>from the shared cart to the door</sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-reminder.jpg" alt="A reminder card confirming what the assistant set" width="200"><br><sub><b>Reminders</b><br>set by a word or a voice note</sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-call.jpg" alt="A voice call with the assistant" width="200"><br><sub><b>Voice calls</b><br>talk to it like a person</sub></td>
   </tr>
 </table>
 
@@ -52,16 +52,7 @@ Everything in the pictures is made-up demo data, drawn by the app's own screensh
     <td align="center" width="25%"><img src="docs/images/app-chart.jpg" alt="A chart of grocery spending drawn as a card" width="200"><br><sub><b>Charts</b></sub></td>
     <td align="center" width="25%"><img src="docs/images/app-checklist.jpg" alt="A checklist card for Saturday" width="200"><br><sub><b>Checklists</b></sub></td>
     <td align="center" width="25%"><img src="docs/images/app-spend.jpg" alt="The Spend page: the month's cost by assistant" width="200"><br><sub><b>Spend</b></sub></td>
-    <td align="center" width="25%"><img src="docs/images/app-connectors.jpg" alt="The Connectors page listing the services an assistant can use" width="200"><br><sub><b>Connectors</b></sub></td>
-  </tr>
-</table>
-
-<table>
-  <tr>
-    <td align="center" width="25%"><img src="docs/images/app-order.jpg" alt="An order card tracking a delivery from ordered to delivered" width="200"><br><sub><b>Orders</b></sub></td>
     <td align="center" width="25%"><img src="docs/images/app-scripture.jpg" alt="A scripture card with the passage and a link to open it" width="200"><br><sub><b>Scripture</b></sub></td>
-    <td align="center" width="25%"><img src="docs/images/app-photos.jpg" alt="Photos shared in the family room" width="200"><br><sub><b>Family photos</b></sub></td>
-    <td align="center" width="25%"><img src="docs/images/app-call.jpg" alt="A voice call with the assistant" width="200"><br><sub><b>Voice calls</b></sub></td>
   </tr>
 </table>
 
