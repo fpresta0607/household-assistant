@@ -54,6 +54,7 @@ export async function runningChannel(cfg, {
 
   const methods = new Map();
   const tools = [];
+  const commands = new Map();
   const hooks = [];
   const pluginLogs = [];
   const api = new Proxy(
@@ -65,6 +66,7 @@ export async function runningChannel(cfg, {
         methods.set(name, handler);
       },
       registerTool: (factory, options) => tools.push({ factory, options }),
+      registerCommand: (command) => commands.set(command.name, command),
       on: (name, handler, options) => hooks.push({ name, handler, matcher: options?.matcher }),
       session: { workflow: { enqueueNextTurnInjection() {} } },
       logger: { info: (line) => pluginLogs.push(line), warn: (line) => pluginLogs.push(line), error() {} },
@@ -109,6 +111,8 @@ export async function runningChannel(cfg, {
     plugin: entry.plugin,
     // The plugin's tool factories, each as OpenClaw offers it to a turn.
     tools,
+    // The plugin's chat commands, such as /emergency, by name.
+    commands,
     contexts,
     dispatches,
     events,

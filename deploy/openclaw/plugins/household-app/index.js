@@ -85,6 +85,7 @@ import { CART_TOOL, createCart } from "./cart.js";
 import { createCartTool } from "./cart-tool.js";
 import { createDid } from "./did.js";
 import { DIGEST_TOOL, WEIGHTS, composeDigest, createDigestTool } from "./digest.js";
+import { EMERGENCY_TOPIC, cardOf } from "./emergency.js";
 import { FAMILY_POST_TOOLS, createFamilyPosts, householdRoutingGuidance } from "./family-posts.js";
 import { gmailSource } from "./gmail-source.js";
 import { createOrderMail } from "./order-mail.js";
@@ -1241,6 +1242,17 @@ function registerFull(api) {
   const write = { scope: "operator.write" };
   workflow = api.session.workflow;
   logger = api.logger;
+  // The emergency card at once, with no model, wherever the owner types it (emergency.js).
+  api.registerCommand({
+    name: "emergency",
+    description: "The emergency card: the vet, poison control, the pediatrician, insurance and the neighbor.",
+    acceptsArgs: false,
+    handler: async () => ({
+      text: live
+        ? cardOf(live.notes.rowsOf(new RegExp(`^${EMERGENCY_TOPIC}$`, "i"))).join("\n")
+        : "Emergency: call 911 first. The emergency card lives in the Steward app, which is not running on this gateway.",
+    }),
+  });
   api.registerCommand({
     name: "app",
     description: "Set up the Steward AI app on your phone.",
