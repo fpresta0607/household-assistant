@@ -1,5 +1,5 @@
 #if DEBUG
-// Franco's own thread as a few hundred mixed rows, for the UI test that flings up through
+// Leo's own thread as a few hundred mixed rows, for the UI test that flings up through
 // it fast (FastFlingTests, CFO notes sections 3 and 4): long Markdown replies, photos, bar
 // and line charts, voice notes of his with their words and voice replies of Corey's, calls,
 // and short and middling answers between them, 300 entries over about five days, all of it
@@ -64,14 +64,14 @@ enum DemoFlingThread {
     private static let barChart = #"{"type":"chart","title":"Grocery spend by week","kind":"bar","x":["W1","W2","W3","W4"],"series":[{"name":"Spend","values":[142,118,131,104]}],"unit":"$"}"#
     private static let lineChart = #"{"type":"chart","title":"Thermostat today","kind":"line","x":["12 AM","4 AM","8 AM","12 PM","4 PM","8 PM"],"series":[{"name":"Living room","values":[68,67,69,71,72.5,70]}],"unit":"°F"}"#
 
-    private static let spokenReply = "Dinner is at 6:30, and Gia lands at 4:10, so there is time to pick her up first."
+    private static let spokenReply = "Dinner is at 6:30, and Rosa lands at 4:10, so there is time to pick her up first."
 
     private static let questions = [
         "What's on this week?",
         "Can you move the dentist to Thursday?",
         "What do we need from the store?",
         "Send me this morning's reading again",
-        "How long to Gia's office?",
+        "How long to Rosa's office?",
     ]
 
     private static let answers = [

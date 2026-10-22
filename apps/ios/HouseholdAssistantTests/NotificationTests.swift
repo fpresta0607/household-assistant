@@ -6,12 +6,12 @@ import XCTest
 
 final class NotificationTests: XCTestCase {
     /// What the gateway seals, as push.js writes it.
-    private static let opened = #"{"conversation":"family","messageId":"m-00000010","sender":"gia","title":"Gia","body":"Dinner is ready 🍝"}"#
+    private static let opened = #"{"conversation":"family","messageId":"m-00000010","sender":"gia","title":"Rosa","body":"Dinner is ready 🍝"}"#
 
     func testAnOpenedNotificationSaysWhoWroteWhatWhere() throws {
         let payload = try JSONDecoder().decode(NotificationPayload.self, from: Data(Self.opened.utf8))
 
-        XCTAssertEqual(payload, NotificationPayload(conversation: .family, messageId: "m-00000010", sender: "gia", title: "Gia", body: "Dinner is ready 🍝"))
+        XCTAssertEqual(payload, NotificationPayload(conversation: .family, messageId: "m-00000010", sender: "gia", title: "Rosa", body: "Dinner is ready 🍝"))
         XCTAssertEqual(payload.userInfo, ["conversation": "family", "messageId": "m-00000010"])
     }
 
@@ -26,9 +26,9 @@ final class NotificationTests: XCTestCase {
     /// Anything else leaves Apple's plain "New message" showing, which still says there is one.
     func testANotificationThatDoesNotSayEverythingIsNotOpened() {
         for json in [
-            #"{"conversation":"family","messageId":"m-00000010","title":"Gia","body":"hi"}"#,
-            #"{"conversation":"telegram","messageId":"m-00000010","sender":"gia","title":"Gia","body":"hi"}"#,
-            #"{"conversation":"family","sender":"gia","title":"Gia","body":"hi"}"#,
+            #"{"conversation":"family","messageId":"m-00000010","title":"Rosa","body":"hi"}"#,
+            #"{"conversation":"telegram","messageId":"m-00000010","sender":"gia","title":"Rosa","body":"hi"}"#,
+            #"{"conversation":"family","sender":"gia","title":"Rosa","body":"hi"}"#,
             "",
         ] {
             XCTAssertNil(try? JSONDecoder().decode(NotificationPayload.self, from: Data(json.utf8)), json)
@@ -108,7 +108,7 @@ final class NotificationTests: XCTestCase {
     private static let household = NotificationPeople(
         me: "franco",
         assistant: "corey",
-        names: ["franco": "Franco", "gia": "Gia", "corey": "Corey", "denise": "Denise"]
+        names: ["franco": "Leo", "gia": "Rosa", "corey": "Corey", "denise": "Denise"]
     )
 
     /// The app writes it and the extension reads it, each in its own process.

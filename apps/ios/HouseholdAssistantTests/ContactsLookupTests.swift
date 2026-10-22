@@ -7,8 +7,8 @@ import XCTest
 @testable import HouseholdAssistant
 
 final class ContactsLookupTests: XCTestCase {
-    private static let draft = MessageCard(to: "Gia", text: "Running 10 minutes late, start without me.")
-    private static let gia = MessageContact(id: "c-1", name: "Gia Marlowe", names: ["Gia", "Marlowe"], address: "+1 317 555 0142")
+    private static let draft = MessageCard(to: "Rosa", text: "Running 10 minutes late, start without me.")
+    private static let rosa = MessageContact(id: "c-1", name: "Rosa Marlowe", names: ["Rosa", "Marlowe"], address: "+1 317 555 0142")
     private static let accesses: [PermissionStatus] = [.notAsked, .allowed, .denied]
 
     func testWithTheSwitchOffNoCardLooksInContacts() {
@@ -30,7 +30,7 @@ final class ContactsLookupTests: XCTestCase {
     }
 
     func testACardThatKnowsWhoNeverLooksAgain() {
-        let recipients: [MessageRecipient] = [.one(Self.gia), .several([Self.gia]), .nobody, .noAccess]
+        let recipients: [MessageRecipient] = [.one(Self.rosa), .several([Self.rosa]), .nobody, .noAccess]
         for recipient in recipients {
             // Arrange
             var state = MessageCardState(card: Self.draft)

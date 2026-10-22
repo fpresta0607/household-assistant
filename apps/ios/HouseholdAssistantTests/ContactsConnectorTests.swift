@@ -33,10 +33,10 @@ final class ContactsConnectorTests: XCTestCase {
     func testThePeopleChosenAreNamedThreeAtATime() {
         let cases: [(names: [String], words: String?)] = [
             ([], nil),
-            (["Gia"], "Gia"),
-            (["Gia", "Mom", "Mike Rossi"], "Gia, Mom, Mike Rossi"),
-            (["Gia", "Mom", "Mike Rossi", "Sarah Lee"], "Gia, Mom, Mike Rossi and 1 more"),
-            (["Gia", "Mom", "Mike Rossi", "Sarah Lee", "Ann", "Bo"], "Gia, Mom, Mike Rossi and 3 more"),
+            (["Rosa"], "Rosa"),
+            (["Rosa", "Mom", "Mike Rossi"], "Rosa, Mom, Mike Rossi"),
+            (["Rosa", "Mom", "Mike Rossi", "Sarah Lee"], "Rosa, Mom, Mike Rossi and 1 more"),
+            (["Rosa", "Mom", "Mike Rossi", "Sarah Lee", "Ann", "Bo"], "Rosa, Mom, Mike Rossi and 3 more"),
         ]
         for (names, words) in cases {
             XCTAssertEqual(ContactsConnector.chosen(names), words, "\(names)")

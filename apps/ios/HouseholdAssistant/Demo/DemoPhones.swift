@@ -1,5 +1,5 @@
 #if DEBUG
-// Franco's iPhones in the made-up household, as Corey's gateway lists them for Account
+// Leo's iPhones in the made-up household, as Corey's gateway lists them for Account
 // and as the approved Settings page shows them: this iPhone, and his iPad Air seen
 // yesterday. A removal and a setup code are answered in the shape the household-app
 // plugin's contract gives them, and a removal is applied, so the demo and the

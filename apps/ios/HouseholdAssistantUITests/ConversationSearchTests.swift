@@ -1,6 +1,6 @@
 // Searching a whole conversation from the plus menu, and what was shared from Chats (CFO
 // notes section 5), on the demo's search thread (DemoSearchThread): 130 messages in
-// Franco's own thread, so its oldest are only found once older pages are read.
+// Leo's own thread, so its oldest are only found once older pages are read.
 //
 // Search is the plus menu's last tile. What is typed lists every message that holds it
 // with who, when and a line of it; a pick brings that message into view and lights it up

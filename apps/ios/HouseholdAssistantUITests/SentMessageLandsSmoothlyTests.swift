@@ -1,4 +1,4 @@
-// What Franco sends lands in Corey's thread in one smooth movement: it rises out of its own
+// What Leo sends lands in Corey's thread in one smooth movement: it rises out of its own
 // corner just above the composer and stays there, through the gateway keeping it a moment
 // later and "Delivered" showing under it. Nothing about it moves or changes size once it
 // has landed. The demo keeps what he sends two seconds later, as a gateway over a slow

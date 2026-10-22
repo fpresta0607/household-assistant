@@ -38,7 +38,7 @@ final class TodayCardTests: XCTestCase {
         // Assert
         XCTAssertTrue(card.label.contains("Next, Dentist"), card.label)
         XCTAssertTrue(card.label.contains("the roads are light"), card.label)
-        XCTAssertTrue(card.label.contains("Then Lunch with Gia"), card.label)
+        XCTAssertTrue(card.label.contains("Then Lunch with Rosa"), card.label)
         XCTAssertTrue(card.label.contains("Then Soccer pickup"), card.label)
         let verse = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Psalm 46:10")).firstMatch
         XCTAssertTrue(verse.exists, "the day's verse is not at the foot of the card")

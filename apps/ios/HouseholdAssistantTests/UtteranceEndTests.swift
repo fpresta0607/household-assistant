@@ -67,7 +67,7 @@ final class UtteranceEndTests: XCTestCase {
             ("Add eggs and", UtteranceEnd.longerPause),
             ("Remind me to call the", UtteranceEnd.longerPause),
             ("What's on tomorrow, um", UtteranceEnd.longerPause),
-            ("Text Gia that I'm on my", UtteranceEnd.longerPause),
+            ("Text Rosa that I'm on my", UtteranceEnd.longerPause),
             ("Add eggs and milk", UtteranceEnd.pause),
             ("Remind me to call the dentist", UtteranceEnd.pause),
         ]
@@ -134,7 +134,7 @@ final class UtteranceEndTests: XCTestCase {
     func testDroppingWordsKeepsTheRestAsWritten() {
         let cases: [(Int, String, String)] = [
             (2, "One sec. Wait, which one?", "Wait, which one?"),
-            (5, "Gia lands at 4:10. Wait, which recital?", "Wait, which recital?"),
+            (5, "Rosa lands at 4:10. Wait, which recital?", "Wait, which recital?"),
             (3, "Don\u{2019}t stop, it's fine", "fine"),
             (1, "'quoted' word", "word"),
             (0, "  Hello there", "Hello there"),

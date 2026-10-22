@@ -1,5 +1,5 @@
 #if DEBUG
-// Franco's own thread shaped like the real one the owner found slow on build 14, for the
+// Leo's own thread shaped like the real one the owner found slow on build 14, for the
 // UI test that times each thing he does in it (ChatSpeedTests): 46 entries over four days,
 // five long Markdown replies of about 4,100, 3,450, 2,100, 2,000 and 1,950 characters, the
 // rest short or middling, three calls, four voice notes and two photos. The words are the
@@ -70,7 +70,7 @@ enum DemoHeavyThread {
         "Can you move the dentist to Thursday?",
         "What do we need from the store?",
         "Send me this morning's reading again",
-        "How long to Gia's office?",
+        "How long to Rosa's office?",
     ]
 
     private static let answers = [

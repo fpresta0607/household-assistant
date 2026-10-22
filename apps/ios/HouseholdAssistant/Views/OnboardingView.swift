@@ -17,6 +17,7 @@ struct OnboardingView: View {
 
     @Environment(AppModel.self) private var model
     @Environment(\.reducesMotion) private var reduceMotion
+    @Environment(\.memberName) private var memberName
     @State private var step: Step
     @State private var member: HouseholdMember?
     /// Why the last paste did not pair, in a plain sentence.
@@ -111,8 +112,8 @@ struct OnboardingView: View {
     /// The four in the family room, floating in one after another.
     private var family: some View {
         let faces: [(name: String, look: FaceTile.Look)] = [
-            (HouseholdMember.franco.name, face(of: .franco)),
-            (HouseholdMember.gia.name, face(of: .gia)),
+            (memberName(.franco), face(of: .franco)),
+            (memberName(.gia), face(of: .gia)),
             (HouseholdMember.franco.assistantName, .assistant(emoji: HouseholdMember.franco.assistantEmoji)),
             (HouseholdMember.gia.assistantName, .assistant(emoji: HouseholdMember.gia.assistantEmoji)),
         ]
@@ -135,7 +136,7 @@ struct OnboardingView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Franco, Gia, Corey and Denise")
+        .accessibilityLabel("\(memberName(.franco)), \(memberName(.gia)), Corey and Denise")
         .onAppear {
             isWelcomed = true
         }
@@ -178,7 +179,7 @@ struct OnboardingView: View {
                             AssistantAvatar(emoji: person.assistantEmoji, size: 52, ring: nil)
                         }
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(person.name)
+                            Text(memberName(person))
                                 .font(.title3.weight(.semibold))
                                 .foregroundStyle(Palette.text)
                             Text("with \(person.assistantName)")
@@ -194,7 +195,7 @@ struct OnboardingView: View {
                     .rainbowGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous), isInteractive: true)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(person.name), with \(person.assistantName)")
+                .accessibilityLabel("\(memberName(person)), with \(person.assistantName)")
             }
             Spacer()
             Spacer()
@@ -284,7 +285,7 @@ struct OnboardingView: View {
 
     /// Franco in royal and Gia in rose, the way the welcome draws them.
     private func face(of person: HouseholdMember) -> FaceTile.Look {
-        let initial = String(person.name.prefix(1))
+        let initial = String(memberName(person).prefix(1))
         return person == .franco ? .ownPerson(initial: initial) : .otherPerson(initial: initial)
     }
 

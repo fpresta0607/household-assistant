@@ -7,8 +7,8 @@
 // A change is applied and read back as the gateway would, so the demo
 // and the screenshots show a change landing. Connectors come in the shape
 // deploy/openclaw/plugins/household-app/connectors.js gives a phone that asks for the
-// unavailable ones too: iCloud, Google and Notion start waiting for Franco's sign-in, the
-// mail account is Gia's and so unavailable here, and a sign-in is linked, switched or
+// unavailable ones too: iCloud, Google and Notion start waiting for Leo's sign-in, the
+// mail account is Rosa's and so unavailable here, and a sign-in is linked, switched or
 // forgotten as connect.js does it, listed by the account's name and never its secret.
 
 import Foundation
@@ -200,15 +200,16 @@ final class DemoSettings {
         }
     }
 
-    /// Named as the approved page names them: SIQsermon and Scripture for faith, Search
-    /// and Reading pages for the web. iCloud, Google and Notion sign in as connectors.js
+    /// Named as the approved page names them, with a made-up Sermon notes in place of the
+    /// household's own sermon archive: Sermon notes and Scripture for faith, Search and
+    /// Reading pages for the web. iCloud, Google and Notion sign in as connectors.js
     /// has them, by app password, Google's own sign-in and a pasted token until the
-    /// household's Notion connection is set up, so ten are on until Franco signs in. The
-    /// mail account is only on Gia's gateway, so Corey's never lists it.
+    /// household's Notion connection is set up, so ten are on until Leo signs in. The
+    /// mail account is only on Rosa's gateway, so Corey's never lists it.
     private static let connectors: [ConnectorListing] = [
         ConnectorListing(id: "pocket-piggies", name: "PocketPiggies", category: "money", icon: "pocketpiggies", summary: "Budgets, savings and the kids' allowances",
             capabilities: ["Reads your budgets, balances and spending", "Answers money questions in your own chat only"]),
-        ConnectorListing(id: "siqsermon", name: "SIQsermon", category: "faith", icon: "siqsermon", summary: "Sermons and their notes",
+        ConnectorListing(id: "sermon-notes", name: "Sermon notes", category: "faith", icon: "symbol:text.book.closed", summary: "Sermons and their notes",
             capabilities: ["Finds sermons and their notes", "Does word studies"]),
         ConnectorListing(id: "scripture", name: "Scripture", category: "faith", icon: "symbol:book", summary: "Berean Standard Bible",
             capabilities: ["Looks up any passage in the Berean Standard Bible"]),
@@ -410,13 +411,13 @@ final class DemoSettings {
         return settings
     }
 
-    /// The account a sign-in from Franco's phone links: his own Google account, the iCloud
+    /// The account a sign-in from Leo's phone links: his own Google account, the iCloud
     /// address he typed, or the household's Notion workspace.
     private static func account(for connector: ConnectorListing, username: String?) -> Account {
         let now = Date()
         switch connector.id {
         case "gog":
-            return Account(id: "gog:app", name: "Franco Marlowe", email: "franco@example.com", linkedAt: now, abilities: connector.capabilities)
+            return Account(id: "gog:app", name: "Leo Marlowe", email: "leo@example.com", linkedAt: now, abilities: connector.capabilities)
         case "notion":
             return Account(
                 id: "notion:app",

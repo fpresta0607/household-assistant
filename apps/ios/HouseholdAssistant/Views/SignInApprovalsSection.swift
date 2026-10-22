@@ -6,6 +6,7 @@ import SwiftUI
 
 struct SignInApprovalsSection: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.memberName) private var memberName
 
     var body: some View {
         let approvals = model.signInApprovals
@@ -23,7 +24,7 @@ struct SignInApprovalsSection: View {
     }
 
     private func row(_ request: AppleSignInRequest) -> some View {
-        let person = HouseholdMember(rawValue: request.person)?.name ?? request.person
+        let person = HouseholdMember(rawValue: request.person).map(memberName) ?? request.person
         let asked = Date(timeIntervalSince1970: Double(request.at) / 1000)
         return SettingsRow(request.name, subtitle: "Joins as \(person), asked \(asked.formatted(.relative(presentation: .named)))") {
             SymbolTile("iphone", color: Palette.gold)

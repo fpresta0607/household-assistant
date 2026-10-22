@@ -66,7 +66,7 @@ final class TapbackTests: XCTestCase {
     }
 
     func testVoiceOverSaysWhoReactedAndHowAsMessagesDoes() {
-        let names = ["franco": "You", "gia": "Gia", "corey": "Corey", "denise": "Denise"]
+        let names = ["franco": "You", "gia": "Rosa", "corey": "Corey", "denise": "Denise"]
         let reactions = [
             RoomReaction(author: "gia", emoji: Tapback.heart.emoji),
             RoomReaction(author: "corey", emoji: Tapback.thumbsUp.emoji),
@@ -77,7 +77,7 @@ final class TapbackTests: XCTestCase {
         ]
         XCTAssertEqual(
             Tapback.spoken(reactions) { names[$0] ?? $0 },
-            "Gia loved this, Corey liked this, Denise laughed at this, You emphasized this, Gia questioned this, Corey reacted with \u{1F989}"
+            "Rosa loved this, Corey liked this, Denise laughed at this, You emphasized this, Rosa questioned this, Corey reacted with \u{1F989}"
         )
         XCTAssertEqual(Tapback.spoken([]) { $0 }, "")
     }

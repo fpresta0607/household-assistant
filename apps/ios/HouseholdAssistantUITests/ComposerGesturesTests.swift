@@ -275,7 +275,7 @@ final class ComposerGesturesTests: XCTestCase {
             words.formUnion(lines.allElementsBoundByIndex.map(\.label))
         }
         XCTAssertEqual(words.count, 3, "the room showed \(words.count) lines for three changes: \(words). \(thread.log)")
-        for said in ["Franco changed the group color", "Franco set the group's appearance to Custom", "Franco changed the group's background to Night"] {
+        for said in ["Leo changed the group color", "Leo set the group's appearance to Custom", "Leo changed the group's background to Night"] {
             XCTAssertTrue(words.contains { $0.hasPrefix(said) }, "no line says \"\(said)\": \(words)")
         }
     }

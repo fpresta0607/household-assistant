@@ -55,8 +55,8 @@ final class ConnectorAccountsTests: XCTestCase {
         XCTAssertEqual(google.capabilities, ["Reads your Gmail", "Reads and adds events in Google Calendar"])
         XCTAssertEqual(google.linkedAccounts.map(\.id), ["gog:app", "gog:box:1a2b3c4d"])
         let app = try XCTUnwrap(google.linkedAccounts.first)
-        XCTAssertEqual(app.name, "Franco Marlowe")
-        XCTAssertEqual(app.email, "franco@example.com")
+        XCTAssertEqual(app.name, "Leo Marlowe")
+        XCTAssertEqual(app.email, "leo@example.com")
         XCTAssertEqual(app.linkedDate, Date(timeIntervalSince1970: 1_792_018_799.5))
         XCTAssertEqual(app.status, .ok)
         XCTAssertTrue(app.canDisconnect)
@@ -151,17 +151,17 @@ final class ConnectorAccountsTests: XCTestCase {
         let google = try JSONDecoder().decode(Connector.self, from: Data(#"""
             {"id":"gog","name":"Google","category":"calendar-and-mail","icon":"google","summary":"Gmail and Google Calendar","isOn":true,
             "signIn":"oauth","accounts":1,"state":"connected","reason":null,"capabilities":[],"signInKind":"oauth",
-            "linkedAccounts":[{"id":"gog:app","name":"Gia Marlowe","email":"gia@example.com","linkedAt":1792018799500,"status":"ok","abilities":[],"canDisconnect":true}],
+            "linkedAccounts":[{"id":"gog:app","name":"Rosa Marlowe","email":"rosa@example.com","linkedAt":1792018799500,"status":"ok","abilities":[],"canDisconnect":true}],
             "oauth":null}
             """#.utf8))
 
-        XCTAssertEqual(google.line, "gia@example.com")
+        XCTAssertEqual(google.line, "rosa@example.com")
         XCTAssertNil(google.signInNeed)
     }
 
     func testAnAccountSaysWhenItsSignInNoLongerWorksAndHowToSignInAgain() {
         let account = { (status: LinkedAccount.Status) in
-            LinkedAccount(id: "gog:app", name: "Gia", email: nil, linkedAt: nil, status: status, abilities: [], canDisconnect: true)
+            LinkedAccount(id: "gog:app", name: "Rosa", email: nil, linkedAt: nil, status: status, abilities: [], canDisconnect: true)
         }
         let cases: [(status: LinkedAccount.Status, words: String?, switchWords: String)] = [
             (.ok, nil, "Switch account"),

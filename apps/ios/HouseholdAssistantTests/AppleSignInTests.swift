@@ -1,5 +1,5 @@
 // Sign in with Apple, the phone's half: the three routes it calls before it is paired,
-// the text Franco's phone signs to let somebody in, and his list of who is waiting.
+// the text Leo's phone signs to let somebody in, and his list of who is waiting.
 // The gateway's half is deploy/openclaw/plugins/household-app/apple-signin.js.
 
 import XCTest
@@ -52,10 +52,10 @@ final class AppleSignInTests: XCTestCase {
     func testAKnownAppleIDGetsASetupCode() async throws {
         let routes = Routes()
         routes.answers["pair"] = (200, #"{"setupCode":"the-code","expiresAtMs":1792540860000}"#)
-        let answer = try await gateway(routes).pair(identityToken: "apple-token", nonce: "raw-nonce", name: "Gia's iPhone")
+        let answer = try await gateway(routes).pair(identityToken: "apple-token", nonce: "raw-nonce", name: "Rosa's iPhone")
         XCTAssertEqual(answer, .setupCode("the-code"))
         XCTAssertEqual(routes.sent.last?.url.path, "/household-app/apple/pair")
-        XCTAssertEqual(routes.sent.last?.body, ["identityToken": "apple-token", "nonce": "raw-nonce", "name": "Gia's iPhone"])
+        XCTAssertEqual(routes.sent.last?.body, ["identityToken": "apple-token", "nonce": "raw-nonce", "name": "Rosa's iPhone"])
     }
 
     func testAnUnknownAppleIDWaitsWithATicket() async throws {
@@ -97,7 +97,7 @@ final class AppleSignInTests: XCTestCase {
 
     // MARK: - Pairing from onboarding
 
-    /// A setup code as the gateway issues it, for Gia on Denise's gateway, good until 2100.
+    /// A setup code as the gateway issues it, for Rosa on Denise's gateway, good until 2100.
     private static let giasCode = Base64URL.encode(Data(
         #"{"url":"wss://household.example.ts.net:18790","bootstrapToken":"boot","expiresAtMs":4102444800000,"person":"gia","assistant":"Denise"}"#.utf8
     ))
@@ -118,7 +118,7 @@ final class AppleSignInTests: XCTestCase {
 
         let nonce = await flow.begin(.gia)
         XCTAssertEqual(flow.phase, .idle, "ready for Apple's sheet")
-        let code = await flow.finish(identityToken: "apple-token", name: "Gia's iPhone")
+        let code = await flow.finish(identityToken: "apple-token", name: "Rosa's iPhone")
 
         XCTAssertEqual(nonce, "raw-nonce")
         XCTAssertEqual(code?.person, "gia")
@@ -136,7 +136,7 @@ final class AppleSignInTests: XCTestCase {
         let flow = pairing(routes, credentials)
 
         _ = await flow.begin(.gia)
-        let code = await flow.finish(identityToken: "apple-token", name: "Gia's iPhone")
+        let code = await flow.finish(identityToken: "apple-token", name: "Rosa's iPhone")
 
         XCTAssertNil(code)
         XCTAssertEqual(flow.phase, .waiting(.gia))
@@ -144,7 +144,7 @@ final class AppleSignInTests: XCTestCase {
         XCTAssertEqual(pairing(routes, credentials).phase, .waiting(.gia))
     }
 
-    func testAWaitingPhonePairsOnceFrancoSaysYes() async throws {
+    func testAWaitingPhonePairsOnceLeoSaysYes() async throws {
         let routes = Routes()
         let credentials = MemoryCredentialStore()
         credentials.appleSignInWait = AppleSignInWait(member: "gia", requestId: "gia-req-1", ticket: "the-ticket")
