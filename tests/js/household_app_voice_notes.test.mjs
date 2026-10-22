@@ -265,9 +265,7 @@ test("a weigh-in said in a voice note is logged as rows from its turn, the uncle
         { item: "Olive", text: "205 g" },
       ],
     })).content[0].text);
-    const outboxFile = path.join(channel.stateDir, "household-app", "outbox.json");
-    await until("the rows in the outbox", async () => (await readFile(outboxFile, "utf8").catch(() => "")).includes("205 g"));
-    const outbox = JSON.parse(await readFile(outboxFile, "utf8"));
+    const kept = JSON.parse((await tool.execute("call-2", { action: "view", topic: "Kitten weights" })).content[0].text);
 
     // Assert
     assert.match(channel.contexts[0].supplemental.groupSystemPrompt, /^This message is a voice note/);
@@ -276,7 +274,7 @@ test("a weigh-in said in a voice note is logged as rows from its turn, the uncle
     assert.equal(channel.contexts[1].supplemental, undefined, "a typed message is no voice note");
     assert.match(answer.logged, /^3 rows under "Kitten weights", [A-Z][a-z]{2}, [A-Z][a-z]{2} \d+$/);
     assert.deepEqual(answer.ask, [{ item: "Biscuit", heard: "two-ten or two-twenty" }]);
-    assert.deepEqual(outbox.notes.map((step) => [step.line.item, step.line.text]), [["Mochi", "212 g"], ["Pepper", "198 g"], ["Olive", "205 g"]], "the unclear one is not logged");
+    assert.deepEqual(kept.lines.map((line) => [line.item, line.text]), [["Mochi", "212 g"], ["Pepper", "198 g"], ["Olive", "205 g"]], "the unclear one is not logged");
   } finally {
     await channel.stop();
   }

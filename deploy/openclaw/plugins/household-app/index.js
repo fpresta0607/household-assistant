@@ -120,6 +120,7 @@ import { createPhones, removeThroughOpenClaw } from "./phones.js";
 import { createHttp2Transport, createPush } from "./push.js";
 import { REACT_TOOL, createReactTool } from "./react-tool.js";
 import { createRoom } from "./room.js";
+import { SEND_TOOL, createSendTool, createSends, refuseDirectSend } from "./send-tool.js";
 import { assistantPage, createSettings, nameOf } from "./settings.js";
 import { openSettingsStore } from "./settings-store.js";
 import { isTextSignedBy } from "./signature.js";
@@ -883,6 +884,20 @@ function startRoom(ctx) {
     log,
   });
 
+  // A draft the owner sends with one tap (send-tool.js). Email goes from the owner's own
+  // Gmail, the one the order mail reader reads, through gog with no shell; an order's tap
+  // hands over the cart's checkout link, where the buyer pays.
+  const sends = createSends({
+    cart,
+    canEmail: Boolean(config.orderMail?.account),
+    deliver: async (draft, signal) => {
+      if (draft.kind === "order") return { sent: "checkout", total: draft.total, ...(draft.checkout ? { checkout: draft.checkout } : {}), cart: cart.card() };
+      await runMail("gog", ["--no-input", "--account", config.orderMail.account, "gmail", "send", "--to", draft.to, "--subject", draft.subject, "--body", draft.body, "--json"], signal);
+      log.info(`${PLUGIN_ID}: a ${draft.kind} the owner approved was sent`);
+      return { sent: true, kind: draft.kind, to: draft.to, subject: draft.subject };
+    },
+  });
+
   // Where the owner is, from the same phones that sign the owner's messages. Never in the
   // store or the outbox, so the relay carries none of it to the other gateway.
   const location = createLocation({ phoneKeys: () => room.refreshPhoneKeys() });
@@ -897,6 +912,7 @@ function startRoom(ctx) {
     announce: (entry) => room.announce(entry),
     ownerKeys: () => room.refreshPhoneKeys(),
     isSignedBy: isTextSignedBy,
+    draftFor: (toolCallId) => sends.draftFor(toolCallId),
     resolve: ({ approvalId, approvalKind, decision }) =>
       runInChannel(() => resolveApprovalOverGateway({
         cfg: cfg(),
@@ -911,7 +927,8 @@ function startRoom(ctx) {
 
   return {
     room, media, store, inbox, drain, owner, peerPerson, pairing, nonces, appleSignIn, tick, location, approvals, cart, cartOrdered,
-    notes, videos, images, stopBounds,
+    notes, videos, images, stopBounds, sends,
+    canEmail: Boolean(config.orderMail?.account),
     orderMail,
     log,
     peerAssistantName: configuredPeerAssistantName,
@@ -1467,6 +1484,23 @@ function registerFull(api) {
   // Old family destinations resolve to the app once, with no Telegram copy.
   const familyPosts = createFamilyPosts({ config: () => runtime.config.current() });
   api.on("before_tool_call", (event, context) => familyPosts.beforeToolCall(event, context), { matcher: FAMILY_POST_TOOLS });
+  // A draft the owner sends with one tap, in the owner's own turns only, and the yes it
+  // waits for, which freezes the draft (send-tool.js). Without a running channel there is
+  // no card to tap, so it is refused. A command's own Gmail send is refused everywhere.
+  api.registerTool(
+    (context) => live && createSendTool({
+      context,
+      owner: live.owner.id,
+      people: [live.owner.id, live.peerPerson.id],
+      sends: live.sends,
+      canEmail: live.canEmail,
+    }),
+    { names: [SEND_TOOL], optional: true },
+  );
+  api.on("before_tool_call", (event, context) => (live
+    ? live.sends.ask(event, context, { ownerSessions: [live.ownerSession, live.ownersFamilySession] })
+    : { block: true, blockReason: "The Steward app's channel is not running, so there is no card to tap." }), { matcher: [SEND_TOOL] });
+  api.on("before_tool_call", (event) => refuseDirectSend(event), { matcher: ["exec"] });
   // The household cart, in the owner's own thread and the family room.
   api.registerTool(
     (context) => live && createCartTool({ context, owner: live.owner.id, people: [live.owner, live.peerPerson], cart: live.cart }),
