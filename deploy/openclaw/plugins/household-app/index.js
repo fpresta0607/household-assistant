@@ -102,6 +102,8 @@ import { LOCATION_TOOL, createLocationTool } from "./location-tool.js";
 import { MAX_MEDIA_BYTES, createMediaStore } from "./media.js";
 import { isMentioned } from "./mentions.js";
 import { MICROSOFT_ENV, createMicrosoftConnector } from "./microsoft-connect.js";
+import { createMeals } from "./meals.js";
+import { MEALS_TOOL, createMealsTool } from "./meals-tool.js";
 import { createModelCatalog } from "./models.js";
 import { createNoteTool } from "./note-tool.js";
 import { NOTE_TOOL, createNotes } from "./notes.js";
@@ -837,6 +839,10 @@ function startRoom(ctx) {
     changed: () => room.publishOutbox(),
   });
 
+  // The week's dinners the assistant proposed, until one is accepted into the cart (meals.js).
+  // Only the cart's own steps cross.
+  const meals = createMeals({ file: path.join(directory, "meals.sqlite") });
+
   // The other gateway's half of the family room, as relay-in.mjs leaves it.
   const inbox = path.join(directory, "inbox");
   let draining = Promise.resolve();
@@ -948,7 +954,7 @@ function startRoom(ctx) {
 
   return {
     room, media, store, inbox, drain, owner, peerPerson, pairing, nonces, appleSignIn, tick, location, approvals, cart, cartOrdered,
-    notes, videos, images, stopBounds, sends, wishes,
+    notes, videos, images, stopBounds, sends, wishes, meals,
     canEmail: Boolean(config.orderMail?.account),
     orderMail,
     log,
@@ -1176,6 +1182,7 @@ export const householdChannel = createChatChannelPlugin({
           started.cart.close();
           started.notes.close();
           started.wishes.close();
+          started.meals.close();
           ctx.setStatus(channelStoppedPatch({ accountId: ctx.accountId }));
         }
       },
@@ -1570,6 +1577,18 @@ function registerFull(api) {
   api.registerTool(
     (context) => live && createCartTool({ context, owner: live.owner.id, people: [live.owner, live.peerPerson], cart: live.cart }),
     { names: [CART_TOOL], optional: true },
+  );
+  // The meal plan that builds the cart, in the owner's own thread and the family room.
+  api.registerTool(
+    (context) => live && createMealsTool({
+      context,
+      owner: live.owner.id,
+      people: [live.owner, live.peerPerson],
+      meals: live.meals,
+      notes: live.notes,
+      cart: live.cart,
+    }),
+    { names: [MEALS_TOOL], optional: true },
   );
   // The household note, in the owner's own thread and the family room.
   api.registerTool(

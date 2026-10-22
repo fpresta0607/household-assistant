@@ -583,6 +583,12 @@ function isAutomation(value) {
       };
     },
 
+    // Every open line not done of each topic whose name matches `pattern`, as the thing it
+    // names: its item, or its words when it has none. The meal plan's kitchen (meals.js).
+    thingsIn(pattern) {
+      return lines().filter((line) => pattern.test(line.topic) && line.automation === undefined && !line.done).map((line) => line.item ?? line.text);
+    },
+
     // One open line, as a view shows it.
     line(id) {
       return viewedLine(openLine(id));

@@ -55,6 +55,7 @@ def node_or_skip() -> str:
         "household_app_home.test.mjs",
         "household_app_location.test.mjs",
         "household_app_maps.test.mjs",
+        "household_app_meals.test.mjs",
         "household_app_media.test.mjs",
         "household_app_order_mail.test.mjs",
         "household_app_mentions.test.mjs",
