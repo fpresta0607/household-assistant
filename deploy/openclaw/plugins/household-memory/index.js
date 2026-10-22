@@ -173,10 +173,10 @@ export function createMemory(api, config, options = {}) {
     }
     if (appFamilySession && sessionKey === appFamilySession) {
       const senderId = telegramIdOfApp(appPeople, rawSenderId);
-      return senderId ? { isPrivate: false, whoId: senderId } : null;
+      return senderId ? { isPrivate: false, whoId: senderId, isApp: true } : null;
     }
     if (appOwnersFamilySession && sessionKey === appOwnersFamilySession) {
-      return telegramIdOfApp(appPeople, rawSenderId) === owner ? { isPrivate: false, whoId: owner, isOwnersTurn: true } : null;
+      return telegramIdOfApp(appPeople, rawSenderId) === owner ? { isPrivate: false, whoId: owner, isOwnersTurn: true, isApp: true } : null;
     }
     if (typeof sessionKey === "string" &&
       (ownerSession.test(sessionKey) || operatorSession.test(sessionKey) || sessionKey === appOwnerSession)) {
@@ -254,8 +254,12 @@ export function createMemory(api, config, options = {}) {
         api.logger.error(`${PLUGIN_ID}: the kept list is full, a request was not kept`);
         sections.push("This request could not be kept: the kept list is full. Tell them so, plainly.");
       } else {
+        // What is kept for the family on this gateway is this assistant's alone, so in the
+        // app's family room it goes into the household note too, the one record both
+        // assistants answer from (household-app's notes.js).
+        const forBoth = chat.isApp ? " It is for the family, so also add it to the household note with household_note, where the other assistant reads it too." : "";
         sections.push(outcome.isNew
-          ? `You have just kept this as #${outcome.kept.id} for ${outcome.kept.who}. Confirm briefly that you will remember it.`
+          ? `You have just kept this as #${outcome.kept.id} for ${outcome.kept.who}. Confirm briefly that you will remember it.${forBoth}`
           : `This is already kept as #${outcome.kept.id}.`);
       }
     }

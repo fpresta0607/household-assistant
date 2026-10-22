@@ -1,7 +1,7 @@
 ---
 name: coordinate
 # Kept under the 220 characters the skill catalog renders before it truncates.
-description: "Talk to the other household assistant. Use when coordinating Franco and Gia: availability, a shared plan, a date night. Everything said this way is posted in the family group first, where both people read it."
+description: "Talk to the other household assistant on Telegram, posted in the family group first. In the app, hand it over with household_note hand instead. Use for availability, a shared plan, a date night."
 metadata:
   {
     "openclaw":
@@ -11,7 +11,12 @@ metadata:
 
 # Coordinate
 
-Corey works for Franco. Denise works for Gia. Telegram will not deliver one bot's messages to the other, so this skill is the only way the two of you reach each other.
+Corey works for Franco. Denise works for Gia. Telegram will not deliver one bot's messages to the other, so on Telegram this skill is the only way the two of you reach each other.
+
+**In the Steward app you have a direct line instead: `household_note` with `hand`.**
+It hands the other assistant a question or a piece of work without a word in the family room, their side marks it seen at once and answers it, and your next turn shows the answer.
+Franco and Gia can watch every word of that line in the app, so the rules below about what you may answer from hold there too.
+Use this skill only for a conversation on Telegram.
 
 **Everything you say through it is posted in the family group, word for word, before the other assistant sees it.**
 There is no private channel between you, there never will be, and that is the point: Franco and Gia read every word the two of you exchange.

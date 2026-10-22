@@ -97,6 +97,7 @@ import { HOME_TOOL, createHomeTool } from "./home-tool.js";
 import { createLocation } from "./location.js";
 import { LOCATION_TOOL, createLocationTool } from "./location-tool.js";
 import { MAX_MEDIA_BYTES, createMediaStore } from "./media.js";
+import { isMentioned } from "./mentions.js";
 import { MICROSOFT_ENV, createMicrosoftConnector } from "./microsoft-connect.js";
 import { createModelCatalog } from "./models.js";
 import { createNoteTool } from "./note-tool.js";
@@ -132,6 +133,12 @@ export const CHANNEL = "household";
 const ACCOUNT = "default";
 const AGENT = "main";
 const FAMILY = "family";
+// The two assistants' direct line: a handoff from the other one starts a turn in this
+// group's session, with The Fam's tools (family-tools.js), and is posted nowhere.
+const PAIR = "pair";
+// A handoff starts a turn only while it is this fresh; an older one, from before a restart,
+// is marked seen and waits in the note.
+const HANDOFF_WITHIN_MS = 10 * 60_000;
 const ROOM_HISTORY = 20;
 const MAX_INBOX_FILE = 64 * 1024 * 1024;
 const INBOX_SCAN_MS = 2000;
@@ -140,6 +147,8 @@ const ORDER_MAIL_MS = 30 * 60_000;
 const ORDER_MAIL_FIRST_MS = 2 * 60_000;
 // How often calls past their thirty days are dropped while the channel runs.
 const OLD_CALLS_MS = 6 * 3_600_000;
+// How often this assistant's family reminders are checked for one that came due.
+const REMINDERS_MS = 30_000;
 const execFileAsync = promisify(execFile);
 // One mail binary's run: no shell, a minute at most, the bytes as they came, and stopped
 // with the channel.
@@ -361,7 +370,7 @@ function startRoom(ctx) {
       cfg: cfg(),
       channel: CHANNEL,
       accountId: ACCOUNT,
-      peer: conversation === FAMILY ? { kind: "group", id: FAMILY } : { kind: "direct", id: owner.id },
+      peer: conversation === FAMILY || conversation === PAIR ? { kind: "group", id: conversation } : { kind: "direct", id: owner.id },
     }).route;
 
   const apns = process.env.HOUSEHOLD_APNS_KEY_ID && process.env.HOUSEHOLD_APNS_TEAM_ID && process.env.HOUSEHOLD_APNS_PRIVATE_KEY
@@ -412,6 +421,15 @@ function startRoom(ctx) {
     return !decision.shouldSkip;
   }
 
+  // Whether a family message asks the other assistant too: its @mention, its name typed, or
+  // its name heard in a voice note, the way this gateway hears its own (isAddressed).
+  async function isPeerAddressed(message) {
+    const name = configuredPeerAssistantName;
+    if (isMentioned(message.text, name) || isNameSpoken(message.text, name)) return true;
+    const heard = await hearing.words(message);
+    return Boolean(heard) && isNameSpoken(heard, name);
+  }
+
   // The family room's recent messages before this one, as OpenClaw's group history.
   function historyBefore(message) {
     const names = Object.fromEntries(room.participants().map((who) => [who.id, who.name]));
@@ -435,13 +453,20 @@ function startRoom(ctx) {
   // thread has, before the rest of the family; or anyone else's, without the owner's
   // private things, which that turn's tools cannot reach either (family-tools.js).
   // The other assistant's name is the configured one, never the name its gateway relays.
-  function familyTurnInstruction(author) {
+  //
+  // A question both assistants were asked gets one answer, for both of them (room.js claims).
+  function familyTurnInstruction(author, claim) {
     const privateThings = `${owner.name}'s private things, such as money, mail, calendar details and private notes`;
+    const forBoth = claim === "claimed"
+      ? ` They asked ${configuredPeerAssistantName} too, who leaves it to you: give the one answer for both of you, from the household note and what you know, and do not say you will check with ${configuredPeerAssistantName}.`
+      : claim === "tookOver"
+        ? ` They asked ${configuredPeerAssistantName} first, who has not answered, so give the one answer for both of you, from the household note and what you know.`
+        : "";
     if (author.id === owner.id) {
       return `${owner.name}, your own person, wrote this in the family room, which ${peerPerson.name} and ${configuredPeerAssistantName} read too. ` +
-        `Answer ${owner.name} as you would in their own thread, with the same tools and memory, and share ${privateThings} only as far as their question asks.`;
+        `Answer ${owner.name} as you would in their own thread, with the same tools and memory, and share ${privateThings} only as far as their question asks.${forBoth}`;
     }
-    return `${author.name} wrote this in the family room. Answer them for the family; ${privateThings} are not theirs to hear from you.`;
+    return `${author.name} wrote this in the family room. Answer them for the family; ${privateThings} are not theirs to hear from you.${forBoth}`;
   }
 
   // A turn names its message's author as the sender, which OpenClaw hands to tools as the
@@ -462,7 +487,7 @@ function startRoom(ctx) {
   // Photos and image files are read by the selected Vision model after admission.
   // Only its reading reaches the chat model, preventing native vision from bypassing
   // the selection. Videos use their bounded digest; ordinary documents stay unchanged.
-  async function runTurn({ conversation, message, author, handedOver = false, isCall = false }) {
+  async function runTurn({ conversation, message, author, handedOver = false, isCall = false, claim }) {
     const channelRuntime = ctx.channelRuntime ?? runtime.channel;
     const isGroup = conversation === FAMILY;
     const isOwner = author.id === owner.id;
@@ -509,7 +534,7 @@ function startRoom(ctx) {
           ...(isGroup ? { inboundHistory: historyBefore(message) } : {}),
         },
         ...(isCall ? { supplemental: { groupSystemPrompt: CALL_TURN_INSTRUCTION } } : {}),
-        ...(isGroup ? { supplemental: { groupSystemPrompt: familyTurnInstruction(author) } } : {}),
+        ...(isGroup ? { supplemental: { groupSystemPrompt: familyTurnInstruction(author, claim) } } : {}),
         media: toInboundMediaFacts(message.media.filter((item) => item.kind !== "video" && !isImageAttachment(item)).map((item) => ({
           path: media.path(item.id),
           contentType: item.mime,
@@ -580,6 +605,91 @@ function startRoom(ctx) {
     }
   }
 
+  // What a handoff's turn is told: who handed it over, who reads the answer, and that a
+  // person's own things are not the other assistant's to hear.
+  function handoffInstruction() {
+    const people = `${owner.name} and ${peerPerson.name}`;
+    return `${configuredPeerAssistantName} handed you this through your direct line, which ${people} can read in the app. ` +
+      `Your reply is kept as your answer to it, and ${configuredPeerAssistantName} reads it in their next turn; nothing here is posted in the family room. ` +
+      `Answer from what the family shares, such as the household note. ${owner.name}'s private things, such as money, mail, calendar details and private notes, are not ${configuredPeerAssistantName}'s to hear. ` +
+      `When it needs ${owner.name}, say so in a line: it stays in the household note as yours to do, and you mark it done there in a chat with ${owner.name}.`;
+  }
+
+  // One turn for the other assistant's handoff, in the direct line's own session, sent by
+  // that assistant as a bot. Its final reply becomes the handoff's answer (notes.js reply):
+  // nothing reaches the room or a phone, and a tool's post finds no conversation called the
+  // direct line (targetConversation). The turn has no household tool (turn.js), so it cannot
+  // hand anything back.
+  async function runHandoff(line) {
+    const channelRuntime = ctx.channelRuntime ?? runtime.channel;
+    const route = routeFor(PAIR);
+    const target = `${CHANNEL}:${PAIR}`;
+    const body = [line.text, line.due ? `(due ${line.due})` : ""].filter(Boolean).join(" ");
+    const ctxPayload = await channelRuntime.inbound.buildContext({
+      channel: CHANNEL,
+      accountId: ACCOUNT,
+      messageId: line.id,
+      messageIdFull: line.id,
+      timestamp: line.at,
+      from: `${CHANNEL}:${peerAssistant.id}`,
+      sender: { id: peerAssistant.id, name: configuredPeerAssistantName, isBot: true },
+      conversation: { kind: "group", id: PAIR, label: `${assistant.name} and ${configuredPeerAssistantName}` },
+      route: {
+        agentId: route.agentId,
+        dmScope: route.dmScope,
+        accountId: ACCOUNT,
+        routeSessionKey: route.sessionKey,
+        dispatchSessionKey: route.sessionKey,
+      },
+      reply: { to: target, originatingTo: target },
+      message: { inboundEventKind: "user_request", body, rawBody: body, bodyForAgent: body, commandBody: body },
+      supplemental: { groupSystemPrompt: handoffInstruction() },
+      access: {
+        commands: { authorized: false },
+        mentions: { canDetectMention: true, wasMentioned: true, requireMention: true, effectiveWasMentioned: true },
+      },
+      extra: { CommandInterpretationSuppressed: true },
+    });
+    const result = await channelRuntime.inbound.dispatch({
+      cfg: cfg(),
+      channel: CHANNEL,
+      accountId: ACCOUNT,
+      route: { agentId: route.agentId, dmScope: route.dmScope, sessionKey: route.sessionKey },
+      ctxPayload,
+      messageId: line.id,
+      replyOptions: { disableBlockStreaming: true, sourceReplyDeliveryMode: "automatic" },
+      delivery: {
+        deliver: async (payload, info) => {
+          if (info.kind !== "final") return;
+          if (payload.isReasoning || payload.isCommentary || payload.isStatusNotice || payload.isCompactionNotice) return;
+          const answered = notes.reply(line.id, payload.text ?? "");
+          return answered
+            ? {
+                messageIds: [line.id],
+                receipt: createMessageReceiptFromOutboundResults({ results: [{ channel: CHANNEL, messageId: line.id }], kind: "text" }),
+              }
+            : { visibleReplySent: false };
+        },
+        onError: (error) => log.warn(`${PLUGIN_ID}: a handoff's answer was not kept: ${error?.message ?? error}`),
+      },
+    });
+    if (result?.admission?.kind !== "dispatch") {
+      log.info(`${PLUGIN_ID}: a handoff turn was not started: ${result?.admission?.kind ?? "unknown"}`);
+    }
+  }
+
+  // The other assistant's handoffs that just arrived: each marked seen at once, which the
+  // other side reads as acknowledged, and a fresh one answered in a turn of its own.
+  function considerHandoffs(handed = []) {
+    for (const { id, at } of handed) {
+      if (!notes.seen(id)) continue;
+      if (Date.now() - at >= HANDOFF_WITHIN_MS) continue;
+      void runInChannel(() => runHandoff({ ...notes.line(id), at })).catch((error) => {
+        log.warn(`${PLUGIN_ID}: a handoff turn failed to start: ${error?.message ?? error}`);
+      });
+    }
+  }
+
   let writing = Promise.resolve();
   const sessionKeys = { family: routeFor(FAMILY).sessionKey, direct: routeFor("direct").sessionKey };
   // Taken here, while the channel starts, so a phone's turn runs as the channel's, and
@@ -589,6 +699,15 @@ function startRoom(ctx) {
     identity: { owner, assistant, peer: { person: peerPerson, assistant: peerAssistant } },
     sessionKeys,
     ownersFamilySession: ownersFamilySession(owner.id),
+    // When the two assistants' line last moved, for the family room's quiet marker.
+    pairLastAt: () => notes.lastAt(),
+    // Who answers a question both assistants were asked.
+    isPeerAddressed,
+    claims: {
+      claim: (message, options) => notes.claim(message, options),
+      took: (message) => notes.took(message),
+      claimOf: (message) => notes.claimOf(message),
+    },
     phoneKeys: async () => phoneKeysFrom(await listDevicePairing()),
     notificationChoices: (phone) => ownSettings().store.notifications(phone),
     // The agent's own name, which a rename from Settings or the box may leave apart from
@@ -645,12 +764,16 @@ function startRoom(ctx) {
 
   // The household note both assistants write and every app turn starts with (notes.js). Its
   // steps cross in the outbox beside the cart's, and the other gateway's come back the same way.
+  // Every step is also an event of the two assistants' line, which both people's phones show.
   const notes = createNotes({
     file: path.join(directory, "notes.sqlite"),
     assistant,
     peerAssistant: { id: peerAssistant.id, name: configuredPeerAssistantName },
     people: [owner, peerPerson],
-    changed: () => room.publishOutbox(),
+    changed: () => {
+      room.publishOutbox();
+      emit(PAIR, { lastAt: notes.lastAt() });
+    },
   });
 
   // The other gateway's half of the family room, as relay-in.mjs leaves it.
@@ -678,6 +801,7 @@ function startRoom(ctx) {
           if (steps.refused) log.warn(`${PLUGIN_ID}: refused ${steps.refused} cart steps from the other gateway`);
           const noted = notes.acceptPeer(batch);
           if (noted.refused) log.warn(`${PLUGIN_ID}: refused ${noted.refused} household note steps from the other gateway`);
+          considerHandoffs(noted.handed);
         } catch (error) {
           log.warn(`${PLUGIN_ID}: an inbox file was refused: ${error?.message ?? error}`);
         } finally {
@@ -753,6 +877,7 @@ function startRoom(ctx) {
     ownerSession: sessionKeys.direct,
     familySession: sessionKeys.family,
     ownersFamilySession: ownersFamilySession(owner.id),
+    pairSession: routeFor(PAIR).sessionKey,
   };
 }
 
@@ -907,6 +1032,25 @@ export const householdChannel = createChatChannelPlugin({
         dropOldCalls();
         const callsTimer = setInterval(dropOldCalls, OLD_CALLS_MS);
         callsTimer.unref();
+        // This assistant's family reminders that came due (notes.js), each moved on before its
+        // words are posted, so a slow post can never post it twice. A reminder from while the
+        // gateway was down is moved on unposted. A reminder's post is marked like a handed-over
+        // turn's, so its words, whoever they name, start no turn on the other side (room.js).
+        const remind = () => {
+          try {
+            for (const due of started.notes.dueReminders()) {
+              started.notes.fired(due.id);
+              if (due.isLate) continue;
+              void started.room.reply({ conversation: FAMILY, text: `Reminder: ${due.text}`, handedOver: true, isTimeSensitive: true })
+                .catch((error) => ctx.log?.warn?.(`${PLUGIN_ID}: a family reminder was not posted: ${error?.message ?? error}`));
+            }
+          } catch (error) {
+            ctx.log?.warn?.(`${PLUGIN_ID}: family reminders were not checked: ${error?.message ?? error}`);
+          }
+        };
+        remind();
+        const remindersTimer = setInterval(remind, REMINDERS_MS);
+        remindersTimer.unref();
         void started.drain();
         try {
           ctx.setStatus(channelReadyPatch({ accountId: ctx.accountId }));
@@ -917,6 +1061,7 @@ export const householdChannel = createChatChannelPlugin({
           clearTimeout(firstMail);
           clearInterval(mailTimer);
           clearInterval(callsTimer);
+          clearInterval(remindersTimer);
           await reading;
           await started.drain();
           if (live === started) live = null;
@@ -1089,6 +1234,10 @@ function registerFull(api) {
     { scope: "operator.admin" },
   );
   api.registerGatewayMethod(`${PLUGIN_ID}.sync`, method((running, params) => running.room.sync(params)), read);
+  // The two assistants' line, for both people to watch: every step either took in the
+  // household note, a page at a time (notes.js timeline). Not `.pair`, which is the setup
+  // code's above: OpenClaw keeps a method's first registration.
+  api.registerGatewayMethod(`${PLUGIN_ID}.line`, method((running, params) => running.notes.timeline({ before: params?.before, limit: params?.limit })), read);
   api.registerGatewayMethod(`${PLUGIN_ID}.history`, method((running, params) => running.room.history(params)), read);
   api.registerGatewayMethod(
     `${PLUGIN_ID}.send`,
@@ -1193,14 +1342,15 @@ function registerFull(api) {
   // included. A system-prompt addition, never a hook on what is sent, which would end
   // Telegram's streaming preview. Every app turn also starts with the household note
   // (notes.js): the family room's shared session, which the other assistant's handed-over
-  // turns run in, all of it, and the owner's own thread and own session of the room, which
+  // turns run in, and the direct line's, where its handoffs run, all of it, and the owner's
+  // own thread and own session of the room, which
   // hold every tool, the lines this assistant wrote for its owner and a count of the rest.
   api.on("before_prompt_build", (event, context) => {
     const cfg = runtime.config.current();
     if ((context?.agentId !== undefined && context.agentId !== AGENT) || !resolveAccount(cfg).configured) return undefined;
     const sessionKey = context?.sessionKey;
     const isOwnersOwn = live !== null && (sessionKey === live.ownerSession || sessionKey === live.ownersFamilySession);
-    const isAppTurn = isOwnersOwn || (live !== null && sessionKey === live.familySession);
+    const isAppTurn = isOwnersOwn || (live !== null && [live.familySession, live.pairSession].includes(sessionKey));
     const note = isAppTurn ? live.notes.prompt(event?.prompt, isOwnersOwn ? { fullFor: live.owner.id } : {}) : "";
     return { appendSystemContext: [ownSettings().settings.guidance(cfg), householdRoutingGuidance(cfg)].filter(Boolean).join("\n\n"), ...(note ? { prependContext: note } : {}) };
   });

@@ -25,6 +25,24 @@ export function isMentioned(text, name) {
   return mentionOf(name, "iu").test(text);
 }
 
+// True when `text` puts a question to someone called `name` by name, without an @: the name
+// opens the question or closes it, as in "Denise - anything on your side?" or "Anything
+// else, Denise?". On 22 October Corey asked Denise that way twice in the family room and she
+// never answered, since only an @mention handed her a turn. A name inside a question is talk
+// about someone ("did Denise log it?"), and a sentence that asks nothing hands over nothing.
+// Emphasis marks around the name, as Markdown writes them, do not count.
+export function isAskedByName(text, name) {
+  if (typeof text !== "string" || typeof name !== "string" || !name) return false;
+  const called = `@?${escape(name)}(?:\\w*bot)?`;
+  const opens = new RegExp(`^(?:(?:hey|and|so|ok|okay|oh|also)[,\\s]+)?${called}\\s*[,:;\\-\\u2013\\u2014]`, "iu");
+  const closes = new RegExp(`[,\\s]${called}\\s*\\?+$`, "iu");
+  return text
+    .replace(/[*_~`]/g, "")
+    .split(/(?<=[.!?])\s+|\n+/u)
+    .map((sentence) => sentence.trim())
+    .some((sentence) => sentence.endsWith("?") && (opens.test(sentence) || closes.test(sentence)));
+}
+
 // The ids of the participants `text` mentions, in the order the room lists them.
 export function mentionedIds(text, participants) {
   return participants.filter((who) => isMentioned(text, who.name)).map((who) => who.id);

@@ -13,8 +13,10 @@ import { stubChannelSdk } from "./openclaw-channel-sdk.mjs";
 
 const PLUGIN = new URL("../../../deploy/openclaw/plugins/household-app/", import.meta.url);
 
-export async function until(what, condition) {
-  for (let attemptsLeft = 400; attemptsLeft > 0; attemptsLeft -= 1) {
+// `attempts` of 5 ms each; a wait on the inbox, which a busy machine may scan only every two
+// seconds, takes more.
+export async function until(what, condition, { attempts = 400 } = {}) {
+  for (let attemptsLeft = attempts; attemptsLeft > 0; attemptsLeft -= 1) {
     if (await condition()) return;
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
@@ -23,19 +25,26 @@ export async function until(what, condition) {
 
 // `sdk` names more SDK functions to behave, as stubChannelSdk takes them; the first channel
 // a test file runs fixes them for the file, since the plugin's entry is imported once.
-// `transcribeAudioFile` stands in for OpenClaw's speech-to-text.
-export async function runningChannel(cfg, { sdk = {}, transcribeAudioFile } = {}) {
+// `transcribeAudioFile` stands in for OpenClaw's speech-to-text. `stateDir` starts it on the
+// state an earlier channel left, as a gateway restart does. `dispatch` stands in for
+// OpenClaw's run of an admitted turn, such as one that delivers a final reply.
+export async function runningChannel(cfg, {
+  sdk = {},
+  transcribeAudioFile,
+  stateDir: earlierState,
+  dispatch = async () => ({ admission: { kind: "dispatch" } }),
+} = {}) {
   // The plugin reads OpenRouter's model list as it starts.
   globalThis.fetch = async () => {
     throw new Error("no network in tests");
   };
   stubChannelSdk(fileURLToPath(new URL("index.js", PLUGIN)), {
-    resolveChannelInboundRouteEnvelope: `({ peer }) => ({ route: { agentId: "main", dmScope: "per-channel-peer", sessionKey: peer.kind === "group" ? "agent:main:household:group:family" : "agent:main:household:direct:" + peer.id } })`,
+    resolveChannelInboundRouteEnvelope: `({ peer }) => ({ route: { agentId: "main", dmScope: "per-channel-peer", sessionKey: "agent:main:household:" + (peer.kind === "group" ? "group:" : "direct:") + peer.id } })`,
     waitUntilAbort: `(signal) => new Promise((resolve) => signal.addEventListener("abort", resolve, { once: true }))`,
     ...sdk,
   });
   const { default: entry, resolveAccount } = await import(new URL("index.js", PLUGIN));
-  const stateDir = await mkdtemp(path.join(tmpdir(), "household-app-channel-"));
+  const stateDir = earlierState ?? await mkdtemp(path.join(tmpdir(), "household-app-channel-"));
   await mkdir(path.join(stateDir, "household-app"), { recursive: true });
   entry.setRuntime({
     state: { resolveStateDir: () => stateDir },
@@ -49,7 +58,12 @@ export async function runningChannel(cfg, { sdk = {}, transcribeAudioFile } = {}
   const pluginLogs = [];
   const api = new Proxy(
     {
-      registerGatewayMethod: (name, handler) => methods.set(name, handler),
+      // OpenClaw keeps a method's first registration, so a second one of a name would never
+      // answer on a gateway; the stand-in refuses it rather than keep the later one.
+      registerGatewayMethod: (name, handler) => {
+        if (methods.has(name)) throw new Error(`${name} is registered twice`);
+        methods.set(name, handler);
+      },
       registerTool: (factory, options) => tools.push({ factory, options }),
       on: (name, handler, options) => hooks.push({ name, handler, matcher: options?.matcher }),
       session: { workflow: { enqueueNextTurnInjection() {} } },
@@ -63,6 +77,7 @@ export async function runningChannel(cfg, { sdk = {}, transcribeAudioFile } = {}
   });
 
   const contexts = [];
+  const dispatches = [];
   const events = [];
   const logs = [];
   const abort = new AbortController();
@@ -80,7 +95,10 @@ export async function runningChannel(cfg, { sdk = {}, transcribeAudioFile } = {}
           contexts.push(params);
           return params;
         },
-        dispatch: async () => ({ admission: { kind: "dispatch" } }),
+        dispatch: async (params) => {
+          dispatches.push(params);
+          return dispatch(params);
+        },
       },
     },
   });
@@ -92,6 +110,7 @@ export async function runningChannel(cfg, { sdk = {}, transcribeAudioFile } = {}
     // The plugin's tool factories, each as OpenClaw offers it to a turn.
     tools,
     contexts,
+    dispatches,
     events,
     logs,
     pluginLogs,
