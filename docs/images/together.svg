@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 470" width="940" height="470" role="img" aria-labelledby="t d">
+<title id="t">How the two assistants work together</title><desc id="d">Both assistants read and write one household note. Three rules keep them from answering twice, dropping a request or posting a reminder twice.</desc>
+<style>
+:root{--bg:#f4f7ff;--card:#ffffff;--line:#bcc8f0;--ink:#14204a;--mute:#56628c;--royal:#2346d8;--onroyal:#ffffff;--gold:#e8b84a;--ongold:#14204a;--soft:#e6ecff;--warm:#fff6df}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1530;--card:#17224b;--line:#3a4b86;--ink:#eef2ff;--mute:#a9b4da;--royal:#7b95ff;--onroyal:#0d1530;--gold:#e8b84a;--ongold:#14204a;--soft:#1f2d63;--warm:#2b2a3a}}
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--ink);font-size:14px}
+.t{font-size:13px}.s{font-size:12px;fill:var(--mute)}.h{font-size:16px;font-weight:700}.b{font-weight:700}
+.bg{fill:var(--bg)}.card{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+.soft{fill:var(--soft);stroke:var(--line);stroke-width:1.5}.warm{fill:var(--warm);stroke:var(--gold);stroke-width:1.5}
+.dash{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 5}
+.royal{fill:var(--royal)}.gold{fill:var(--gold)}
+.onroyal{fill:var(--onroyal)}.ongold{fill:var(--ongold)}
+.ln{stroke:var(--royal);stroke-width:2;fill:none}.lg{stroke:var(--gold);stroke-width:2;fill:none}
+.mt{fill:var(--mute)}
+</style>
+<defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--royal)"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--gold)"/></marker>
+</defs>
+<rect width="940" height="470" rx="18" class="bg"/>
+<rect x="30" y="50" width="200" height="150" rx="14" class="card"/>
+<text x="130" y="90" class="h" text-anchor="middle">Corey</text>
+<text x="130" y="120" class="t" text-anchor="middle">answers one person</text>
+<text x="130" y="142" class="t" text-anchor="middle">reads and writes</text>
+<text x="130" y="164" class="t" text-anchor="middle">the household note</text>
+<rect x="710" y="50" width="200" height="150" rx="14" class="card"/>
+<text x="810" y="90" class="h" text-anchor="middle">Denise</text>
+<text x="810" y="120" class="t" text-anchor="middle">answers the other</text>
+<text x="810" y="142" class="t" text-anchor="middle">reads and writes</text>
+<text x="810" y="164" class="t" text-anchor="middle">the household note</text>
+<rect x="300" y="30" width="340" height="190" rx="14" class="warm"/>
+<text x="470" y="62" class="h" text-anchor="middle">The household note</text>
+<text x="470" y="92" class="t" text-anchor="middle">Logs: one topic, one row per item</text>
+<text x="470" y="116" class="t" text-anchor="middle">Due days and promises</text>
+<text x="470" y="140" class="t" text-anchor="middle">Reminders with a time and a repeat</text>
+<text x="470" y="164" class="t" text-anchor="middle">Handoffs from one assistant to the other</text>
+<text x="470" y="188" class="t" text-anchor="middle">Emergency card, renewals, the kitchen</text>
+<path d="M232 125 L298 125" class="lg" marker-end="url(#ag)" marker-start="url(#ag)"/>
+<path d="M708 125 L642 125" class="lg" marker-end="url(#ag)" marker-start="url(#ag)"/>
+<rect x="30" y="250" width="280" height="190" rx="14" class="card"/>
+<text x="50" y="284" class="h" text-anchor="start">A question to both</text>
+<text x="50" y="314" class="t" text-anchor="start">The asker's own assistant</text>
+<text x="50" y="336" class="t" text-anchor="start">answers for both, from the</text>
+<text x="50" y="358" class="t" text-anchor="start">note. The other steps in</text>
+<text x="50" y="380" class="t" text-anchor="start">only after 20 seconds of</text>
+<text x="50" y="402" class="t" text-anchor="start">silence.</text>
+<rect x="330" y="250" width="280" height="190" rx="14" class="card"/>
+<text x="350" y="284" class="h" text-anchor="start">A handoff</text>
+<text x="350" y="314" class="t" text-anchor="start">One assistant leaves the</text>
+<text x="350" y="336" class="t" text-anchor="start">other a line in the note.</text>
+<text x="350" y="358" class="t" text-anchor="start">It is marked seen on</text>
+<text x="350" y="380" class="t" text-anchor="start">arrival and answered in a</text>
+<text x="350" y="402" class="t" text-anchor="start">direct line that posts nothing.</text>
+<rect x="630" y="250" width="280" height="190" rx="14" class="card"/>
+<text x="650" y="284" class="h" text-anchor="start">A family reminder</text>
+<text x="650" y="314" class="t" text-anchor="start">The assistant that took it</text>
+<text x="650" y="336" class="t" text-anchor="start">posts it when it is due,</text>
+<text x="650" y="358" class="t" text-anchor="start">with no model run, and</text>
+<text x="650" y="380" class="t" text-anchor="start">moves it on first, so it</text>
+<text x="650" y="402" class="t" text-anchor="start">is never posted twice.</text>
+<path d="M470 222 L470 248" class="ln" marker-end="url(#ar)"/>
+</svg>
