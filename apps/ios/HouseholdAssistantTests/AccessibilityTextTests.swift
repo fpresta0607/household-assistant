@@ -44,13 +44,24 @@ final class AccessibilityTextTests: XCTestCase {
         let words = original.text
         let before = try font(in: original)
 
+        // A row redraws once its words are parsed again in the new style, off the main
+        // thread, which took from 0.2 to 1.5 seconds on GitHub's Macs, so a fixed second
+        // read the old font some of the time (issue 27). Each step waits for what it checks.
         gateway.model.settings.isTextBold = true
-        try await Task.sleep(for: .seconds(1))
+        await gateway.eventually("the row redraws in Bold Text") {
+            let row = self.paragraphs(in: root).first { $0.text == words }
+            return row.flatMap { try? self.font(in: $0) }.map { self.weight($0) > self.weight(before) } ?? false
+        }
         let bold = try XCTUnwrap(paragraphs(in: root).first { $0.text == words })
         XCTAssertGreaterThan(weight(try font(in: bold)), weight(before), "a visible cached row must redraw")
 
         gateway.model.settings.textSize = .xxxLarge
-        try await Task.sleep(for: .seconds(1))
+        await gateway.eventually("the row redraws larger, with room for its words") {
+            guard let row = self.paragraphs(in: root).first(where: { $0.text == words }),
+                  let shown = try? self.font(in: row) else { return false }
+            return shown.pointSize > before.pointSize
+                && row.bounds.height + 2 >= row.sizeThatFits(CGSize(width: row.bounds.width, height: .greatestFiniteMagnitude)).height
+        }
         let larger = try XCTUnwrap(paragraphs(in: root).first { $0.text == words })
         XCTAssertGreaterThan(try font(in: larger).pointSize, before.pointSize)
         XCTAssertGreaterThan(weight(try font(in: larger)), weight(before), "larger text must keep Bold Text")
