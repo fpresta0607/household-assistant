@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 270" width="940" height="270" role="img" aria-labelledby="t d">
+<title id="t">Nothing is sent without a tap</title><desc id="d">The assistant drafts, a card shows every word and the address or the items and total, the owner taps Allow once, and exactly that draft goes out once.</desc>
+<style>
+:root{--bg:#f4f7ff;--card:#ffffff;--line:#bcc8f0;--ink:#14204a;--mute:#56628c;--royal:#2346d8;--onroyal:#ffffff;--gold:#e8b84a;--ongold:#14204a;--soft:#e6ecff;--warm:#fff6df}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1530;--card:#17224b;--line:#3a4b86;--ink:#eef2ff;--mute:#a9b4da;--royal:#7b95ff;--onroyal:#0d1530;--gold:#e8b84a;--ongold:#14204a;--soft:#1f2d63;--warm:#2b2a3a}}
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--ink);font-size:14px}
+.t{font-size:13px}.s{font-size:12px;fill:var(--mute)}.h{font-size:16px;font-weight:700}.b{font-weight:700}
+.bg{fill:var(--bg)}.card{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+.soft{fill:var(--soft);stroke:var(--line);stroke-width:1.5}.warm{fill:var(--warm);stroke:var(--gold);stroke-width:1.5}
+.dash{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 5}
+.royal{fill:var(--royal)}.gold{fill:var(--gold)}
+.onroyal{fill:var(--onroyal)}.ongold{fill:var(--ongold)}
+.ln{stroke:var(--royal);stroke-width:2;fill:none}.lg{stroke:var(--gold);stroke-width:2;fill:none}
+.mt{fill:var(--mute)}
+</style>
+<defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--royal)"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--gold)"/></marker>
+</defs>
+<rect width="940" height="270" rx="18" class="bg"/>
+<rect x="20" y="30" width="205" height="200" rx="14" class="card"/>
+<circle cx="48" cy="62" r="13" class="royal"/>
+<text x="48" y="67" class="b onroyal" text-anchor="middle">1</text>
+<text x="70" y="67" class="t b" text-anchor="start">It drafts</text>
+<text x="36" y="104" class="t" text-anchor="start">The assistant writes the</text>
+<text x="36" y="126" class="t" text-anchor="start">whole message, or the</text>
+<text x="36" y="148" class="t" text-anchor="start">cart order with prices.</text>
+<path d="M227 130 L256 130" class="lg" marker-end="url(#ag)"/>
+<rect x="258" y="30" width="205" height="200" rx="14" class="card"/>
+<circle cx="286" cy="62" r="13" class="royal"/>
+<text x="286" y="67" class="b onroyal" text-anchor="middle">2</text>
+<text x="308" y="67" class="t b" text-anchor="start">A card shows all</text>
+<text x="274" y="104" class="t" text-anchor="start">Every word and the address,</text>
+<text x="274" y="126" class="t" text-anchor="start">or each item and the total.</text>
+<text x="274" y="148" class="t" text-anchor="start">The assistant cannot</text>
+<text x="274" y="170" class="t" text-anchor="start">change it unseen.</text>
+<path d="M465 130 L494 130" class="lg" marker-end="url(#ag)"/>
+<rect x="496" y="30" width="205" height="200" rx="14" class="card"/>
+<circle cx="524" cy="62" r="13" class="royal"/>
+<text x="524" y="67" class="b onroyal" text-anchor="middle">3</text>
+<text x="546" y="67" class="t b" text-anchor="start">You tap Allow once</text>
+<text x="512" y="104" class="t" text-anchor="start">Only in your own thread.</text>
+<text x="512" y="126" class="t" text-anchor="start">A changed draft is a new</text>
+<text x="512" y="148" class="t" text-anchor="start">card and a new tap.</text>
+<path d="M703 130 L732 130" class="lg" marker-end="url(#ag)"/>
+<rect x="734" y="30" width="205" height="200" rx="14" class="card"/>
+<circle cx="762" cy="62" r="13" class="royal"/>
+<text x="762" y="67" class="b onroyal" text-anchor="middle">4</text>
+<text x="784" y="67" class="t b" text-anchor="start">It goes, once</text>
+<text x="750" y="104" class="t" text-anchor="start">Exactly the draft whose hash</text>
+<text x="750" y="126" class="t" text-anchor="start">the card showed. An order</text>
+<text x="750" y="148" class="t" text-anchor="start">opens Amazon's checkout,</text>
+<text x="750" y="170" class="t" text-anchor="start">where you pay.</text>
+</svg>

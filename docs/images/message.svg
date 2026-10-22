@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 290" width="940" height="290" role="img" aria-labelledby="t d">
+<title id="t">What happens to a message</title><desc id="d">A message is signed by the sender's phone, checked by the gateway, answered by the assistant with the tools that place allows, drawn as cards on the phone, and announced by a push that carries no words.</desc>
+<style>
+:root{--bg:#f4f7ff;--card:#ffffff;--line:#bcc8f0;--ink:#14204a;--mute:#56628c;--royal:#2346d8;--onroyal:#ffffff;--gold:#e8b84a;--ongold:#14204a;--soft:#e6ecff;--warm:#fff6df}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1530;--card:#17224b;--line:#3a4b86;--ink:#eef2ff;--mute:#a9b4da;--royal:#7b95ff;--onroyal:#0d1530;--gold:#e8b84a;--ongold:#14204a;--soft:#1f2d63;--warm:#2b2a3a}}
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--ink);font-size:14px}
+.t{font-size:13px}.s{font-size:12px;fill:var(--mute)}.h{font-size:16px;font-weight:700}.b{font-weight:700}
+.bg{fill:var(--bg)}.card{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+.soft{fill:var(--soft);stroke:var(--line);stroke-width:1.5}.warm{fill:var(--warm);stroke:var(--gold);stroke-width:1.5}
+.dash{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 5}
+.royal{fill:var(--royal)}.gold{fill:var(--gold)}
+.onroyal{fill:var(--onroyal)}.ongold{fill:var(--ongold)}
+.ln{stroke:var(--royal);stroke-width:2;fill:none}.lg{stroke:var(--gold);stroke-width:2;fill:none}
+.mt{fill:var(--mute)}
+</style>
+<defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--royal)"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--gold)"/></marker>
+</defs>
+<rect width="940" height="290" rx="18" class="bg"/>
+<rect x="17" y="40" width="170" height="210" rx="14" class="card"/>
+<circle cx="45" cy="72" r="13" class="royal"/>
+<text x="45" y="77" class="b onroyal" text-anchor="middle">1</text>
+<text x="67" y="77" class="t b" text-anchor="start">You send</text>
+<text x="33" y="114" class="t" text-anchor="start">Your phone signs the</text>
+<text x="33" y="136" class="t" text-anchor="start">message with its own</text>
+<text x="33" y="158" class="t" text-anchor="start">key. A voice note is</text>
+<text x="33" y="180" class="t" text-anchor="start">turned into words</text>
+<text x="33" y="202" class="t" text-anchor="start">first.</text>
+<path d="M188 145 L200 145" class="ln" marker-end="url(#ar)"/>
+<rect x="201" y="40" width="170" height="210" rx="14" class="card"/>
+<circle cx="229" cy="72" r="13" class="royal"/>
+<text x="229" y="77" class="b onroyal" text-anchor="middle">2</text>
+<text x="251" y="77" class="t b" text-anchor="start">Gateway checks</text>
+<text x="217" y="114" class="t" text-anchor="start">It keeps the message</text>
+<text x="217" y="136" class="t" text-anchor="start">only if one of your</text>
+<text x="217" y="158" class="t" text-anchor="start">pinned phones signed</text>
+<text x="217" y="180" class="t" text-anchor="start">it. Nobody else can</text>
+<text x="217" y="202" class="t" text-anchor="start">start your own turn.</text>
+<path d="M372 145 L384 145" class="ln" marker-end="url(#ar)"/>
+<rect x="385" y="40" width="170" height="210" rx="14" class="card"/>
+<circle cx="413" cy="72" r="13" class="royal"/>
+<text x="413" y="77" class="b onroyal" text-anchor="middle">3</text>
+<text x="435" y="77" class="t b" text-anchor="start">Assistant works</text>
+<text x="401" y="114" class="t" text-anchor="start">Your own thread has</text>
+<text x="401" y="136" class="t" text-anchor="start">the full toolbox. The</text>
+<text x="401" y="158" class="t" text-anchor="start">family room has a</text>
+<text x="401" y="180" class="t" text-anchor="start">shorter list and no</text>
+<text x="401" y="202" class="t" text-anchor="start">shell.</text>
+<path d="M556 145 L568 145" class="ln" marker-end="url(#ar)"/>
+<rect x="569" y="40" width="170" height="210" rx="14" class="card"/>
+<circle cx="597" cy="72" r="13" class="royal"/>
+<text x="597" y="77" class="b onroyal" text-anchor="middle">4</text>
+<text x="619" y="77" class="t b" text-anchor="start">Answer returns</text>
+<text x="585" y="114" class="t" text-anchor="start">Words, or a card: a</text>
+<text x="585" y="136" class="t" text-anchor="start">chart, a list, a cart,</text>
+<text x="585" y="158" class="t" text-anchor="start">a verse, an approval.</text>
+<text x="585" y="180" class="t" text-anchor="start">Chips say what it</text>
+<text x="585" y="202" class="t" text-anchor="start">changed.</text>
+<path d="M740 145 L752 145" class="ln" marker-end="url(#ar)"/>
+<rect x="753" y="40" width="170" height="210" rx="14" class="card"/>
+<circle cx="781" cy="72" r="13" class="royal"/>
+<text x="781" y="77" class="b onroyal" text-anchor="middle">5</text>
+<text x="803" y="77" class="t b" text-anchor="start">Phone buzzes</text>
+<text x="769" y="114" class="t" text-anchor="start">Apple sees only</text>
+<text x="769" y="136" class="t" text-anchor="start">"New message". The</text>
+<text x="769" y="158" class="t" text-anchor="start">words are sealed for</text>
+<text x="769" y="180" class="t" text-anchor="start">your phone to open.</text>
+</svg>

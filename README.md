@@ -1,57 +1,158 @@
-# household-assistant
+<h1 align="center">Household Assistant</h1>
 
-The household assistant for Corey and Denise.
-It shares an IONOS VPS with SIQsermon.
+<p align="center">
+Two AI assistants and one iPhone app for a two-parent household.<br>
+They share a family room, a note, a cart and a calendar, and they run on a small private server the household owns.
+</p>
 
-## Phase 0 - headroom
+<p align="center">
+  <img src="docs/images/overview.svg" alt="Two iPhones each talk to their own assistant's gateway on one private server. A relay carries the family room between the gateways. The gateways reach language models, calendars and mail, the house, finances and Amazon." width="900">
+</p>
 
-Phase 0 installs no assistant code.
-It makes room on the shared box and proves SIQsermon's data is recoverable first.
+## Meet the two assistants
 
-- [docs/phase0/runbook.md](docs/phase0/runbook.md) - what was done, what was verified, and how to undo it
-- [docs/phase0/measurements.md](docs/phase0/measurements.md) - how the limits were arrived at
-- [docs/phase0/budget.md](docs/phase0/budget.md) - how much of the box the assistant gets
+**Corey** and **Denise** are two assistants, each with their own gateway and their own person.
+Each person talks to their assistant in the **Steward AI** app, one private thread each, plus a **family room** that both people and both assistants share.
+They are one household's helpers, so they keep one household's records: a shared note, a shared cart, a shared calendar.
 
-## The OpenClaw runtime
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/images/app-chats.jpg" alt="The Chats list with a thread for each assistant, the family room and the Today card" width="200"><br><sub><b>Chats</b><br>one thread each, plus the family room</sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-today.jpg" alt="The Today card: the next things on the calendar and a verse for the day" width="200"><br><sub><b>Today</b><br>what is next, and a verse</sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-cart.jpg" alt="The shared household cart as a card in the family room" width="200"><br><sub><b>The cart</b><br>one list for the whole house</sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-approval.jpg" alt="An approval card asking for a tap before anything is sent" width="200"><br><sub><b>Approvals</b><br>nothing goes out without a tap</sub></td>
+  </tr>
+</table>
 
-The host and container layer the assistants run inside.
-The Phase 1 household service below defines authenticated identity and scopes.
-The deployed gateways use their own integrations under the [family-group policy](docs/deploy/openclaw.md#the-family-group).
+Everything in the pictures is made-up demo data, drawn by the app's own screenshot tests.
 
-- [docs/deploy/openclaw.md](docs/deploy/openclaw.md) - how to reach it, restart it, back it up and roll it back, why its heartbeat is off so neither assistant messages anyone unasked, why everything runs on OpenRouter, who can reach each assistant in the family group, how every voice note reaches them and how they see each other there, and what only the Overlord can finish
-- [scripts/openclaw-family-group.py](scripts/openclaw-family-group.py) - what each gateway does with a message or a voice note in the family group, and the one entry that makes the two the same
-- [scripts/openclaw-openrouter.py](scripts/openclaw-openrouter.py) - audits and applies the routes in [The model backend](docs/deploy/openclaw.md#the-model-backend) on both gateways
-- [scripts/openclaw-speech.py](scripts/openclaw-speech.py) - audits and applies how a spoken reply is made on both gateways, see [Speaking](docs/deploy/openclaw.md#speaking)
-- [deploy/openclaw/plugins/household-family-room/](deploy/openclaw/plugins/household-family-room) - the OpenClaw plugin that gives each assistant what it cannot see or hear of the family group: voice notes that did not name it, what photos and videos there showed, and the other assistant's posts
-- [deploy/openclaw/plugins/household-openrouter-video/](deploy/openclaw/plugins/household-openrouter-video) - the OpenClaw plugin that describes a video someone sends either assistant through OpenRouter, which OpenClaw's own OpenRouter provider cannot
-- [deploy/openclaw/plugins/household-speech/](deploy/openclaw/plugins/household-speech) - the OpenClaw plugin that speaks a reply as numbered voice notes, each made and sent once, under a ceiling for one reply and for one day
-- [deploy/openclaw/plugins/household-app/](deploy/openclaw/plugins/household-app) - the Steward AI app as its own OpenClaw channel: the family room both people and both assistants share, and each person's thread with their assistant, carried between the gateways by [scripts/household-app-relay.py](scripts/household-app-relay.py); see [The household app's family room](docs/deploy/openclaw.md#the-household-apps-family-room)
+## What they do
 
-The scripts in [scripts/](scripts) are the executable form of both runbooks.
-They run as root on the box.
+| | |
+|---|---|
+| **Today card** | The next things on the calendar and a verse for the day, written at 4:45 and 16:45. |
+| **Prep packets** | Each morning at 8:00, one packet per event 36 to 60 hours away: address, when to leave, what to bring, forms, confirmation number. |
+| **Sunday digest** | Sunday at 19:00: the week at a glance, what is slipping, the cart, open promises and what needs a decision. |
+| **The household note** | One shared record both assistants write: logs with a row per item, due days, promises, reminders, handoffs. |
+| **Cart** | One shared shopping list. An order is one tap, then Amazon's checkout with the cart filled in. |
+| **Meal plan** | Up to seven dinners from what is in the kitchen and what is on sale. After a yes, the missing items go in the cart, each once. |
+| **Document vault** | Send a photo of a passport, policy or warranty. The assistant keeps its renewal day and tells its owner 30 days ahead. |
+| **Wishlist** | Quietly remembers what people say they want. Hands the ideas to the right parent three weeks before a birthday or Christmas. |
+| **Emergency card** | `/emergency` answers at once, with no model: vet, poison control, pediatrician, insurance, neighbor. |
+| **Photo keeper** | On the phone only: last month's best shots and a short video, and a clean-out of near-duplicates, blurry shots and old screenshots. |
+| **The house** | Thermostat, TV volume, Spotify, YouTube and the TV's power, through a key holder that limits what they can do. |
+| **Finances** | Each person's assistant reads that person's PocketPiggies account, read-only, after their consent. |
+| **Spend** | What each assistant cost this month, rebuilt every ten minutes. |
+| **Voice** | Voice notes, voice calls and spoken replies, with ceilings on what speech may cost. |
+| **Pictures and video** | Made on request, with a daily dollar ceiling for each person. |
+| **Everything else** | Charts, checklists, scripture cards, maps, reminders, calendars and mail, widgets, the Share Sheet and a Talk button. |
 
-PocketPiggies connects through a private Telegram consent button and a host key holder that answers MCP over a Unix socket: [installation and verification](docs/deploy/pocket-piggies.md).
-Only Corey reads Franco's account and only Denise reads Gia's, read-only, after the corresponding owner's consent.
-Each owner's private chat keeps every tool; the credential stays in the key holder, and the family group runs without tools that could reach it.
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/images/app-chart.jpg" alt="A chart of grocery spending drawn as a card" width="200"><br><sub><b>Charts</b></sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-checklist.jpg" alt="A checklist card for Saturday" width="200"><br><sub><b>Checklists</b></sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-spend.jpg" alt="The Spend page: the month's cost by assistant" width="200"><br><sub><b>Spend</b></sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-connectors.jpg" alt="The Connectors page listing the services an assistant can use" width="200"><br><sub><b>Connectors</b></sub></td>
+  </tr>
+</table>
 
-## Phase 1 - identity and privacy spine
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/images/app-order.jpg" alt="An order card tracking a delivery from ordered to delivered" width="200"><br><sub><b>Orders</b></sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-scripture.jpg" alt="A scripture card with the passage and a link to open it" width="200"><br><sub><b>Scripture</b></sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-photos.jpg" alt="Photos shared in the family room" width="200"><br><sub><b>Family photos</b></sub></td>
+    <td align="center" width="25%"><img src="docs/images/app-call.jpg" alt="A voice call with the assistant" width="200"><br><sub><b>Voice calls</b></sub></td>
+  </tr>
+</table>
 
-Phase 1 is the spine every later phase hangs from: who is speaking, what they may see, what a tool may do on their behalf, and how an approval is bound.
-It runs locally against mocked providers, and it needs no credential from anyone.
+## How a message travels
 
-People are `franco` and `gia`.
-Bot personas are `corey` and `denise`.
-These are four separate identities: a human is never a persona, and a persona is never a channel.
-The authenticated sender decides what "my" means, so Gia addressing Corey gets Gia's authorized context wearing Corey's voice and cannot reach Franco's private context.
+<p align="center">
+  <img src="docs/images/message.svg" alt="A message is signed by the sender's phone, checked by the gateway, answered by the assistant with the tools that place allows, returned as words or cards, and announced by a push with no words in it." width="900">
+</p>
 
-- [household/identity.py](household/identity.py) - people, personas, enrollment, routes, and the signed identity envelope
-- [household/service.py](household/service.py) - the one authenticated API over memory, tasks, reminders, lists, calendars, mail, approvals and integration health
-- [household/tools.py](household/tools.py) - the typed tool contracts, and the only tool names the service will dispatch
-- [household/approvals.py](household/approvals.py) - an approval bound to one action version, actor, route, destination and expiry
-- [household/store.py](household/store.py) and [household/migrations/](household/migrations) - the scoped SQLite datastore
-- [tests/test_leaks.py](tests/test_leaks.py) - the leak tests, each written so the permissive behaviour fails it
+A message in a person's own thread starts a turn only if one of that person's phones signed it.
+Neither an assistant nor anyone holding a gateway token can speak for them.
 
-Run the checks:
+## Working together
+
+<p align="center">
+  <img src="docs/images/together.svg" alt="Corey and Denise both read and write the household note. A question to both is answered by the asker's own assistant, a handoff is seen on arrival and answered on a direct line, and a family reminder is posted once by the assistant that took it." width="900">
+</p>
+
+The note is the one place family facts live.
+A weigh-in, a due date or a promise made to one assistant is there for the other, and for the next turn of either.
+
+## Nothing is sent without a tap
+
+<p align="center">
+  <img src="docs/images/send.svg" alt="The assistant drafts, a card shows every word, the owner taps Allow once, and exactly that draft goes out once." width="900">
+</p>
+
+Email send is off until a gateway is given an account for it.
+Until then only a cart order can be sent, and its tap opens Amazon's checkout, where the person pays.
+
+## When things happen
+
+<p align="center">
+  <img src="docs/images/week.svg" alt="The schedule: the relay every fifteen seconds, spend every ten minutes, the Today card at 4:45 and 16:45, prep packets at 8:00, the Sunday digest at 19:00, a nightly backup, a notice 30 days before a document renews and wishes three weeks before a birthday." width="900">
+</p>
+
+Times are in the household's own time zone.
+
+## Rules that do not bend
+
+- **Identity comes from the channel, never from the text.** A display name, a message body or a model-supplied id is ignored on purpose, and the default is to refuse.
+- **Private stays private.** A group route never carries a private scope, or a tool that reaches one person's mail, calendar or approvals.
+- **A tool cannot name who it acts for.** The actor and the scopes come from the signed envelope, and a delegate can only narrow it.
+- **A yes is not a tool.** An approval binds one action, actor, route, destination and expiry, and it is spent once.
+- **Keys stay out of the assistants.** The house and the finance accounts sit behind key holders on the host, which answer with what the house read back and never with the token.
+- **Memory has a budget.** Every container declares a memory limit, so a runaway assistant cannot starve the rest of the box.
+
+The Python service in [household/](household) is where these rules are written and tested, against mocked providers, with no credential from anyone.
+The deployed gateways follow the owner-authorized exception in [the family group](docs/deploy/openclaw.md#the-family-group).
+
+## How it runs
+
+- **One small private server** runs both gateways as OpenClaw containers, behind the household's private network.
+  Models come through OpenRouter, and each owner can choose fallback models in Settings.
+- **The app is the channel.** Telegram is retired, and the app's installer switches it off.
+- **A relay on the host** carries the family room between the gateways, every message signed by the phone that sent it.
+- **Key holders** answer for the house and for PocketPiggies over a local socket.
+- **Backups** run every night: both gateways' state, then a restore drill that opens what it just wrote.
+- **Rollouts** go one gateway at a time, each after a backup of its state.
+
+## How the app is built
+
+There is no Mac of our own.
+GitHub lends one for a job and wipes it afterwards, and its minutes are free while this repository is public.
+Linux checks run on every pull request.
+A Mac run starts only by hand, stops at a timeout, and reports what it cost.
+A TestFlight release is one click, from main.
+
+## Where things are
+
+| Folder | What is in it |
+|---|---|
+| [apps/ios/](apps/ios) | The Steward AI app, as a text XcodeGen spec ([its README](apps/ios/README.md)) |
+| [deploy/openclaw/plugins/](deploy/openclaw/plugins) | The OpenClaw plugins: the app's channel, family room, memory, pictures, speech, job mirror, PocketPiggies |
+| [deploy/openclaw/skills/](deploy/openclaw/skills) | The skills both assistants get |
+| [household/](household) | The identity and privacy spine, the home and PocketPiggies key holders |
+| [scripts/](scripts) | The installers, relay, backup and checks, run as root on the box |
+| [services/voicebox/](services/voicebox) | A local speech service that waits for a Mac to run on |
+| [docs/](docs) | Runbooks, plans and the Apple checklist |
+
+## Read more
+
+- [OpenClaw on the server](docs/deploy/openclaw.md): reach it, restart it, back it up, roll it back, and how the family room works
+- [PocketPiggies](docs/deploy/pocket-piggies.md): who can read finance, and how
+- [The app-only rollout](docs/household-app-only-rollout.md): how the app replaced Telegram
+- [Apple activation checklist](docs/apple-activation-checklist.md): everything only the owner can do, in order
+- [TestFlight](docs/testflight.md) and [Apple signing](docs/apple-signing.md)
+- [Phase 0 headroom](docs/phase0/runbook.md) and [the memory budget](docs/phase0/budget.md)
+- [Plans and briefs](docs/plan/README.md)
+
+## Run the checks
 
 ```
 python -m venv .venv
@@ -61,73 +162,3 @@ python -m venv .venv
 .venv/Scripts/python.exe -m mypy
 .venv/Scripts/python.exe -m pytest
 ```
-
-### What a later phase must not undo
-
-These guarantees apply to the Phase 1 household service.
-The deployed OpenClaw gateways follow the owner-authorized exception described in [The family group](docs/deploy/openclaw.md#the-family-group).
-
-- Identity is resolved from authenticated channel metadata only, and the default is to refuse.
-  A display name, a message body, a forwarded header and a model-supplied id are all ignored on purpose.
-- The memory scopes are split into the identity envelope before anything is retrieved, not by asking a model to keep a secret.
-  A group route never carries a private scope, for anyone.
-  A direct route has exactly one member, so the private scope it carries is read by that person alone.
-- A group route also never carries a capability that reaches one person's mail, calendars, account addresses or approvals.
-  Both people read the household group, so those tools answer only in the conversation the account's owner is alone in.
-- The actor and the scopes come from the envelope.
-  A tool argument that names a person or a scope set is refused, and no tool contract may declare one.
-- Delegation narrows an envelope and never widens it.
-  The actor, the persona, the route and the expiry are carried through untouched, so a sub-task cannot escalate the person it acts for.
-- Calendar windows and reminder times are compared as timezone-aware instants, never as text.
-  A naive timestamp is refused at the tool boundary, and a reminder's due time is stored in UTC.
-- An approval binds to an action version, an actor, a route, a destination and an expiry, and it is spent once.
-  A message body is data: nothing reads one for an instruction, an approval or an identity.
-- Granting an approval is not a tool.
-  A yes arrives as an authenticated message through `Gateway.approve`, so the loop that proposes a write cannot mint the yes that spends it.
-- Every provider entry point takes an account grant rather than a bare account id.
-  In Phase 1 that grant is an in-process convention the service mints after checking ownership, not a verified token.
-  It must be signed and verified before Phase 3 gives a provider a real credential.
-- Storage is SQLite with write-ahead logging, foreign keys, forward-only migrations and one controlled writer.
-
-### The memory budget still binds
-
-[docs/phase0/budget.md](docs/phase0/budget.md) owns the shared assistant allowance and links to the current allocation.
-Every container any later phase adds must declare `deploy.resources.limits.memory`.
-Without one, a runaway assistant exhausts the box and the kernel's OOM killer chooses globally by resident size, which means it kills SIQsermon's Neo4j rather than the assistant.
-
-## The group surface - Corey and Denise coordinating
-
-Telegram never delivers one bot's messages to another, so the two assistants reach each other through a relay on the host rather than through the group itself.
-Every word one says to the other is posted in the family group first, verbatim, so there is no channel Franco and Gia cannot read.
-The relay is a `systemd` timer outside both containers, which is where the turn cap, the stop word and the off switch live.
-
-- [docs/plan/coordination-between-assistants.md](docs/plan/coordination-between-assistants.md) - the design, the rules it enforces, what the planner may propose from, and the emergency control that does not go through Telegram
-- [docs/deploy/openclaw.md](docs/deploy/openclaw.md) - how to install it, where its state lives, the `!coordination off` switch, and the household clock
-
-The code those documents describe:
-
-- [household/coordination.py](household/coordination.py) - the turn, the two-message cap, the stop word and the off switch
-- [household/openclaw.py](household/openclaw.py) - the only two sinks a crossing has: the family group, and the peer's gateway
-- [household/family_room.py](household/family_room.py) - each assistant's own posts in the group, handed to the other as context, and nothing that was not posted there
-- [household/planner.py](household/planner.py) - the proactive date planner over the shared calendar, its two taste inputs and its research budget
-- [scripts/coordination-daemon.py](scripts/coordination-daemon.py) - the `tick` and `plan` runs the timers in [deploy/coordination/](deploy/coordination) call
-- [deploy/openclaw/skills/coordinate/](deploy/openclaw/skills/coordinate) - the skill both assistants get, and the four results it can print
-
-## The iPhone app - built on GitHub's Macs
-
-There is no Mac of our own.
-The owner chose GitHub's hosted Macs on 14 October 2026, with a cap of 5 dollars a day, so the iOS app is built, tested, signed and sent to TestFlight on a Mac GitHub lends for one job and wipes afterwards.
-Every Mac run is started by hand, stops at a timeout, and reports what it cost.
-Memory, reminders, calendar state, lists, authentication and assistant logic stay on the VPS, behind the Phase 1 spine above.
-
-- [docs/apple-activation-checklist.md](docs/apple-activation-checklist.md) - **start here**: everything only the owner can do, in order, from Windows
-- [docs/testflight.md](docs/testflight.md) - the one click to TestFlight, the secrets, and what each run costs
-- [docs/apple-signing.md](docs/apple-signing.md) - team, identifiers, capabilities, the certificate and the profiles
-- [docs/voicebox.md](docs/voicebox.md) - the local speech service, which waits for a Mac
-
-The code those documents describe:
-
-- [apps/ios/](apps/ios) - the Steward AI app: a native OpenClaw gateway client, as a text XcodeGen spec
-- [scripts/ios-cloud.py](scripts/ios-cloud.py) - one command from any computer: a preview, a rehearsal or a TestFlight build, and its cost
-- [scripts/macos/](scripts/macos) - the scripts GitHub's Mac runs, and Voicebox's
-- [services/voicebox/](services/voicebox) - the speech service itself

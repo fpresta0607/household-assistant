@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 580" width="940" height="580" role="img" aria-labelledby="t d">
+<title id="t">The household at a glance</title><desc id="d">Two iPhones each pair with their own assistant's gateway on one private server. A relay carries the family room between the gateways. Key holders keep the house and finance credentials out of the gateways, and the gateways reach models, calendars, mail and Amazon.</desc>
+<style>
+:root{--bg:#f4f7ff;--card:#ffffff;--line:#bcc8f0;--ink:#14204a;--mute:#56628c;--royal:#2346d8;--onroyal:#ffffff;--gold:#e8b84a;--ongold:#14204a;--soft:#e6ecff;--warm:#fff6df}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1530;--card:#17224b;--line:#3a4b86;--ink:#eef2ff;--mute:#a9b4da;--royal:#7b95ff;--onroyal:#0d1530;--gold:#e8b84a;--ongold:#14204a;--soft:#1f2d63;--warm:#2b2a3a}}
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--ink);font-size:14px}
+.t{font-size:13px}.s{font-size:12px;fill:var(--mute)}.h{font-size:16px;font-weight:700}.b{font-weight:700}
+.bg{fill:var(--bg)}.card{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+.soft{fill:var(--soft);stroke:var(--line);stroke-width:1.5}.warm{fill:var(--warm);stroke:var(--gold);stroke-width:1.5}
+.dash{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 5}
+.royal{fill:var(--royal)}.gold{fill:var(--gold)}
+.onroyal{fill:var(--onroyal)}.ongold{fill:var(--ongold)}
+.ln{stroke:var(--royal);stroke-width:2;fill:none}.lg{stroke:var(--gold);stroke-width:2;fill:none}
+.mt{fill:var(--mute)}
+</style>
+<defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--royal)"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--gold)"/></marker>
+</defs>
+<rect width="940" height="580" rx="18" class="bg"/>
+<rect x="30" y="120" width="150" height="110" rx="14" class="card"/>
+<rect x="95" y="132" width="20" height="5" rx="3" class="soft"/>
+<text x="105" y="172" class="h" text-anchor="middle">Steward AI</text>
+<text x="105" y="194" class="s" text-anchor="middle">A person's iPhone</text>
+<text x="105" y="212" class="s" text-anchor="middle">Chats  Today  Settings</text>
+<rect x="30" y="340" width="150" height="110" rx="14" class="card"/>
+<rect x="95" y="352" width="20" height="5" rx="3" class="soft"/>
+<text x="105" y="392" class="h" text-anchor="middle">Steward AI</text>
+<text x="105" y="414" class="s" text-anchor="middle">A person's iPhone</text>
+<text x="105" y="432" class="s" text-anchor="middle">Chats  Today  Settings</text>
+<rect x="240" y="30" width="420" height="510" rx="20" class="dash"/>
+<text x="262" y="58" class="h" text-anchor="start">The household box</text>
+<rect x="265" y="78" width="370" height="150" rx="14" class="card"/>
+<text x="285" y="106" class="h" text-anchor="start">Corey's gateway</text>
+<text x="285" y="132" class="t" text-anchor="start">OpenClaw with the household-app channel</text>
+<text x="285" y="156" class="t" text-anchor="start">Own thread  -  family room  -  household note</text>
+<text x="285" y="180" class="t" text-anchor="start">Vault  -  wishlist  -  meal plan  -  cart</text>
+<text x="285" y="204" class="t" text-anchor="start">Scheduled jobs  -  digest  -  prep packets</text>
+<rect x="265" y="308" width="370" height="150" rx="14" class="card"/>
+<text x="285" y="336" class="h" text-anchor="start">Denise's gateway</text>
+<text x="285" y="362" class="t" text-anchor="start">OpenClaw with the household-app channel</text>
+<text x="285" y="386" class="t" text-anchor="start">Own thread  -  family room  -  household note</text>
+<text x="285" y="410" class="t" text-anchor="start">Vault  -  wishlist  -  meal plan  -  cart</text>
+<text x="285" y="434" class="t" text-anchor="start">Scheduled jobs  -  digest  -  prep packets</text>
+<path d="M450 230 L450 306" class="lg" marker-end="url(#ag)" marker-start="url(#ag)"/>
+<text x="466" y="272" class="s" text-anchor="start">relay: family room, notes, handoffs</text>
+<rect x="265" y="478" width="370" height="44" rx="12" class="warm"/>
+<text x="450" y="497" class="t b" text-anchor="middle">Key holders: home and PocketPiggies</text>
+<text x="450" y="514" class="s" text-anchor="middle">their tokens never enter a gateway</text>
+<path d="M180 175 L263 175" class="ln" marker-end="url(#ar)" marker-start="url(#ar)"/>
+<path d="M180 395 L263 395" class="ln" marker-end="url(#ar)" marker-start="url(#ar)"/>
+<text x="222" y="164" class="s" text-anchor="middle">own thread</text>
+<text x="222" y="384" class="s" text-anchor="middle">own thread</text>
+<text x="30" y="290" class="s" text-anchor="start">Both phones also share</text>
+<text x="30" y="306" class="s" text-anchor="start">the family room with</text>
+<text x="30" y="322" class="s" text-anchor="start">both assistants.</text>
+<rect x="710" y="40" width="210" height="76" rx="14" class="soft"/>
+<text x="725" y="72" class="t b" text-anchor="start">Language models</text>
+<text x="725" y="94" class="s" text-anchor="start">through OpenRouter</text>
+<rect x="710" y="150" width="210" height="76" rx="14" class="soft"/>
+<text x="725" y="182" class="t b" text-anchor="start">Calendars, mail, notes</text>
+<text x="725" y="204" class="s" text-anchor="start">iCloud, Google, Outlook, Notion</text>
+<rect x="710" y="260" width="210" height="76" rx="14" class="soft"/>
+<text x="725" y="292" class="t b" text-anchor="start">The house</text>
+<text x="725" y="314" class="s" text-anchor="start">Home Assistant, Apple TV, Spotify</text>
+<rect x="710" y="370" width="210" height="76" rx="14" class="soft"/>
+<text x="725" y="402" class="t b" text-anchor="start">PocketPiggies</text>
+<text x="725" y="424" class="s" text-anchor="start">the family's finances, read-only</text>
+<rect x="710" y="480" width="210" height="76" rx="14" class="soft"/>
+<text x="725" y="512" class="t b" text-anchor="start">Amazon</text>
+<text x="725" y="534" class="s" text-anchor="start">a cart and its checkout link</text>
+<path d="M660 78 L708 78" class="ln" marker-end="url(#ar)"/>
+<path d="M660 188 L708 188" class="ln" marker-end="url(#ar)"/>
+<path d="M660 298 L708 298" class="ln" marker-end="url(#ar)"/>
+<path d="M660 408 L708 408" class="ln" marker-end="url(#ar)"/>
+<path d="M660 518 L708 518" class="ln" marker-end="url(#ar)"/>
+</svg>
