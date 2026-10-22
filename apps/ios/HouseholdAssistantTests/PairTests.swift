@@ -116,7 +116,7 @@ final class PairTests: XCTestCase {
 
     // MARK: - What the gateway sends
 
-    func testThePageDecodesEveryKindInThePluginsShape() throws {
+    func testThePageDecodesEveryKindInThePluginsShape() async throws {
         // Act
         let page = try fixturePage()
 
@@ -141,7 +141,7 @@ final class PairTests: XCTestCase {
         XCTAssertNil(page.events[9].forWho, "a takeover names only the message")
     }
 
-    func testThePairEventSaysWhenTheLineLastMoved() throws {
+    func testThePairEventSaysWhenTheLineLastMoved() async throws {
         // Act
         guard case .event(let event) = try GatewayCodec.decode(try Fixtures.text("household-app-pair-event")) else {
             return XCTFail("not an event")
@@ -152,7 +152,7 @@ final class PairTests: XCTestCase {
         XCTAssertEqual(event.payload?["lastAt"]?.intValue, try fixturePage().events.last?.at)
     }
 
-    func testAKindALaterGatewayAddsAndALineThatDoesNotReadStillDecodeAsPlainLines() throws {
+    func testAKindALaterGatewayAddsAndALineThatDoesNotReadStillDecodeAsPlainLines() async throws {
         // Arrange
         let json = #"""
             {"events":[
@@ -176,7 +176,7 @@ final class PairTests: XCTestCase {
         ])
     }
 
-    func testEveryRoomPageSaysWhenTheLineLastMovedOnceItHasAnyStep() throws {
+    func testEveryRoomPageSaysWhenTheLineLastMovedOnceItHasAnyStep() async throws {
         // Arrange
         let marked = try Fixtures.text("household-app-sync-response", answering: "fixture-sync") { frame in
             var payload = frame["payload"] as? [String: Any] ?? [:]
@@ -198,7 +198,7 @@ final class PairTests: XCTestCase {
 
     // MARK: - The group's lines
 
-    func testEachLineSaysWhatHappenedInPlainWords() throws {
+    func testEachLineSaysWhatHappenedInPlainWords() async throws {
         // Act
         let entries = PairEntry.entries(of: try fixturePage().events)
 
@@ -219,7 +219,7 @@ final class PairTests: XCTestCase {
         XCTAssertEqual(entries[0].id, "ns-00000000-0000-4000-8000-000000000001", "a burst is known by its first row")
     }
 
-    func testATakeoverWhoseClaimIsNotHereNamesNobodyAndAnUnknownNameIsItsId() throws {
+    func testATakeoverWhoseClaimIsNotHereNamesNobodyAndAnUnknownNameIsItsId() async throws {
         // Arrange
         let events = [try Self.decoded(#"{"id":"ns-1","at":1,"by":"denise","kind":"tookOver","message":"m-1"}"#)]
 
@@ -230,7 +230,7 @@ final class PairTests: XCTestCase {
         XCTAssertEqual(words, ["denise took over a question"])
     }
 
-    func testABurstIsRowsByOneAssistantToOneTopicWithinASecondOfItsFirst() throws {
+    func testABurstIsRowsByOneAssistantToOneTopicWithinASecondOfItsFirst() async throws {
         // Arrange: each case's steps as (at, by, kind, topic), and the rows each line holds.
         let cases: [(why: String, steps: [(Int, String, String, String)], lines: [Int])] = [
             ("rows in the same moment", [(0, "corey", "added", "Seedlings"), (1, "corey", "added", "Seedlings"), (2, "corey", "added", "Seedlings")], [3]),
@@ -256,7 +256,7 @@ final class PairTests: XCTestCase {
         }
     }
 
-    func testTheMarkerShowsForAnHourAfterTheLineLastMoved() {
+    func testTheMarkerShowsForAnHourAfterTheLineLastMoved() async {
         // Arrange
         let lastAt = 1_792_505_832_000
         let moment = Date(timeIntervalSince1970: 1_792_505_832)
