@@ -14,7 +14,7 @@ import path from "node:path";
 import { after, test } from "node:test";
 
 import { createMeals, itemKey } from "../../deploy/openclaw/plugins/household-app/meals.js";
-import { runningChannel, until } from "./fixtures/household-app-channel.mjs";
+import { runningChannel } from "./fixtures/household-app-channel.mjs";
 
 const ROOT = mkdtempSync(path.join(os.tmpdir(), "household-meals-"));
 const opened = [];
@@ -154,9 +154,13 @@ test("through the plugin, an accepted plan fills the cart with each item once, a
     const proposed = await run(meals, { action: "propose", dinners: WEEK });
     const accepted = await run(meals, { action: "accept", plan: proposed.plan });
     const again = await run(meals, { action: "accept", plan: proposed.plan });
-    // Seven adds are seven atomic rewrites of the outbox, one after another, slow on a busy disk.
-    await until("the cart in the outbox", async () => (await readFile(outbox, "utf8").catch(() => "")).includes("ground beef"), { attempts: 6000 });
-    const crossing = JSON.parse(await readFile(outbox, "utf8")).cart.filter((step) => step.kind === "add");
+    // The outbox is rewritten whole for each add, so it is read only now and then, never in a
+    // tight loop that could meet a rewrite: on Windows a replace that meets a read is lost.
+    let crossing = [];
+    for (let readsLeft = 40; readsLeft > 0 && crossing.length < 7; readsLeft -= 1) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      crossing = (JSON.parse(await readFile(outbox, "utf8").catch(() => "{}")).cart ?? []).filter((step) => step.kind === "add");
+    }
 
     // Assert
     assert.deepEqual(proposed.have, ["rice", "eggs"]);
