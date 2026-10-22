@@ -1,0 +1,140 @@
+{
+  "type": "res",
+  "id": "fixture-pair",
+  "ok": true,
+  "payload": {
+    "events": [
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000001",
+        "at": 1792504930000,
+        "by": "corey",
+        "kind": "added",
+        "for": "franco",
+        "line": {
+          "id": "hn-97197f4c",
+          "topic": "Seedlings",
+          "text": "4 cm",
+          "item": "Basil"
+        }
+      },
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000002",
+        "at": 1792504930001,
+        "by": "corey",
+        "kind": "added",
+        "for": "franco",
+        "line": {
+          "id": "hn-4bb05884",
+          "topic": "Seedlings",
+          "text": "2 cm",
+          "item": "Thyme"
+        }
+      },
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000003",
+        "at": 1792504930002,
+        "by": "corey",
+        "kind": "added",
+        "for": "franco",
+        "line": {
+          "id": "hn-750e84e5",
+          "topic": "Seedlings",
+          "text": "6 cm",
+          "item": "Chives"
+        }
+      },
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000004",
+        "at": 1792504990000,
+        "by": "corey",
+        "kind": "corrected",
+        "for": "franco",
+        "line": {
+          "id": "hn-97197f4c",
+          "topic": "Seedlings",
+          "text": "5 cm",
+          "item": "Basil"
+        }
+      },
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000005",
+        "at": 1792505110000,
+        "by": "corey",
+        "kind": "handed",
+        "for": "franco",
+        "line": {
+          "id": "hn-5692333b",
+          "topic": "Handoffs",
+          "text": "Can you check whether the library books are due this week?",
+          "owner": "denise"
+        }
+      },
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000006",
+        "at": 1792505112000,
+        "by": "denise",
+        "kind": "seen",
+        "line": {
+          "id": "hn-5692333b",
+          "topic": "Handoffs",
+          "text": "Can you check whether the library books are due this week?",
+          "owner": "denise"
+        }
+      },
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000007",
+        "at": 1792505142000,
+        "by": "denise",
+        "kind": "replied",
+        "line": {
+          "id": "hn-5692333b",
+          "topic": "Handoffs",
+          "text": "Can you check whether the library books are due this week?",
+          "owner": "denise"
+        },
+        "reply": "Two are due Friday, the rest next week."
+      },
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000008",
+        "at": 1792505147000,
+        "by": "denise",
+        "kind": "done",
+        "for": "gia",
+        "line": {
+          "id": "hn-5692333b",
+          "topic": "Handoffs",
+          "text": "Can you check whether the library books are due this week?",
+          "owner": "denise"
+        }
+      },
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000009",
+        "at": 1792505747000,
+        "by": "corey",
+        "kind": "claimed",
+        "for": "franco",
+        "message": "m-00000001"
+      },
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000010",
+        "at": 1792505772000,
+        "by": "denise",
+        "kind": "tookOver",
+        "message": "m-00000001"
+      },
+      {
+        "id": "ns-00000000-0000-4000-8000-000000000011",
+        "at": 1792505832000,
+        "by": "corey",
+        "kind": "removed",
+        "line": {
+          "id": "hn-750e84e5",
+          "topic": "Seedlings",
+          "text": "6 cm",
+          "item": "Chives"
+        }
+      }
+    ],
+    "more": false
+  }
+}

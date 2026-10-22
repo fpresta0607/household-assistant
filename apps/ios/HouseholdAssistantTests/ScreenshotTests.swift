@@ -143,6 +143,20 @@ final class ScreenshotTests: XCTestCase {
         try await snap("chats.today.none", none)
     }
 
+    // MARK: - Corey & Denise
+
+    /// The two assistants' direct line in the demo household (DemoPair): Corey's seedlings
+    /// as one line, the library handoff seen, answered and done, and Denise's question he has
+    /// just seen, four minutes ago, which the family room's marker says too.
+    func testCoreyAndDenise() async throws {
+        let gateway = FixtureGateway()
+        await gateway.connect { $0.room.isAvailable == true && !$0.pairLine.entries.isEmpty }
+        try await snap("chats.pair-row", gateway)
+        try await snap("pair.group") { settingsPage(PairView(), gateway) }
+        try await snap("pair.group.dark", dark: true) { settingsPage(PairView(), gateway) }
+        try await snap("pair.group.xxl", type: .accessibility2) { settingsPage(PairView(), gateway) }
+    }
+
     /// The tab bar as one floating pill under Chats, still both tabs once the list has
     /// scrolled the way a finger would, and Settings at the top and at the very end of its
     /// page, where its last row clears the pill (CFO notes section 10).

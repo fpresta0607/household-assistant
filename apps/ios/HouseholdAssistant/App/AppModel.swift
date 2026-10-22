@@ -37,6 +37,8 @@ final class AppModel {
     let assistantSettings: AssistantSettingsModel
     /// The assistant's day at a glance, above the pins on Chats.
     let today: TodayModel
+    /// The two assistants' direct line, which both parents watch as the Corey & Denise group.
+    let pairLine: PairModel
     /// Pairing by signing in with Apple, for a phone with no setup code.
     let appleSignIn: AppleSignInPairing
     /// The iPhones waiting for Franco to let them in. Empty on anybody else's phone.
@@ -153,6 +155,7 @@ final class AppModel {
         messageSpeech = MessageSpeechPlayer(connection: connection, media: media)
         assistantSettings = AssistantSettingsModel(connection: connection, sign: signer.sign, spendStore: settings)
         today = TodayModel(connection: connection, archive: roomArchive, seen: settings)
+        pairLine = PairModel(connection: connection)
         appleSignIn = AppleSignInPairing(credentials: credentials) { member in
             AppleSignInGateway(base: member.gateway, post: applePost)
         }
@@ -176,6 +179,7 @@ final class AppModel {
         connection.onEvent = { [weak self] event in
             self?.room.handle(event)
             self?.today.handle(event)
+            self?.pairLine.handle(event)
         }
         connection.onConnected = { [weak self] in
             self?.hasDeviceToken = true
@@ -270,6 +274,11 @@ final class AppModel {
     /// The other household's assistant, for "checking with Denise".
     var otherAssistantName: String? {
         room.participants.first { $0.kind == .assistant && $0.id != room.me?.assistant }?.name
+    }
+
+    /// The two assistants' group, "Corey & Denise", this phone's own assistant first.
+    var pairName: String {
+        otherAssistantName.map { "\(assistantName) & \($0)" } ?? assistantName
     }
 
     /// This phone's assistant's face, once somebody has chosen one.
@@ -778,6 +787,7 @@ final class AppModel {
         tab = .chats
         assistantSettings.reset()
         today.reset()
+        pairLine.reset()
         signInApprovals.reset()
         pairedPhones.reset()
         location.reset()
@@ -874,6 +884,8 @@ final class AppModel {
         await location.catchUp()
         await sendShares()
         await sendMetrics()
+        // Last: the assistants' line is the least urgent thing here, and nothing waits on it.
+        await pairLine.refresh()
     }
 
     private func registerForPush() async {

@@ -1,0 +1,8 @@
+{
+  "type": "event",
+  "event": "plugin.household-app.pair",
+  "payload": {
+    "lastAt": 1792505832000
+  },
+  "seq": 43
+}

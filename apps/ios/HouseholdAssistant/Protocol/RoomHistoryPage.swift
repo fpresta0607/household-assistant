@@ -33,10 +33,12 @@ struct RoomHistoryPage: Decodable, Equatable, Sendable {
     let looks: [RoomEntry]?
     /// The family room's look, as on the sync page.
     let familyLook: FamilyLook?
+    /// When the two assistants' direct line last moved, as on the sync page.
+    let pair: RoomPair?
 
     private enum CodingKeys: String, CodingKey {
         case messages, hasMore, reactions, approvals, lives, places, transcripts, reads, participants, sessionKeys, ownersFamilySession, familyAvatar
-        case looks, familyLook
+        case looks, familyLook, pair
         case me = "self"
     }
 }
