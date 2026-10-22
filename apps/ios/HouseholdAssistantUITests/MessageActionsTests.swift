@@ -318,14 +318,14 @@ final class MessageActionsTests: XCTestCase {
             XCTAssertLessThanOrEqual(row.frame.maxY, bottom, "the composer must not cover the selected row or timestamp")
             return row.frame
         }
-        // The app acknowledges two distinct rendered timestamp labels inside the
-        // unobscured safe area after half a second with the real recognizer still holding.
+        // The app acknowledges exactly one rendered timestamp label, the swiped message's,
+        // inside the unobscured safe area after half a second with the real recognizer holding.
         let held = XCTDarwinNotificationExpectation(notificationName: control + ".timestamps-held")
         let start = rows[rows.count - 1].coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -125, dy: 0)),
                     withVelocity: .slow, thenHoldForDuration: 2)
         XCTAssertEqual(XCTWaiter.wait(for: [held], timeout: 2), .completed,
-                       "multiple visible timestamp labels were never rendered while the drag was held")
+                       "the swiped message's timestamp was never the one label rendered while the drag was held")
         for (row, frame) in zip(rows, frames) {
             XCTAssertEqual(row.frame.minX, frame.minX, accuracy: 1,
                            app.descendants(matching: .any)["debug.threadLog"].label)

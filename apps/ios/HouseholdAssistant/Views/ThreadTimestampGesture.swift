@@ -2,6 +2,8 @@ import SwiftUI
 import UIKit
 
 struct ThreadTimestampGesture: UIGestureRecognizerRepresentable {
+    /// Where the swipe began, in the window, so the list can tell which message it is on.
+    let onBegin: (CGPoint) -> Void
     let onChange: (CGFloat) -> Void
     let onEnd: () -> Void
 
@@ -18,7 +20,10 @@ struct ThreadTimestampGesture: UIGestureRecognizerRepresentable {
 
     func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
         switch recognizer.state {
-        case .began, .changed:
+        case .began:
+            onBegin(recognizer.location(in: recognizer.view?.window))
+            onChange(max(0, -recognizer.translation(in: recognizer.view?.window).x))
+        case .changed:
             onChange(max(0, -recognizer.translation(in: recognizer.view?.window).x))
         case .ended, .cancelled, .failed:
             onEnd()
