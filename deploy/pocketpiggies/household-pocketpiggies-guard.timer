@@ -1,0 +1,15 @@
+# The PocketPiggies guard's backstop: after boot and every 15 seconds, in case a config
+# change reached the file in a way the path unit did not see.
+# Lives at /etc/systemd/system/household-pocketpiggies-guard.timer on the box.
+
+[Unit]
+Description=Check the gateways' PocketPiggies policy every 15 seconds
+
+[Timer]
+OnBootSec=15s
+OnUnitActiveSec=15s
+AccuracySec=1s
+Unit=household-pocketpiggies-guard.service
+
+[Install]
+WantedBy=timers.target

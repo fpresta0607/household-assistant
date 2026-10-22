@@ -1,0 +1,454 @@
+# XcodeGen specification for the Steward AI iOS app.
+#
+# There is no .xcodeproj in this repository on purpose. This file is the
+# project, and `xcodegen generate` turns it into one on the Mac. A binary
+# project file cannot be reviewed in a pull request and conflicts on every
+# concurrent branch; this can and does not.
+#
+# NOT YET RUN ON APPLE HARDWARE. This spec has been checked for YAML validity
+# and for internal consistency from Windows. `xcodegen generate` itself has
+# never been run against it, because XcodeGen only runs on macOS.
+#
+# The app target is the Steward AI client: Chats, Voice, Settings, the
+# widgets and the Talk control, Siri's App Intent and Talk's, and the
+# extension that opens its notifications. None of it has been compiled yet
+# either; the first build on the Mac is the first build there has been.
+#
+# The bundle identifiers below all start with `com.siqstack`, the owner's
+# registered reverse-DNS prefix. The App IDs beneath it are registered at
+# developer.apple.com under Certificates, Identifiers & Profiles -> Identifiers;
+# see docs/apple-signing.md.
+
+name: HouseholdAssistant
+
+options:
+  minimumXcodeGenVersion: "2.38.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+  groupSortPosition: top
+  developmentLanguage: en
+  # iOS 26 for Liquid Glass (`glassEffect`, `GlassEffectContainer`). Both
+  # household phones run it.
+  deploymentTarget:
+    iOS: "26.0"
+
+# The only dependency, pinned to one exact release.
+#   SwiftStreamingMarkdown v0.7.0 is commit 5f7c04e0558df6146f90d482edb62cb456986bda,
+#   and it is pinned by that commit rather than by version. v0.7.0 depends on
+#   HighlightSwift by revision, and SwiftPM refuses a package required at a
+#   stable version that depends on an unstable one: `exactVersion: 0.7.0`
+#   fails package resolution before anything compiles. A root pinned by
+#   revision may depend on one, so the same release resolves.
+#
+# One more pin, for a package no target uses directly: swift-syntax. The
+# markdown package's `@Equatable` macro (ordo-one/equatable, exactly 1.4.1 by
+# that package's own manifest) is built from swift-syntax and runs while the
+# app compiles, and the scripts in scripts/macos run it without Xcode's trust
+# prompt (-skipMacroValidation). Equatable allows swift-syntax anywhere in
+# 600.0.0..<604.0.0, so without this line a new release would change the code
+# that runs at build time with nobody having read it. 603.0.2 is commit
+# 79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1, what the graph resolves to today.
+packages:
+  SwiftStreamingMarkdown:
+    url: https://github.com/microsoft/SwiftStreamingMarkdown
+    revision: 5f7c04e0558df6146f90d482edb62cb456986bda
+  swift-syntax:
+    url: https://github.com/swiftlang/swift-syntax.git
+    exactVersion: 603.0.2
+
+configs:
+  Debug: debug
+  Release: release
+
+settings:
+  base:
+    # Language mode 5 with the Swift 6 concurrency checks switched on as
+    # warnings. The code is written to be Swift 6 clean, but it has never met
+    # a compiler on Apple's SDKs, and a first build should report isolation
+    # findings rather than stop on them. Set this to "6.0" once they are zero.
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.4"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+    GCC_TREAT_WARNINGS_AS_ERRORS: NO
+    # DEVELOPMENT_TEAM is deliberately absent. Continuous integration builds
+    # for the simulator with CODE_SIGNING_ALLOWED=NO and needs no team; the
+    # archive takes the team from the environment in scripts/macos/build-ios.sh
+    # so that no account identifier is committed here.
+
+targets:
+  HouseholdAssistant:
+    type: application
+    platform: iOS
+    # The household's own values, the gateway's tailnet name and Google's iOS client:
+    # placeholders in Household.xcconfig, the real ones in the gitignored Local.xcconfig
+    # it includes, or in the release job's xcconfig (scripts/macos/build-ios.sh).
+    configFiles:
+      Debug: Household.xcconfig
+      Release: Household.xcconfig
+    sources:
+      - path: HouseholdAssistant
+        # Captured gateway frames, read by the tests from the source tree.
+        # They are not part of the app.
+        excludes:
+          - "Protocol/Fixtures"
+      - path: Shared
+      # The key notifications are sealed under, which the app hands to its gateway and
+      # the notification extension opens them with, and the App Group folder where the
+      # app draws the faces the extension shows.
+      - path: HouseholdAssistantNotifications/PushKey.swift
+      - path: HouseholdAssistantNotifications/NotificationFolder.swift
+      # The App Group folder the Share Extension hands what was shared to the app in, and
+      # the extension's sheet, which the screenshot tests draw from the app.
+      - path: HouseholdAssistantShare/ShareFolder.swift
+      - path: HouseholdAssistantShare/ShareComposeView.swift
+      - path: HouseholdAssistantShare/ShareSheetItem.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.siqstack.stewardai
+        PRODUCT_NAME: HouseholdAssistant
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: HouseholdAssistant/Info.plist
+      properties:
+        CFBundleDisplayName: Steward AI
+        # Each person calls the app by their assistant's name, so "Hey Siri, ask Corey"
+        # and "Hey Siri, ask Denise" match StewardShortcuts' "Ask (app name)" phrase. The
+        # intent cannot tell which name was said, so each phone asks its own assistant.
+        INAlternativeAppNames:
+          - INAlternativeAppName: Corey
+          - INAlternativeAppName: Denise
+        # The box's tailnet name, read by HouseholdMember.gatewayHost.
+        HouseholdGatewayHost: $(HOUSEHOLD_GATEWAY_HOST)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # The app also targets iPad, where App Store Connect refuses an upload
+        # that does not list all four orientations (error 90474), because an
+        # iPad app must be able to run beside another one.
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        # Declared up front so that every TestFlight upload skips the export
+        # compliance question. The one use of cryptography is an Ed25519
+        # signature from Apple's CryptoKit that proves this device's identity
+        # to the gateway: authentication only, with the operating system's own
+        # implementation, which is exempt. Revisit this if the app ever
+        # encrypts anything itself.
+        ITSAppUsesNonExemptEncryption: false
+        NSMicrophoneUsageDescription: Steward AI records your voice notes, and listens while you call your assistant.
+        NSSpeechRecognitionUsageDescription: Steward AI turns what you say into text on this phone, then sends the text to your assistant.
+        # While Using is asked when the person first shares where they are: in the first
+        # run, in Settings, or a map from the composer's plus. Always is asked at the moment
+        # something must go on with the app closed (LocationAlwaysAsk): sharing that lasts,
+        # in the first run or Settings, a live map, and a reminder by place. On a first ask
+        # iOS shows only While Using and offers Always by itself once the app first reports
+        # in the background. The string below is the plain line iOS shows when it does.
+        NSLocationWhenInUseUsageDescription: Steward AI uses where you are only when you choose, to tell your own assistant for as long as you say, to share a map in a chat, or to show the way on a map your assistant sends. It tells nobody you did not choose.
+        NSLocationAlwaysAndWhenInUseUsageDescription: So what you turned on goes on with the app closed, your location shared for the time you chose, and your reminders by place, which your iPhone watches itself. Without it, sharing pauses when Steward AI is closed.
+        # A live map in a chat keeps moving with the app in the background, only while it
+        # lasts, through a background activity session (LiveLocationFeed), which iOS shows
+        # as the blue location pill.
+        # A call with the assistant is a CallKit call (SystemCall), and `audio` keeps it
+        # going with the phone locked or the app in the background: the microphone, the
+        # voice and the link to the gateway all run on while the call has the sound.
+        # `voip` is what entitles the app to CallKit at all: Apple's documentation for
+        # CXErrorCodeRequestTransactionError.unentitled names a missing `voip` as the usual
+        # reason iOS refuses a call the app asks for. The app still takes no VoIP pushes:
+        # it only ever places a call, from the app, a widget, the Talk control or Siri.
+        UIBackgroundModes:
+          - location
+          - audio
+          - voip
+        # Asked when the person turns Steward AI's own Precise Location switch on while iOS
+        # gives the app only the area (Permissions.askForPrecise).
+        NSLocationTemporaryUsageDescriptionDictionary:
+          PreciseSharing: You turned on Precise Location in Steward AI, so your assistant can know exactly where you are rather than only the neighbourhood.
+        NSCameraUsageDescription: Steward AI uses the camera when you take a photo or a video, or scan a document, to send in a chat.
+        # Asked when the person turns on Require Face ID in Settings, Privacy (AppCover).
+        NSFaceIDUsageDescription: Steward AI uses Face ID to open only for you, when you turn on App Lock.
+        # A text your assistant drafts finds its person by name in Contacts, on the phone,
+        # once the Contacts connector in Settings, Connectors is on: iOS asks as it is turned
+        # on, and never at install. One plain line, as iOS shows it.
+        NSContactsUsageDescription: Steward AI looks in your contacts on this iPhone to find who your assistant drafts a text for, and reads a contact only when you choose to send it in a chat.
+        NSPhotoLibraryAddUsageDescription: Steward AI adds a photo or a video from a chat to your library when you tap Save.
+        # Add to Calendar on an event card. Write-only: the app adds events and never reads the calendar.
+        NSCalendarsWriteOnlyAccessUsageDescription: Steward AI adds the events your assistant sends to your calendar when you tap Add to Calendar. It never reads your calendar.
+        # `steward://family`, `steward://direct`, `.../write` and `steward://talk` from the
+        # widgets (AppLink), `steward://pair?...` from a pairing QR code, and any other
+        # provider's sign-in answer, such as `steward://connector/notion?...`, which the
+        # sign-in sheet listens for. Google's answer to Connect Google comes back on the
+        # client id reversed, the one redirect Google allows an iOS client.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.siqstack.stewardai
+            CFBundleURLSchemes:
+              - steward
+          - CFBundleURLName: com.siqstack.stewardai.google
+            CFBundleURLSchemes:
+              - com.googleusercontent.apps.$(GOOGLE_IOS_CLIENT_ID)
+        # The whole client id, read by ConnectorSignInFlow for Google's own sign-in
+        # (OAuthAuthorization+Google).
+        GoogleIOSClientID: $(GOOGLE_IOS_CLIENT_ID).apps.googleusercontent.com
+        # The gateway is `wss://` on its tailnet name, behind `tailscale serve`
+        # and the tailnet's own certificate, so it needs no exception. Local
+        # networking still lets a typed `ws://` reach an IP address or a short
+        # local name, for a gateway on the same network. Everything else stays
+        # under App Transport Security.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        # A notification shows as a message from whoever wrote it, with their face,
+        # because the notification extension hands iOS each one as this intent. The app
+        # also tells iOS of every message the person sends as one, which puts the
+        # conversations in the Share Sheet's top row.
+        NSUserActivityTypes:
+          - INSendMessageIntent
+        # Space Grotesk, PocketPiggies' typeface, for its cards. It is under the SIL Open
+        # Font License, whose text ships beside it (Fonts/SpaceGrotesk-OFL.txt).
+        UIAppFonts:
+          - SpaceGrotesk-Medium.ttf
+          - SpaceGrotesk-Bold.ttf
+    # The widget and the two other extensions are separate processes and read what they
+    # show, or leave what was shared, in this group; see docs/apple-signing.md. The App
+    # Group must be enabled on all four App IDs before a signed build. Sign in with Apple pairs a
+    # phone with no Telegram, Push Notifications lets Apple give the phone the token
+    # its gateway pushes to, Communication Notifications lets a notification show
+    # the sender's face, and Time Sensitive Notifications lets a reminder's push through
+    # a Focus; each must be enabled on the app's App ID before a signed build.
+    entitlements:
+      path: HouseholdAssistant/HouseholdAssistant.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.siqstack.stewardai
+        com.apple.developer.applesignin:
+          - Default
+        aps-environment: production
+        com.apple.developer.usernotifications.communication: true
+        com.apple.developer.usernotifications.time-sensitive: true
+    dependencies:
+      - target: HouseholdAssistantWidgets
+      - target: HouseholdAssistantNotifications
+      - target: HouseholdAssistantShare
+      - package: SwiftStreamingMarkdown
+
+  HouseholdAssistantWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: HouseholdAssistantWidgets
+      - path: Shared
+      - path: HouseholdAssistant/Model/AppTheme.swift
+      # What the app leaves in the App Group for the widgets, the links back into the app
+      # and the name of each face the app draws, shared with the app and tested on Linux.
+      - path: HouseholdAssistant/Model/WidgetSnapshot.swift
+      - path: HouseholdAssistant/Model/RingColor.swift
+      - path: HouseholdAssistant/Model/AppLink.swift
+      - path: HouseholdAssistant/Model/NotificationPeople.swift
+      - path: HouseholdAssistant/Protocol/RoomConversation.swift
+      # The app's own faces, page, rims and motion, so a widget is drawn as the app is.
+      # FaceTile also draws a participant, which brings the three files that describe one.
+      - path: HouseholdAssistant/Model/RimStyle.swift
+      - path: HouseholdAssistant/Design/FaceTile.swift
+      - path: HouseholdAssistant/Design/MeshBackground.swift
+      - path: HouseholdAssistant/Design/ThemeAtmosphere.swift
+      - path: HouseholdAssistant/Design/Motion.swift
+      - path: HouseholdAssistant/Protocol/RoomParticipant.swift
+      - path: HouseholdAssistant/Protocol/RoomMedia.swift
+      - path: HouseholdAssistant/Protocol/JSONValue.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.siqstack.stewardai.widgets
+        PRODUCT_NAME: HouseholdAssistantWidgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: HouseholdAssistantWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Steward AI
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: HouseholdAssistantWidgets/HouseholdAssistantWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.siqstack.stewardai
+
+  # Opens each notification's sealed words with this phone's key, so Apple only ever
+  # carries "New message", and shows them as a message from whoever wrote it, with the
+  # face the app drew into the App Group. See
+  # HouseholdAssistantNotifications/NotificationService.swift.
+  HouseholdAssistantNotifications:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: HouseholdAssistantNotifications
+      # What a notification says, who is who, and the family room's name, shared with
+      # the app and tested on Linux.
+      - path: HouseholdAssistant/Protocol/RoomConversation.swift
+      - path: HouseholdAssistant/Protocol/NotificationPayload.swift
+      - path: HouseholdAssistant/Model/NotificationActions.swift
+      - path: HouseholdAssistant/Model/NotificationPeople.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.siqstack.stewardai.notifications
+        PRODUCT_NAME: HouseholdAssistantNotifications
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: HouseholdAssistantNotifications/Info.plist
+      properties:
+        CFBundleDisplayName: Steward AI
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
+          NSExtensionAttributes:
+            IntentsSupported:
+              - INSendMessageIntent
+    # The App Group is also the Keychain access group the notification key is kept in.
+    entitlements:
+      path: HouseholdAssistantNotifications/HouseholdAssistantNotifications.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.siqstack.stewardai
+
+  # Steward AI in every app's Share Sheet: pick the family room or the assistant's thread,
+  # add words, and send. It holds no link to the gateway and no key: it copies what was
+  # shared into the App Group and the app sends it, signed, the way the composer does. See
+  # HouseholdAssistantShare/ShareViewController.swift.
+  HouseholdAssistantShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: HouseholdAssistantShare
+      # The hand-off and its folder, the message's limits and the conversations, shared
+      # with the app and tested on Linux.
+      - path: HouseholdAssistant/Model/ShareHandoff.swift
+      - path: HouseholdAssistant/Model/ShareOutbox.swift
+      - path: HouseholdAssistant/Model/PlainFileName.swift
+      - path: HouseholdAssistant/Model/RoomAttachment.swift
+      - path: HouseholdAssistant/Model/WidgetSnapshot.swift
+      - path: HouseholdAssistant/Model/RingColor.swift
+      - path: HouseholdAssistant/Model/NotificationPeople.swift
+      - path: HouseholdAssistant/Protocol/RoomConversation.swift
+      # The faces the widgets draw from the App Group, and the app's page, motion and
+      # thumbnails, so the sheet is drawn as the app is. FaceTile also draws a
+      # participant, which brings the three files that describe one. Palette takes the
+      # complete preset colors from ThemeSelection.
+      - path: Shared/Palette.swift
+      - path: HouseholdAssistant/Model/AppTheme.swift
+      - path: Shared/ThemeSelection.swift
+      - path: Shared/WidgetConversation.swift
+      - path: Shared/WidgetFace.swift
+      - path: Shared/WidgetFaceTile.swift
+      - path: Shared/WidgetFamilyFace.swift
+      - path: Shared/WidgetFacePhotos.swift
+      - path: HouseholdAssistant/Design/FaceTile.swift
+      - path: HouseholdAssistant/Design/MeshBackground.swift
+      - path: HouseholdAssistant/Design/ThemeAtmosphere.swift
+      - path: HouseholdAssistant/Design/Motion.swift
+      - path: HouseholdAssistant/Media/MediaThumbnails.swift
+      - path: HouseholdAssistant/Protocol/RoomParticipant.swift
+      - path: HouseholdAssistant/Protocol/RoomMedia.swift
+      - path: HouseholdAssistant/Protocol/JSONValue.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.siqstack.stewardai.share
+        PRODUCT_NAME: HouseholdAssistantShare
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: HouseholdAssistantShare/Info.plist
+      properties:
+        CFBundleDisplayName: Steward AI
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            # Picking the family room or the assistant from the Share Sheet's top row
+            # opens the sheet on that conversation (ShareSuggestions).
+            IntentsSupported:
+              - INSendMessageIntent
+            # Photos, videos and files up to the ten one message carries, a web page's
+            # link, and text.
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+              NSExtensionActivationSupportsMovieWithMaxCount: 10
+              NSExtensionActivationSupportsFileWithMaxCount: 10
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsWebPageWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+    entitlements:
+      path: HouseholdAssistantShare/HouseholdAssistantShare.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.siqstack.stewardai
+
+  HouseholdAssistantTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HouseholdAssistantTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.siqstack.stewardai.tests
+        GENERATE_INFOPLIST_FILE: YES
+        # Hosted in the app so that @testable import reaches the app module.
+        # These are the values Xcode writes for a hosted unit-test bundle; they
+        # are spelled out rather than inferred so that the behaviour does not
+        # depend on which XcodeGen version generates the project.
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/HouseholdAssistant.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/HouseholdAssistant
+        BUNDLE_LOADER: $(TEST_HOST)
+    dependencies:
+      - target: HouseholdAssistant
+
+  HouseholdAssistantUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: HouseholdAssistantUITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.siqstack.stewardai.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: HouseholdAssistant
+    dependencies:
+      - target: HouseholdAssistant
+
+schemes:
+  HouseholdAssistant:
+    build:
+      targets:
+        HouseholdAssistant: all
+        HouseholdAssistantWidgets: all
+        HouseholdAssistantNotifications: all
+        HouseholdAssistantShare: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - HouseholdAssistantTests
+        - HouseholdAssistantUITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+

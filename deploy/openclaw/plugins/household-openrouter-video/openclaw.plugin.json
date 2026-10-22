@@ -1,0 +1,17 @@
+{
+  "id": "household-openrouter-video",
+  "name": "Household OpenRouter video",
+  "description": "Describes a video someone sends either assistant through OpenRouter, which OpenClaw's own OpenRouter provider does not.",
+  "enabledByDefault": false,
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "mediaUnderstandingProviders": ["openrouter-video"]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

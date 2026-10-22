@@ -1,0 +1,12 @@
+{
+  "name": "household-family-room",
+  "version": "1.0.0",
+  "private": true,
+  "description": "What one household assistant cannot see or hear of the family group, added to its next turn there",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

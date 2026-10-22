@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+.env.*
+*.db
+*.db-wal
+*.db-shm
+*.egg-info/
+
+# goblin worktrees live beside this checkout
+.worktrees/
+
+# App Store Connect and APNs keys, downloaded once from Apple
+AuthKey_*.p8
+
+# The app build's household values (apps/ios/Household.xcconfig)
+apps/ios/Local.xcconfig
+
+# Scratch a gate step once committed (#251)
+.test-validation/
+.spotify-validation/
+uv.lock

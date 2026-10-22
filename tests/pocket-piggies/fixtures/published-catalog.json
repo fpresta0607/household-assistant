@@ -1,0 +1,1363 @@
+{
+  "schemaVersion": 1,
+  "reads": [
+    {
+      "id": "assistant.catalog",
+      "method": "GET",
+      "path": "/api/assistant/catalog",
+      "description": "This catalog: every read and table this connection can use.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "units": "none",
+      "timezone": "none"
+    },
+    {
+      "id": "assistant.records",
+      "method": "GET",
+      "path": "/api/assistant/records/{table}",
+      "description": "One page of the owner's own rows from one table, in the columns the catalog lists for it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "One of this catalog's tables[].name."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 100
+          },
+          "cursor": {
+            "type": "string",
+            "description": "page.nextCursor from the previous page of the same table."
+          },
+          "from": {
+            "type": "string",
+            "format": "date",
+            "description": "An owner-local day, YYYY-MM-DD, inclusive."
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "description": "An owner-local day, YYYY-MM-DD, inclusive."
+          }
+        },
+        "required": [
+          "table"
+        ],
+        "additionalProperties": false
+      },
+      "units": "mixed",
+      "timezone": "user",
+      "notes": "Each column carries its own type and unit in tables[].columns. Rows come newest first on (timeColumn, id); follow page.nextCursor while page.hasMore, and a row added meanwhile is neither repeated nor skipped. from and to filter the table's timeColumn by owner-local day. Dates are YYYY-MM-DD with no time of day; instants are UTC ISO 8601."
+    },
+    {
+      "id": "assistant.context",
+      "method": "GET",
+      "path": "/api/assistant/context",
+      "description": "Stored account balances with their freshness, the rolling and monthly budget, upcoming recurring charges and this month's savings.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "accountCursor": {
+            "type": "string",
+            "format": "uuid",
+            "description": "accounts.page.nextCursor from the previous page."
+          }
+        },
+        "additionalProperties": false
+      },
+      "units": "cents",
+      "timezone": "user",
+      "notes": "Accounts come 50 a page; the other sections repeat on every page and must not be summed across pages. A section in unavailableSections is null, never zero. Balances are stored, not live: quote freshness with them."
+    },
+    {
+      "id": "ask_piggy.answer",
+      "method": "POST",
+      "path": "/api/ask-piggy",
+      "description": "A deterministic, model-free answer to one money question, with its arithmetic shown.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "periodKey": {
+            "type": "string",
+            "pattern": "^\\d{4}(-(0[1-9]|1[0-2])|-Q[1-4])?$",
+            "description": "A month (YYYY-MM), a calendar quarter (YYYY-Q1) or a year (YYYY)."
+          },
+          "piggyId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A piggy id from piggy_banks.list or the piggies table."
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "additionalProperties": false
+      },
+      "units": "cents",
+      "timezone": "user",
+      "notes": "Structured amounts are cents; the answer's sentences write amounts as dollars. The structured reads are the better source for synthesis."
+    },
+    {
+      "id": "transactions.statement",
+      "method": "POST",
+      "path": "/api/pnl",
+      "description": "Every transaction row of one period with its piggy, the period's piggies and the connected accounts.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "periodKey": {
+            "type": "string",
+            "pattern": "^\\d{4}(-(0[1-9]|1[0-2])|-Q[1-4])?$",
+            "description": "A month (YYYY-MM), a calendar quarter (YYYY-Q1) or a year (YYYY)."
+          }
+        },
+        "required": [
+          "periodKey"
+        ],
+        "additionalProperties": false
+      },
+      "units": "cents",
+      "timezone": "none",
+      "notes": "rowCount and truncated say whether the period held more rows than were returned; a truncated period must not be totalled."
+    },
+    {
+      "id": "piggy_banks.list",
+      "method": "GET",
+      "path": "/api/piggy-banks",
+      "description": "Every active piggy with its group, monthly target and rolling balance.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "units": "dollars",
+      "timezone": "none",
+      "notes": "Groups are lowercase needs, wants and savings. balance is rolling since the budget start, not this month."
+    },
+    {
+      "id": "account.safe_to_transfer",
+      "method": "GET",
+      "path": "/api/account/safe-to-transfer",
+      "description": "How much can move from the primary checking account to savings without the next card bill overdrawing it, with the whole subtraction.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "units": "cents",
+      "timezone": "user",
+      "notes": "A negative result is shortfallCents, never a negative safe amount. Other checking accounts are excluded and listed."
+    },
+    {
+      "id": "account.cash_on_hand",
+      "method": "GET",
+      "path": "/api/account/cash-on-hand",
+      "description": "The full cash position: balances by account kind, net worth, the rolling and monthly budget, trends and the report card.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "units": "cents",
+      "timezone": "user",
+      "notes": "rawBudgetCents is Needs plus Wants rolling since the budget start: never call it this month's figure (monthlyBudget is the monthly frame). safeToSpendCents is a daily rate that counts income not yet received: never quote it as money on hand."
+    },
+    {
+      "id": "account.net_worth_history",
+      "method": "GET",
+      "path": "/api/account/net-worth-history",
+      "description": "Daily net-worth snapshots: cash, debt, investments and net worth.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 7,
+            "maximum": 365,
+            "default": 90
+          }
+        },
+        "additionalProperties": false
+      },
+      "units": "cents",
+      "timezone": "user",
+      "notes": "A snapshot is taken only on days the owner opens the app; a missing day has no snapshot, not a zero."
+    },
+    {
+      "id": "income.breakdown",
+      "method": "GET",
+      "path": "/api/inflow-breakdown",
+      "description": "Income since the budget start, what was fed to piggies from it, Money to Feed, and month, quarter and year totals.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "units": "mixed",
+      "timezone": "user",
+      "notes": "Dollars: items[].amount, totalIncome, totalFeedableIncome, totalFreedUp, totalAllocated, pointsEligibleAllocated, nonPointsEligibleAllocated, availableToFeed. Cents: every field ending in Cents, feedEvents[].totalCents, lifetime and periodStatsByMode. With no budget start date only part of the answer is present."
+    },
+    {
+      "id": "piggies.current_month_spending",
+      "method": "GET",
+      "path": "/api/piggies/current-month-spending",
+      "description": "Spending per Needs and Wants piggy, for the dashboard animation.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "units": "dollars",
+      "timezone": "user",
+      "notes": "spentThisMonth sums charges (refunds ignored) from the EARLIER of the budget start date and this month's first day through today, so after the first budget month it covers the whole budget era, not the month. For this month use assistant.context budget.monthlyBudget."
+    },
+    {
+      "id": "piggies.savings_month",
+      "method": "GET",
+      "path": "/api/piggies/savings-month",
+      "description": "What was allocated to each savings piggy in one month and how much of it is covered.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "description": "A calendar month, YYYY-MM."
+          }
+        },
+        "required": [
+          "month"
+        ],
+        "additionalProperties": false
+      },
+      "units": "mixed",
+      "timezone": "user",
+      "notes": "totalSavings is dollars; allocByPiggy and coveredByPiggy are cents."
+    },
+    {
+      "id": "piggies.income_percent",
+      "method": "GET",
+      "path": "/api/piggies/{piggyId}/income-percent",
+      "description": "For a piggy whose target is a percent of income: the percent, the income average it is taken of, and the resulting target.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "piggyId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A piggy id from piggy_banks.list or the piggies table."
+          }
+        },
+        "required": [
+          "piggyId"
+        ],
+        "additionalProperties": false
+      },
+      "units": "mixed",
+      "timezone": "user",
+      "notes": "404 unless the piggy is one of the owner's percent piggies. monthlyTarget is dollars, averageMonthlyIncomeCents is cents, incomePct is a percent."
+    },
+    {
+      "id": "piggies.review",
+      "method": "GET",
+      "path": "/api/piggies/{piggyId}/review/last-month",
+      "description": "One piggy's recent transactions and spending summary: this month and the two before.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "piggyId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A piggy id from piggy_banks.list or the piggies table."
+          }
+        },
+        "required": [
+          "piggyId"
+        ],
+        "additionalProperties": false
+      },
+      "units": "cents",
+      "timezone": "none",
+      "notes": "Months are UTC calendar months. currentBalanceCents is all-time allocations minus all-time charges and can differ from the app's Balance; use piggy_banks.list for that."
+    },
+    {
+      "id": "piggy_banks.rebalance_eligibility",
+      "method": "GET",
+      "path": "/api/piggy-banks/rebalance-eligibility",
+      "description": "Whether there is enough spending history in the last 90 days for a rebalance, and the counts behind it.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "units": "dollars",
+      "timezone": "none"
+    },
+    {
+      "id": "transactions.period",
+      "method": "GET",
+      "path": "/api/transactions/period",
+      "description": "The ledger rows of one period, newest first, optionally narrowed to some piggies.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "pattern": "^\\d{4}(-(0[1-9]|1[0-2])|-Q[1-4])?$",
+            "description": "A month (YYYY-MM), a calendar quarter (YYYY-Q1) or a year (YYYY)."
+          },
+          "piggy": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 50,
+            "description": "Send the parameter once per piggy id."
+          }
+        },
+        "required": [
+          "period"
+        ],
+        "additionalProperties": false
+      },
+      "units": "dollars",
+      "timezone": "none",
+      "notes": "amount is dollars, positive is money out. At most 1,000 rows; truncated says the oldest were cut."
+    },
+    {
+      "id": "transactions.unassigned_by_month",
+      "method": "GET",
+      "path": "/api/transactions/unassigned-by-month",
+      "description": "How many transactions have no piggy, per month, and with include=transactions the transactions themselves.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "include": {
+            "type": "string",
+            "enum": [
+              "transactions"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "units": "dollars",
+      "timezone": "none",
+      "notes": "include=transactions lists every unassigned transaction with no paging; amount is dollars, positive is money out."
+    },
+    {
+      "id": "plaid.status",
+      "method": "GET",
+      "path": "/api/plaid/status",
+      "description": "Which banks are connected and when each connection last changed, from the database alone.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "units": "none",
+      "timezone": "none"
+    },
+    {
+      "id": "accessories.list",
+      "method": "GET",
+      "path": "/api/accessories",
+      "description": "Piggy Points and the accessories owned and equipped; not money.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "units": "none",
+      "timezone": "none"
+    },
+    {
+      "id": "savings.review",
+      "method": "GET",
+      "path": "/api/savings-review/summary",
+      "description": "For one month: what was set aside for savings, what actually moved to savings, what is left to move and what can safely move now.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "description": "A calendar month, YYYY-MM."
+          }
+        },
+        "additionalProperties": false
+      },
+      "units": "cents",
+      "timezone": "user",
+      "notes": "month defaults to the owner's current month and cannot be a later one."
+    },
+    {
+      "id": "savings.challenge",
+      "method": "GET",
+      "path": "/api/savings-challenge",
+      "description": "This month's savings tracker: money moved to savings against the goal, the honeycomb grid and points.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "units": "cents",
+      "timezone": "user",
+      "notes": "Read for an assistant without creating the month's row or awarding points: pointsAwarded is what is stored and pointsEarnedThisSync is 0. progressPct is uncapped."
+    }
+  ],
+  "tables": [
+    {
+      "name": "user_metadata",
+      "description": "Budget settings: budget start date, vibe, timezone, primary checking account and Piggy Points.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "onboarding_complete",
+          "type": "boolean"
+        },
+        {
+          "name": "last_feed_event_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "budget_start_date",
+          "type": "date",
+          "description": "First day of the budget era; balances and Money to Feed count from here."
+        },
+        {
+          "name": "first_budget_committed_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "has_done_first_feed",
+          "type": "boolean"
+        },
+        {
+          "name": "vibe",
+          "type": "text",
+          "description": "Feed Me split: null is 50/30/20 Needs/Wants/Savings, stability 60/20/20, save_more 50/20/30, freedom 50/40/10."
+        },
+        {
+          "name": "piggy_points_balance",
+          "type": "integer"
+        },
+        {
+          "name": "piggy_points_lifetime_earned",
+          "type": "integer"
+        },
+        {
+          "name": "savings_review_pending_month",
+          "type": "text"
+        },
+        {
+          "name": "timezone",
+          "type": "text",
+          "description": "IANA zone every owner-local date is resolved in."
+        },
+        {
+          "name": "primary_checking_account_id",
+          "type": "uuid"
+        },
+        {
+          "name": "primary_checking_pinned",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "profiles",
+      "description": "The owner's display name and subscription state.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "description": "The owner's account id."
+        },
+        {
+          "name": "display_name",
+          "type": "text"
+        },
+        {
+          "name": "plan_id",
+          "type": "text"
+        },
+        {
+          "name": "plan_status",
+          "type": "text"
+        },
+        {
+          "name": "current_period_end",
+          "type": "timestamptz"
+        },
+        {
+          "name": "cancel_at_period_end",
+          "type": "boolean"
+        },
+        {
+          "name": "is_pilot",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "name": "plaid_items",
+      "description": "Bank connections: institution, sync state and when each was disconnected.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "institution_name",
+          "type": "text"
+        },
+        {
+          "name": "institution_id",
+          "type": "text"
+        },
+        {
+          "name": "sync_status",
+          "type": "text"
+        },
+        {
+          "name": "last_sync_completed_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "disconnected_at",
+          "type": "timestamptz",
+          "description": "Set when the connection was removed; its data is kept."
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "name": "accounts",
+      "description": "Bank, card and investment accounts with their last stored balances.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "plaid_item_id",
+          "type": "uuid",
+          "description": "plaid_items.id."
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "official_name",
+          "type": "text"
+        },
+        {
+          "name": "mask",
+          "type": "text"
+        },
+        {
+          "name": "type",
+          "type": "text"
+        },
+        {
+          "name": "subtype",
+          "type": "text"
+        },
+        {
+          "name": "iso_currency_code",
+          "type": "text"
+        },
+        {
+          "name": "current_balance",
+          "type": "numeric",
+          "unit": "dollars",
+          "description": "Last stored balance; for a credit card or loan, what is owed."
+        },
+        {
+          "name": "available_balance",
+          "type": "numeric",
+          "unit": "dollars"
+        },
+        {
+          "name": "is_active",
+          "type": "boolean"
+        },
+        {
+          "name": "last_synced_at",
+          "type": "timestamptz",
+          "description": "When the balance was last stored; it is not live."
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "status",
+          "type": "text"
+        },
+        {
+          "name": "institution_id",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "transactions",
+      "description": "Every bank transaction that was not deleted, newest first, including pending rows and rows flagged as duplicates.",
+      "timeColumn": "date",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "account_id",
+          "type": "uuid",
+          "description": "accounts.id."
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "merchant_name",
+          "type": "text"
+        },
+        {
+          "name": "original_name",
+          "type": "text"
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "unit": "dollars",
+          "description": "Positive is money out, negative is money in."
+        },
+        {
+          "name": "iso_currency_code",
+          "type": "text"
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "description": "The bank's posting date, with no time of day."
+        },
+        {
+          "name": "pending",
+          "type": "boolean",
+          "description": "Pending rows count in no balance."
+        },
+        {
+          "name": "category",
+          "type": "text[]"
+        },
+        {
+          "name": "original_category",
+          "type": "text[]"
+        },
+        {
+          "name": "is_transfer",
+          "type": "boolean"
+        },
+        {
+          "name": "transfer_group_id",
+          "type": "uuid"
+        },
+        {
+          "name": "is_duplicate",
+          "type": "boolean",
+          "description": "A replay of another row; it counts in no total."
+        },
+        {
+          "name": "primary_transaction_id",
+          "type": "uuid"
+        },
+        {
+          "name": "is_income",
+          "type": "boolean",
+          "description": "The one source of income in every calculation."
+        },
+        {
+          "name": "normalized_merchant_name",
+          "type": "text"
+        },
+        {
+          "name": "piggy_id",
+          "type": "uuid",
+          "description": "piggies.id the charge is assigned to; null is unassigned."
+        },
+        {
+          "name": "classification_confidence",
+          "type": "numeric"
+        },
+        {
+          "name": "cleaning_status",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "deleted_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "enriched_merchant_name",
+          "type": "text"
+        },
+        {
+          "name": "enriched_category_primary",
+          "type": "text"
+        },
+        {
+          "name": "enriched_category_detailed",
+          "type": "text"
+        },
+        {
+          "name": "enriched_location",
+          "type": "jsonb"
+        },
+        {
+          "name": "enriched_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "enriched_logo_url",
+          "type": "text"
+        },
+        {
+          "name": "enriched_website",
+          "type": "text"
+        },
+        {
+          "name": "transfer_type",
+          "type": "text"
+        },
+        {
+          "name": "affects_budget",
+          "type": "boolean",
+          "description": "False for a row kept outside the budget."
+        },
+        {
+          "name": "dedupe_ordinal",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "name": "piggies",
+      "description": "Budget categories (piggies), their group and monthly target, including archived ones.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "group",
+          "type": "text",
+          "description": "NEEDS, WANTS or SAVINGS."
+        },
+        {
+          "name": "emoji",
+          "type": "text"
+        },
+        {
+          "name": "color",
+          "type": "text"
+        },
+        {
+          "name": "monthly_target_cents",
+          "type": "integer",
+          "unit": "cents"
+        },
+        {
+          "name": "priority",
+          "type": "integer"
+        },
+        {
+          "name": "is_archived",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "is_vault",
+          "type": "boolean"
+        },
+        {
+          "name": "is_fixed",
+          "type": "boolean"
+        },
+        {
+          "name": "savings_share_pct",
+          "type": "numeric",
+          "unit": "percent",
+          "description": "Share of the savings pool (0-100); savings piggies only."
+        },
+        {
+          "name": "income_pct",
+          "type": "numeric",
+          "unit": "percent",
+          "description": "Set when the monthly target is a percent of income; null is a dollar target."
+        }
+      ]
+    },
+    {
+      "name": "piggy_allocations",
+      "description": "Money fed into piggies (positive) and taken back out (negative).",
+      "timeColumn": "allocated_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "piggy_id",
+          "type": "uuid"
+        },
+        {
+          "name": "source_transaction_id",
+          "type": "uuid",
+          "description": "The income transaction that funded it, when known."
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer",
+          "unit": "cents"
+        },
+        {
+          "name": "allocated_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "note",
+          "type": "text"
+        },
+        {
+          "name": "is_points_eligible",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "name": "piggy_rules",
+      "description": "Merchant rules that file a merchant's charges into a piggy.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "piggy_id",
+          "type": "uuid"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "matcher_type",
+          "type": "text"
+        },
+        {
+          "name": "merchant_normalized",
+          "type": "text"
+        },
+        {
+          "name": "name_pattern",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "piggy_balances",
+      "description": "Each piggy's rolling balance since the budget start: allocated minus posted spending.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "piggy_id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "group",
+          "type": "text"
+        },
+        {
+          "name": "emoji",
+          "type": "text"
+        },
+        {
+          "name": "color",
+          "type": "text"
+        },
+        {
+          "name": "monthly_target_cents",
+          "type": "integer",
+          "unit": "cents"
+        },
+        {
+          "name": "priority",
+          "type": "integer"
+        },
+        {
+          "name": "is_archived",
+          "type": "boolean"
+        },
+        {
+          "name": "is_vault",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "allocated_cents",
+          "type": "numeric",
+          "unit": "cents"
+        },
+        {
+          "name": "spent_cents",
+          "type": "numeric",
+          "unit": "cents",
+          "description": "Negative when refunds exceed charges."
+        },
+        {
+          "name": "balance_cents",
+          "type": "numeric",
+          "unit": "cents"
+        }
+      ]
+    },
+    {
+      "name": "transaction_overrides",
+      "description": "Per-transaction piggy overrides and hidden-from-stats flags.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "transaction_id",
+          "type": "uuid"
+        },
+        {
+          "name": "override_piggy_id",
+          "type": "uuid"
+        },
+        {
+          "name": "hidden_from_stats",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "name": "category_tx_overrides",
+      "description": "Per-transaction category choices, including draft categories.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "transaction_id",
+          "type": "uuid"
+        },
+        {
+          "name": "piggy_id_or_draft_category_id",
+          "type": "text"
+        },
+        {
+          "name": "is_draft",
+          "type": "boolean"
+        },
+        {
+          "name": "hidden_from_stats",
+          "type": "boolean"
+        },
+        {
+          "name": "manual_piggy_id",
+          "type": "uuid"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "name": "transaction_exclusions",
+      "description": "Transactions excluded from a category.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "transaction_id",
+          "type": "uuid"
+        },
+        {
+          "name": "category_id",
+          "type": "text"
+        },
+        {
+          "name": "is_draft",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "name": "transfer_groups",
+      "description": "Groups that pair the two sides of a transfer.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "account_balance_snapshots",
+      "description": "Daily net-worth snapshots, one per owner-local day.",
+      "timeColumn": "snapshot_date",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "snapshot_date",
+          "type": "date"
+        },
+        {
+          "name": "total_cash_cents",
+          "type": "integer",
+          "unit": "cents"
+        },
+        {
+          "name": "total_debt_cents",
+          "type": "integer",
+          "unit": "cents"
+        },
+        {
+          "name": "total_investment_cents",
+          "type": "integer",
+          "unit": "cents"
+        },
+        {
+          "name": "net_worth_cents",
+          "type": "integer",
+          "unit": "cents"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "name": "savings_challenges",
+      "description": "One row per owner-local month of the savings tracker: goal, grid cells and points awarded.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "month_key",
+          "type": "text",
+          "description": "YYYY-MM."
+        },
+        {
+          "name": "goal_cents",
+          "type": "integer",
+          "unit": "cents"
+        },
+        {
+          "name": "cell_amounts_cents",
+          "type": "jsonb",
+          "unit": "cents"
+        },
+        {
+          "name": "points_awarded",
+          "type": "integer"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "timezone",
+          "type": "text"
+        },
+        {
+          "name": "awarded_milestones",
+          "type": "jsonb"
+        }
+      ]
+    },
+    {
+      "name": "savings_movements",
+      "description": "Recorded moves into and out of savings piggies.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "piggy_id",
+          "type": "uuid"
+        },
+        {
+          "name": "direction",
+          "type": "text"
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer",
+          "unit": "cents"
+        },
+        {
+          "name": "source",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "name": "budget_drafts",
+      "description": "Budget plans drafted during onboarding and rebalancing. Rows can be large; ask for small pages.",
+      "timeColumn": "created_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "avg_monthly_income",
+          "type": "numeric",
+          "unit": "dollars"
+        },
+        {
+          "name": "draft_data",
+          "type": "jsonb"
+        },
+        {
+          "name": "status",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "name": "user_accessories",
+      "description": "Piggy accessories the owner has acquired; not money.",
+      "timeColumn": "acquired_at",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "The owner; always the connected account."
+        },
+        {
+          "name": "accessory_id",
+          "type": "uuid"
+        },
+        {
+          "name": "acquired_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "acquisition_source",
+          "type": "text"
+        }
+      ]
+    }
+  ]
+}

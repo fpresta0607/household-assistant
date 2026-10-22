@@ -1,0 +1,8 @@
+{
+  "type": "event",
+  "event": "plugin.household-app.changed",
+  "payload": {
+    "rev": 6
+  },
+  "seq": 41
+}

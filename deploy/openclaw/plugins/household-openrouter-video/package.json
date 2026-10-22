@@ -1,0 +1,12 @@
+{
+  "name": "household-openrouter-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Video understanding through OpenRouter for the household's OpenClaw gateways",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "pocket-piggies",
+  "name": "Pocket Piggies",
+  "description": "Read the account owner's PocketPiggies finances, read-only, in their private Telegram chat and their own thread in the Steward AI app",
+  "categories": ["tools"],
+  "activation": { "onStartup": true },
+  "contracts": {
+    "tools": [
+      "pocketpiggies_catalog",
+      "pocketpiggies_read",
+      "pocketpiggies_records"
+    ]
+  },
+  "toolMetadata": {
+    "pocketpiggies_catalog": {
+      "optional": true,
+      "replaySafe": true,
+      "sideEffecting": false
+    },
+    "pocketpiggies_read": {
+      "optional": true,
+      "replaySafe": true,
+      "sideEffecting": false
+    },
+    "pocketpiggies_records": {
+      "optional": true,
+      "replaySafe": true,
+      "sideEffecting": false
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "ownerTelegramId": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+      "accountLabel": { "type": "string", "enum": ["corey", "denise"] },
+      "ownerHouseholdPersonId": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,31}$",
+        "description": "The owner's person id in the household app channel, whose own thread there, started from a message the owner's phone signed, may read finance."
+      }
+    },
+    "required": ["ownerTelegramId", "accountLabel"],
+    "additionalProperties": false
+  }
+}

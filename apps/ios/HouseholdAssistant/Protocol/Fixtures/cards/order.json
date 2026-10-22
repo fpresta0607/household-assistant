@@ -1,0 +1,15 @@
+{
+  "type": "order",
+  "title": "Household order",
+  "items": 3,
+  "status": "shipped",
+  "arriving": "2026-10-16",
+  "order": "113-***-4417",
+  "steps": [
+    { "label": "Ordered", "at": "2026-10-14T19:42:00-04:00" },
+    { "label": "Shipped", "at": "2026-10-15T06:10:00-04:00" },
+    { "label": "Out for delivery" },
+    { "label": "Delivered" }
+  ],
+  "skill": "lists"
+}

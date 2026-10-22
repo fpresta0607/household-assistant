@@ -1,0 +1,35 @@
+{
+  "type": "req",
+  "id": "54ba7126-9522-4f50-af50-bc4ee8012ae5",
+  "method": "connect",
+  "params": {
+    "minProtocol": 4,
+    "maxProtocol": 4,
+    "client": {
+      "id": "openclaw-ios",
+      "displayName": "steward-ios-v1 protocol probe",
+      "version": "0.1.0",
+      "platform": "ios",
+      "deviceFamily": "iphone",
+      "mode": "ui"
+    },
+    "role": "operator",
+    "scopes": [
+      "operator.read",
+      "operator.write"
+    ],
+    "caps": [],
+    "auth": {
+      "deviceToken": "REDACTED"
+    },
+    "locale": "en-US",
+    "userAgent": "steward-ios/0.1.0",
+    "device": {
+      "id": "7382a412d8455d8fdc9408f9a1472480f73182bd73c99b66981576166ccb87fb",
+      "publicKey": "3bRVdFUEO3LccphwBbDQ011DAHsyCHQaCEcfABS5Mcw",
+      "signature": "REDACTED",
+      "signedAt": 1789787807161,
+      "nonce": "a69c753c-41ef-4b97-bce7-7f7ca96c94b4"
+    }
+  }
+}

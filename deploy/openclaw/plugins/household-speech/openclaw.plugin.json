@@ -1,0 +1,29 @@
+{
+  "id": "household-speech",
+  "name": "Household speech",
+  "description": "Speaks a reply as numbered voice notes, each made and sent once, and holds what speech may cost in one reply and in one day.",
+  "enabledByDefault": false,
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": ["speak"]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["replyCharacters", "dayCharacters"],
+    "properties": {
+      "replyCharacters": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "The most characters one spoken reply may be."
+      },
+      "dayCharacters": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "The most characters this gateway may send to the speech provider in one day, every try counted."
+      }
+    }
+  }
+}

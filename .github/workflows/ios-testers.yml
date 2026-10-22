@@ -1,0 +1,46 @@
+# Read who in the internal TestFlight groups has installed the app.
+#
+#   Trigger: `workflow_dispatch` only, by someone with write access.
+#
+#   It reads and never writes: `app-store-connect.py installs` lists each
+#     internal tester's TestFlight state (invited, accepted, installed) by
+#     first name only, so the log holds no email address, and names the newest
+#     build in TestFlight. Apple reports that a tester installed the app, not
+#     which build.
+#
+#   Spend: one Linux job of about a minute. No Mac.
+#
+#   Secrets: the App Store Connect API key from the `testflight` environment,
+#     given only to the step that reads it, written with umask 077 and deleted
+#     when the step ends.
+
+name: ios-testers
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: testflight
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: who has installed the app
+        shell: bash
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          umask 077
+          export APP_STORE_CONNECT_KEY_PATH="${RUNNER_TEMP}/AuthKey.p8"
+          trap 'rm -f "${APP_STORE_CONNECT_KEY_PATH}"' EXIT
+          printf '%s\n' "${APP_STORE_CONNECT_KEY_P8}" | tr -d '\r' > "${APP_STORE_CONNECT_KEY_PATH}"
+          python3 scripts/macos/app-store-connect.py installs | tee -a "${GITHUB_STEP_SUMMARY}"

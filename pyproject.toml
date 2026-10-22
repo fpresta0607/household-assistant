@@ -1,0 +1,56 @@
+[project]
+name = "household-assistant"
+version = "0.1.0"
+description = "Identity, scopes and approvals for the Corey and Denise household assistants"
+requires-python = ">=3.12"
+# zoneinfo is stdlib, the IANA database it reads is not shipped with Windows.
+dependencies = ["tzdata; platform_system == 'Windows'"]
+
+[project.optional-dependencies]
+# PyYAML is a test-only dependency: the deployed compose file is machine-consumed
+# YAML, so the test that both gateways run on Central parses it rather than grepping
+# it. Nothing under household/ imports it; the runtime still has no dependencies.
+dev = ["pytest>=8.3", "ruff>=0.6", "mypy>=1.11", "PyYAML>=6.0", "types-PyYAML>=6.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["household*"]
+
+[tool.setuptools.package-data]
+household = ["migrations/*.sql"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "ANN", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# Checked as Linux because that is the only place this runs. The daemon and the
+# installer use O_NOFOLLOW, O_DIRECTORY, fchown and dir_fd, which typeshed marks
+# POSIX-only, so checking them as Windows reports nine errors about a platform the
+# box will never be and disagrees with CI, which is Linux.
+platform = "linux"
+files = ["deploy", "household", "scripts", "services", "tests"]
+
+# pyatv is only in the home key holder's own venv on the box (deploy/home/requirements.txt),
+# not in the project's dependencies, and household/home/apple_tv.py types what it uses.
+[[tool.mypy.overrides]]
+module = ["pyatv", "pyatv.*"]
+ignore_missing_imports = true
+
+# The custom integration runs in the pinned Home Assistant container, with the Spotify
+# integration's own spotifyaio.
+[[tool.mypy.overrides]]
+module = ["homeassistant.*", "spotifyaio", "spotifyaio.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

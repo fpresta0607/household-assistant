@@ -1,0 +1,4 @@
+// Copy to Local.xcconfig (gitignored) and fill in the household's own values.
+// See Household.xcconfig for what each one is.
+HOUSEHOLD_GATEWAY_HOST = <machine>.<tailnet>.ts.net
+GOOGLE_IOS_CLIENT_ID = <project number>-<client id>

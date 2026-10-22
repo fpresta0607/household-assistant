@@ -1,0 +1,316 @@
+# Archive the iOS app on one of GitHub's Macs, sign it, send it to TestFlight,
+# and wait until the household's phones can install it.
+#
+# This is the only workflow in the repository that is given a secret, and the
+# only one that sends anything to Apple, so its trigger model is deliberately
+# narrow:
+#
+#   Trigger: `workflow_dispatch` only, which needs someone with write access to
+#     start it by hand: the Run workflow button on github.com or in the GitHub
+#     phone app, or `scripts/ios-cloud.py testflight` from any computer. There
+#     is no `push`, `pull_request` or `pull_request_target` trigger, so the
+#     release path is not reachable from a change that has not been merged.
+#
+#   Confirmation: the `confirm` box must read exactly UPLOAD for anything to be
+#     signed or sent, and an upload is refused unless it runs on main. Left
+#     empty, the run is a rehearsal: it reads which Apple steps are done, shows
+#     the signing settings each target would get, archives with signing
+#     switched off, and prints the export it would do. It signs nothing and
+#     sends nothing.
+#
+#   Spend: the owner chose GitHub's hosted Macs on 14 October 2026, with a cap
+#     of 5 dollars a day. A rehearsal is refused when today's Mac minutes plus
+#     its 45 minute timeout could pass that cap. On 15 October he allowed the
+#     uploads he asks for past that worst case, as long as the day's real cost
+#     stays under the cap: an upload's Mac job gets a timeout cut to what is
+#     left of the day, and is refused only when fewer than 10 minutes are left.
+#     A run started with `owner_approved_spend`, which is only for the owner's
+#     word on one build, is reported and never refused, and keeps its timeout.
+#     The `cost` job writes the run's Mac minutes and their price on its summary.
+#     The Apple steps and the wait for processing run on Linux, at a tenth of
+#     the price.
+#
+#   Permissions: `contents: read`, and `actions: read` for the two jobs that
+#     count Mac minutes. The release does not tag, does not create a GitHub
+#     release, and does not write to the repository.
+#
+#   Secrets: from the `testflight` environment, never the repository scope,
+#     and each is given only to the step that reads it, through `env:`, and is
+#     never echoed. Four are read:
+#       APP_STORE_CONNECT_KEY_ID, APP_STORE_CONNECT_ISSUER_ID,
+#       APP_STORE_CONNECT_KEY_P8      the App Store Connect API key, Admin role
+#       DISTRIBUTION_CERTIFICATE_KEY  the RSA private key of the team's Apple
+#                                     Distribution certificate
+#     Both private keys are written to files under RUNNER_TEMP with umask 077,
+#     without the carriage returns a secret pasted on Windows can carry, and
+#     passed by path, never on a command line. The Mac is wiped after the
+#     job, and the step that deletes the keys and the throwaway keychain runs
+#     whether the job succeeded or failed. The key id and issuer id, and the
+#     team id the signing step reads from the profile, are account identifiers
+#     rather than credentials: xcodebuild takes them as arguments, so they are
+#     visible in a process listing on the Mac while it runs, and `ha_redact`
+#     and an `add-mask` keep them out of the logs.
+#
+#   Apple ID and password: never. Authentication is the App Store Connect API
+#     key, which is scoped, revocable, and needs nobody to type a password.
+#
+# Concurrency is serialised and never cancelled: interrupting an upload
+# halfway is worse than waiting for it.
+
+name: ios-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type UPLOAD to send main to TestFlight. Leave empty for a rehearsal that signs and sends nothing.'
+        required: false
+        default: ''
+      build_number:
+        description: 'Build number to stamp; leave empty to use the run number'
+        required: false
+        default: ''
+      owner_approved_spend:
+        description: 'Only on the owner''s word: this run may pass the 5 dollar day'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
+
+env:
+  HA_BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
+  IS_UPLOAD: ${{ inputs.confirm == 'UPLOAD' }}
+
+jobs:
+  budget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      minutes: ${{ steps.budget.outputs.minutes }}
+    steps:
+      - name: uploads go from main only
+        if: env.IS_UPLOAD == 'true' && github.ref != 'refs/heads/main'
+        run: |
+          echo "An upload sends main to TestFlight. Start it on main, or leave the confirmation empty for a rehearsal."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: keep the day under the cap
+        id: budget
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IS_APPROVED: ${{ inputs.owner_approved_spend }}
+        run: |
+          if [ "${IS_APPROVED}" = "true" ]; then
+            python3 scripts/ios-cloud.py budget --ceiling-minutes 45 --approved
+          elif [ "${IS_UPLOAD}" = "true" ]; then
+            python3 scripts/ios-cloud.py budget --ceiling-minutes 45 --fit-minimum 10
+          else
+            python3 scripts/ios-cloud.py budget --ceiling-minutes 45
+          fi
+
+  # Read only, and on Linux, so a missing Apple step stops an upload before a
+  # Mac minute is spent. In a rehearsal it reports and the run goes on.
+  preflight:
+    needs: budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: testflight
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: which Apple steps are done
+        shell: bash
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          umask 077
+          export APP_STORE_CONNECT_KEY_PATH="${RUNNER_TEMP}/AuthKey.p8"
+          trap 'rm -f "${APP_STORE_CONNECT_KEY_PATH}"' EXIT
+          printf '%s\n' "${APP_STORE_CONNECT_KEY_P8}" | tr -d '\r' > "${APP_STORE_CONNECT_KEY_PATH}"
+          if python3 scripts/macos/app-store-connect.py preflight | tee -a "${GITHUB_STEP_SUMMARY}"; then
+            exit 0
+          fi
+          if [ "${IS_UPLOAD}" = "true" ]; then
+            echo "An Apple step is still to do, so nothing is built or sent. See docs/apple-activation-checklist.md."
+            exit 1
+          fi
+          echo "A rehearsal goes on regardless."
+
+  testflight:
+    needs: [budget, preflight]
+    runs-on: macos-26
+    timeout-minutes: ${{ fromJSON(needs.budget.outputs.minutes) }}
+    environment: testflight
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: xcodegen
+        run: brew install xcodegen
+
+      - name: what this Mac has
+        run: |
+          xcodebuild -version
+          xcodegen --version
+
+      - name: signing identity and profiles
+        if: env.IS_UPLOAD == 'true'
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+          DISTRIBUTION_CERTIFICATE_KEY: ${{ secrets.DISTRIBUTION_CERTIFICATE_KEY }}
+        run: |
+          umask 077
+          signing="${RUNNER_TEMP}/signing"
+          mkdir -p "${signing}"
+          export APP_STORE_CONNECT_KEY_PATH="${signing}/AuthKey.p8"
+          export SIGNING_KEY_PATH="${signing}/distribution-key.pem"
+          printf '%s\n' "${APP_STORE_CONNECT_KEY_P8}" | tr -d '\r' > "${APP_STORE_CONNECT_KEY_PATH}"
+          printf '%s\n' "${DISTRIBUTION_CERTIFICATE_KEY}" | tr -d '\r' > "${SIGNING_KEY_PATH}"
+          python scripts/macos/app-store-connect.py signing --out "${signing}"
+          team="$(sed -n 's/^DEVELOPMENT_TEAM=//p' "${signing}/signing.env")"
+          echo "::add-mask::${team}"
+          cat "${signing}/signing.env" >> "${GITHUB_ENV}"
+          echo "APP_STORE_CONNECT_KEY_PATH=${APP_STORE_CONNECT_KEY_PATH}" >> "${GITHUB_ENV}"
+
+      - name: archive
+        env:
+          HOUSEHOLD_GATEWAY_HOST: ${{ secrets.HOUSEHOLD_GATEWAY_HOST }}
+          GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+        run: |
+          if [ "${IS_UPLOAD}" = "true" ]; then
+            ./scripts/macos/build-ios.sh
+          else
+            ./scripts/macos/build-ios.sh --rehearse
+          fi
+
+      - name: verify ContactsUI symbol compatibility
+        run: |
+          python - <<'PY'
+          import plistlib
+          import subprocess
+          from pathlib import Path
+
+          applications = Path("apps/ios/build/HouseholdAssistant.xcarchive/Products/Applications")
+          app, = applications.glob("*.app")
+          with (app / "Info.plist").open("rb") as source:
+              executable = plistlib.load(source)["CFBundleExecutable"]
+          symbols = subprocess.check_output(["xcrun", "nm", "-u", str(app / executable)], text=True)
+          if "contactAccessPicker" in symbols:
+              raise SystemExit("ITMS-90863: archive imports the ContactsUI picker unavailable on Apple silicon Macs")
+          print("Verified: archive has no unsupported contactAccessPicker symbol imports.")
+          PY
+
+      - name: upload to TestFlight
+        if: env.IS_UPLOAD == 'true'
+        shell: bash
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          python scripts/macos/app-store-connect.py archive \
+            --path apps/ios/build/HouseholdAssistant.xcarchive \
+            --build-number "${HA_BUILD_NUMBER}" \
+            | tee apps/ios/build/release-archive-metadata.json
+          ./scripts/macos/deploy-testflight.sh --confirm
+
+      - name: retain the verified archive metadata
+        if: always() && env.IS_UPLOAD == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-archive-metadata
+          path: apps/ios/build/release-archive-metadata.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: what an upload would send
+        if: env.IS_UPLOAD != 'true'
+        run: |
+          rehearsal="${RUNNER_TEMP}/rehearsal"
+          mkdir -p "${rehearsal}"
+          printf 'a rehearsal key, never sent\n' > "${rehearsal}/AuthKey.p8"
+          DEVELOPMENT_TEAM=rehearsal \
+          HA_APP_PROFILE='rehearsal app profile' \
+          HA_WIDGET_PROFILE='rehearsal widget profile' \
+          HA_NOTIFICATIONS_PROFILE='rehearsal notifications profile' \
+          HA_SHARE_PROFILE='rehearsal share profile' \
+          APP_STORE_CONNECT_KEY_ID=rehearsal \
+          APP_STORE_CONNECT_ISSUER_ID=rehearsal \
+          APP_STORE_CONNECT_KEY_PATH="${rehearsal}/AuthKey.p8" \
+            ./scripts/macos/deploy-testflight.sh --dry-run
+
+      - name: remove the keys and the keychain
+        if: always()
+        run: |
+          if [ -n "${HA_KEYCHAIN:-}" ]; then
+            security delete-keychain "${HA_KEYCHAIN}" || true
+          fi
+          rm -rf "${RUNNER_TEMP}/signing"
+
+  # Apple processes an upload for several minutes before a phone can install
+  # it. Waiting for that on Linux costs a tenth of waiting on the Mac.
+  testers:
+    needs: testflight
+    if: inputs.confirm == 'UPLOAD'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: testflight
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: wait until the testers' phones can install it
+        shell: bash
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          umask 077
+          export APP_STORE_CONNECT_KEY_PATH="${RUNNER_TEMP}/AuthKey.p8"
+          trap 'rm -f "${APP_STORE_CONNECT_KEY_PATH}"' EXIT
+          printf '%s\n' "${APP_STORE_CONNECT_KEY_P8}" | tr -d '\r' > "${APP_STORE_CONNECT_KEY_PATH}"
+          python3 scripts/macos/app-store-connect.py testers \
+            --build-number "${HA_BUILD_NUMBER}" --wait-minutes 30 | tee -a "${GITHUB_STEP_SUMMARY}"
+
+  cost:
+    needs: [budget, testflight]
+    if: always() && needs.budget.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: what this run's Mac minutes cost
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ios-cloud.py cost --run "${GITHUB_RUN_ID}"
+

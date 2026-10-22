@@ -1,0 +1,17 @@
+{
+  "type": "event",
+  "event": "agent",
+  "payload": {
+    "runId": "3cb45679-ae95-4602-9e16-90362ef588eb",
+    "stream": "run_status",
+    "data": {
+      "phase": "preparing_workspace"
+    },
+    "sessionKey": "agent:main:steward-ios-v1-probe",
+    "agentId": "main",
+    "seq": 1,
+    "ts": 1789787807926,
+    "isHeartbeat": false
+  },
+  "seq": 5
+}

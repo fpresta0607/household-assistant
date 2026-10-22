@@ -1,0 +1,54 @@
+# Bring the owner's Apple account to what every app target needs, and read it back.
+#
+#   Trigger: `workflow_dispatch` only, by someone with write access.
+#
+#   It writes to the owner's Apple account, and every write is idempotent:
+#     `app-store-connect.py setup` registers each target's App ID, turns on the
+#     capabilities its entitlements need (Sign in with Apple, Push Notifications,
+#     Communication Notifications, App Groups), and makes fresh App Store profiles
+#     in place of the ones a change made Apple invalidate. It uploads nothing.
+#     Apple's API cannot assign an App Group to an App ID, so a profile without the
+#     group is reported, with the portal step that assigns it.
+#
+#   Spend: one Linux job of about a minute. No Mac.
+#
+#   Secrets: the App Store Connect API key and the distribution certificate's
+#     private key from the `testflight` environment, given only to the step that
+#     reads them, written with umask 077 and deleted when the step ends. The
+#     profiles' read-back leaves out every entitlement that holds the team id.
+
+name: ios-capabilities
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: testflight
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: App IDs, capabilities and profiles
+        shell: bash
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+          DISTRIBUTION_CERTIFICATE_KEY: ${{ secrets.DISTRIBUTION_CERTIFICATE_KEY }}
+        run: |
+          umask 077
+          keys="${RUNNER_TEMP}/keys"
+          mkdir -p "${keys}"
+          trap 'rm -rf "${keys}"' EXIT
+          export APP_STORE_CONNECT_KEY_PATH="${keys}/AuthKey.p8"
+          export SIGNING_KEY_PATH="${keys}/distribution-key.pem"
+          printf '%s\n' "${APP_STORE_CONNECT_KEY_P8}" | tr -d '\r' > "${APP_STORE_CONNECT_KEY_PATH}"
+          printf '%s\n' "${DISTRIBUTION_CERTIFICATE_KEY}" | tr -d '\r' > "${SIGNING_KEY_PATH}"
+          python3 scripts/macos/app-store-connect.py setup | tee -a "${GITHUB_STEP_SUMMARY}"

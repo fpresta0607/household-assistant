@@ -1,0 +1,41 @@
+{
+  "type": "cart",
+  "id": "household",
+  "title": "Household cart",
+  "items": [
+    {
+      "id": "ci-7f3a9c2e",
+      "name": "Paper towels, 12 rolls",
+      "quantity": 1,
+      "by": "Denise",
+      "for": "Gia",
+      "url": "https://www.amazon.com/dp/B07XYZ1234",
+      "image": "https://m.media-amazon.com/images/I/71example.jpg"
+    },
+    {
+      "id": "ci-1b84d0f6",
+      "name": "Dish soap, 3 pack",
+      "quantity": 1,
+      "by": "Denise",
+      "for": "Gia",
+      "url": "https://www.amazon.com/dp/B08ABC5678"
+    },
+    {
+      "id": "ci-c2e95a17",
+      "name": "Coffee filters #4",
+      "quantity": 2,
+      "by": "Corey",
+      "for": "Franco",
+      "url": "https://www.amazon.com/dp/B000DEF901"
+    },
+    {
+      "id": "ci-90ad3e44",
+      "name": "Birthday candles",
+      "quantity": 1,
+      "by": "Corey",
+      "for": "Franco"
+    }
+  ],
+  "checkout": "https://www.amazon.com/gp/aws/cart/add.html?ASIN.1=B07XYZ1234&Quantity.1=1&ASIN.2=B08ABC5678&Quantity.2=1&ASIN.3=B000DEF901&Quantity.3=2",
+  "skill": "lists"
+}

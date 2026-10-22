@@ -1,0 +1,12 @@
+{
+  "name": "household-pictures",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pictures and short videos the family asks either assistant for, through OpenRouter, under a daily ceiling per person",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

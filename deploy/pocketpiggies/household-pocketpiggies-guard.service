@@ -1,0 +1,37 @@
+# Puts each gateway's PocketPiggies policy back whenever its config changes.
+#
+# The owner's private chat keeps every tool, so the gateway's own uid can rewrite
+# openclaw.json: hand exec back to the family group, open private messages to someone
+# else, or point the plugin at another owner. This runs as root, outside both gateways,
+# and rewrites the drifted keys to what the installer set, or stops that gateway's key
+# holder when its config cannot be made safe. Gateways without finance are skipped.
+#
+# Started by household-pocketpiggies-guard.path on every change and by the timer as a
+# backstop. Lives at /etc/systemd/system/household-pocketpiggies-guard.service on the box.
+
+[Unit]
+Description=Keep the gateways' PocketPiggies policy in place
+# A gateway rewriting its config in a loop must not be able to rate-limit the guard into
+# silence; each run is cheap and only rewrites what drifted.
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/household-assistant/pocketpiggies/pocket-piggies-install.py --guard
+# If the guard itself fails, whether it crashed, ran out of time or was killed for
+# memory, nothing vouches for either gateway's policy any more: stop all finance.
+ExecStopPost=/bin/sh -c 'test "$$SERVICE_RESULT" = success || systemctl stop "household-pocketpiggies@*.service"'
+TimeoutStartSec=60
+Nice=10
+# Repair counts across runs, so a config that keeps drifting back stops finance.
+RuntimeDirectory=household-pocketpiggies-guard
+RuntimeDirectoryPreserve=yes
+RuntimeDirectoryMode=0700
+# Root, but it only needs to read and rewrite the gateways' configs and stop a unit.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/household-assistant
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+MemoryMax=128M

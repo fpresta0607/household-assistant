@@ -1,0 +1,66 @@
+# One assistant's PocketPiggies key holder: household-pocketpiggies@corey and @denise.
+#
+# It holds that owner's PocketPiggies client credential and read grant on the host,
+# under its own system user, in a state directory no container mounts. The gateway
+# reaches it only through a Unix socket in the gateway's own state directory, which
+# the instance drop-in binds here at /run/household-pocketpiggies, and gets back read
+# results and link messages, never a credential.
+#
+# Lives at /etc/systemd/system/household-pocketpiggies@.service on the box. The
+# installer (scripts/pocket-piggies-install.py) writes the per-instance drop-in with
+# the owner's Telegram id and the gateway directory to bind.
+
+[Unit]
+Description=PocketPiggies key holder for %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=household-pp-%i
+Group=household-pp-%i
+Environment=PYTHONPATH=/opt/household-assistant/pocketpiggies
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/household-assistant/pocketpiggies/pocketpiggies-keyholder.py %i
+Restart=on-failure
+RestartSec=5
+StateDirectory=household-pocketpiggies/%i
+StateDirectoryMode=0700
+UMask=0077
+# Only the socket directory is shared, and only with this instance's gateway.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateIPC=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+# A flood of calls from the gateway is counted in-process rather than logged line by
+# line; this keeps whatever still gets through from crowding out other services' logs.
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=1000
+# Small and in the background: SIQsermon is this host's primary tenant. A 2 MB answer is
+# held a few times over while it is parsed, checked and wrapped, so leave room for that.
+MemoryMax=128M
+TasksMax=32
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

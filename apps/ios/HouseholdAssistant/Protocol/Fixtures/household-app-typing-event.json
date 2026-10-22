@@ -1,0 +1,10 @@
+{
+  "type": "event",
+  "event": "plugin.household-app.typing",
+  "payload": {
+    "conversation": "family",
+    "author": "denise",
+    "active": true
+  },
+  "seq": 42
+}

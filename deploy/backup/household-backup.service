@@ -1,0 +1,22 @@
+# Both gateways' state and the coordination relay's database, every night, with a
+# restore drill of what was written. scripts/household-backup.sh says what it does.
+#
+# Lives at /etc/systemd/system/household-backup.service on the box, with the three
+# scripts it runs in /opt/household-assistant/backup.
+
+[Unit]
+Description=Back up both household gateways and restore-drill the backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/household-assistant/backup/household-backup.sh --keep 14
+# Two archives of about 150 MB, two restores to read them back, two codex copies.
+# Measured at under five minutes on 14 October; this is the backstop for a run that
+# has stopped, not the budget for one that is working.
+TimeoutStartSec=1800
+# SIQsermon is this host's primary tenant and a live product, so the backup yields
+# CPU and disk under contention.
+Nice=10
+IOSchedulingClass=idle

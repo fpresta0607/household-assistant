@@ -1,0 +1,18 @@
+// The household's own values for the app target, which the repository does not hold.
+//
+// A checkout builds with the placeholders below. The owner's Mac puts the real values in
+// Local.xcconfig beside this file, which Git ignores (copy Local.xcconfig.example), and
+// the release job writes them into its own xcconfig from the testflight environment's
+// secrets, refusing a placeholder (scripts/macos/build-ios.sh).
+//
+// HOUSEHOLD_GATEWAY_HOST is the box's tailnet name, where each phone reaches its
+// assistant's gateway. GOOGLE_IOS_CLIENT_ID is Google's iOS OAuth client for
+// com.siqstack.stewardai, which Connect Google in Settings signs in with: PKCE and no
+// secret. It is only the part before `.apps.googleusercontent.com`, digits, a hyphen, then
+// lowercase letters and digits. The app adds the ending, its redirect scheme is this part
+// after `com.googleusercontent.apps.`, and the gateway's channels.household.googleClientId
+// must be the same client, ending included.
+HOUSEHOLD_GATEWAY_HOST = household.example.ts.net
+GOOGLE_IOS_CLIENT_ID = 123456789012-abcdefghijklmnopqrstuvwxyz012345
+
+#include? "Local.xcconfig"

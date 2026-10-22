@@ -1,0 +1,16 @@
+# Starts household-app-relay.service as soon as either gateway writes its household-app
+# outbox, which is what makes a message reach the other phone in about a second rather
+# than on the next timer.
+#
+# Lives at /etc/systemd/system/household-app-relay.path on the box.
+
+[Unit]
+Description=Watch the household gateways' app outboxes
+
+[Path]
+PathChanged=/var/lib/household-assistant/openclaw/household-app/outbox.json
+PathChanged=/var/lib/household-assistant/openclaw-denise/household-app/outbox.json
+Unit=household-app-relay.service
+
+[Install]
+WantedBy=paths.target

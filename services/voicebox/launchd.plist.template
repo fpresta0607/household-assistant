@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd job description for Voicebox.
+
+  This is a template. scripts/macos/voicebox-install.sh replaces every
+  at-delimited placeholder below and writes the result to
+  ~/Library/LaunchAgents/. Do not write a placeholder-shaped string anywhere
+  in this file that the installer does not substitute, including in this
+  comment: the installer refuses to install a job description that still has
+  one, which is what stops a half-filled plist from reaching launchd.
+
+  ENVIRONMENT stands for one key and string pair per VOICEBOX_ variable that
+  was set when the installer ran, which is how an engine that needs a model
+  path finds it under launchd. A variable that was unset is left out rather
+  than written as an empty string.
+
+  It is a user agent rather than a system daemon on purpose: speech synthesis
+  needs the logged-in user's audio session, and a user agent cannot be reached
+  by anything that has not already logged in as that user.
+
+  KeepAlive restarts the service if it exits for any reason, including a crash.
+  ThrottleInterval keeps a crash loop from becoming a busy loop.
+
+  NOT YET RUN ON APPLE HARDWARE.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>@LABEL@</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>@PYTHON@</string>
+    <string>@INSTALL_ROOT@/voicebox.py</string>
+    <string>serve</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+@ENVIRONMENT@
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+
+  <key>WorkingDirectory</key>
+  <string>@INSTALL_ROOT@</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>ProcessType</key>
+  <string>Interactive</string>
+
+  <key>StandardOutPath</key>
+  <string>@LOG_DIR@/voicebox.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>@LOG_DIR@/voicebox.err.log</string>
+</dict>
+</plist>

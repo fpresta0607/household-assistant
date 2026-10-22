@@ -1,0 +1,16 @@
+{
+  "type": "res",
+  "id": "1312b8b1-c66f-4dec-bbd4-9487d28810d4",
+  "ok": false,
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "missing scope: operator.read",
+    "details": {
+      "code": "MISSING_SCOPE",
+      "missingScope": "operator.read",
+      "requiredScopes": [
+        "operator.read"
+      ]
+    }
+  }
+}

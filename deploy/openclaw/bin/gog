@@ -1,0 +1,21 @@
+#!/bin/sh
+# gog, with the household app's Google sign-in when this gateway holds one.
+#
+# Installed as `gog` in the gateway's binary mount, with the real gog beside it as
+# `gog-bin`. Connect Google in the Steward app keeps the refresh token on the gateway,
+# sealed, under the household's iOS client, which has no secret, and gog refuses a
+# client without one. So when that sign-in exists this hands gog a fresh access token
+# (GOG_ACCESS_TOKEN) for one run. Otherwise gog runs exactly as installed, with the
+# accounts signed in on the box, which is how Franco's work on Corey's gateway.
+set -eu
+real="$(dirname "$0")/gog-bin"
+state="${OPENCLAW_STATE_DIR:-${HOME:-/home/node}/.openclaw}"
+token_command="${GOG_APP_TOKEN_COMMAND:-/opt/household-plugins/household-app/google-token.mjs}"
+if [ -z "${GOG_ACCESS_TOKEN:-}" ] && [ -f "${state}/household-app/connectors/google.json" ]; then
+  if ! GOG_ACCESS_TOKEN="$(node "${token_command}")"; then
+    echo "gog: the Google sign-in from the Steward app could not be refreshed" >&2
+    exit 1
+  fi
+  export GOG_ACCESS_TOKEN
+fi
+exec "${real}" "$@"

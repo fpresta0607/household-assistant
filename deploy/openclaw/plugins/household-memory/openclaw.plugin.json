@@ -1,0 +1,41 @@
+{
+  "id": "household-memory",
+  "name": "Household memory",
+  "description": "Keeps what a family member asks the assistant to remember, shows it at the start of every turn in that chat, and finds older chats when someone asks about the past.",
+  "enabledByDefault": false,
+  "contracts": {
+    "tools": ["recall", "forget"]
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["groupChatId", "ownerTelegramId", "people"],
+    "properties": {
+      "groupChatId": {
+        "type": "string",
+        "pattern": "^-[1-9][0-9]*$",
+        "description": "The family group's Telegram chat id."
+      },
+      "ownerTelegramId": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*$",
+        "description": "The Telegram user id of the family member whose private chat this assistant is."
+      },
+      "people": {
+        "type": "object",
+        "description": "Each family member's Telegram user id and the name to keep their requests under. The owner must be one of them.",
+        "propertyNames": { "pattern": "^[1-9][0-9]*$" },
+        "additionalProperties": { "type": "string", "pattern": "^[A-Za-z][A-Za-z .'-]{0,39}$" }
+      },
+      "appPeople": {
+        "type": "object",
+        "description": "Each family member's id in the household app, by their Telegram user id, so the app's own thread and family room share the kept list and older chats with Telegram. The owner must be one of them.",
+        "propertyNames": { "pattern": "^[1-9][0-9]*$" },
+        "additionalProperties": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" }
+      }
+    }
+  }
+}

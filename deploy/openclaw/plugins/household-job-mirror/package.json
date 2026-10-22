@@ -1,0 +1,12 @@
+{
+  "name": "household-job-mirror",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Each scheduled message a family member gets on Telegram, in the household app as well",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

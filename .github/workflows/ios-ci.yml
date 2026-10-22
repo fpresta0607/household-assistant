@@ -1,0 +1,446 @@
+# Continuous integration for the iOS app, and the preview build on a GitHub Mac.
+#
+# There is no Mac of our own. The owner chose GitHub's hosted Macs on
+# 14 October 2026, with a cap of 5 dollars a day, so the trigger model is
+# stated here rather than left to be inferred:
+#
+#   Linux checks on every change: `lint` and `swift-test` run on `pull_request`
+#     and `push` to main, filtered to the paths this workflow is about. Not
+#     `pull_request_target`: that runs the base branch's workflow with write
+#     access and the repository's secrets against a fork's code.
+#
+#   The Mac only by hand: `preview` runs on `workflow_dispatch` and on nothing
+#     else. A hosted Mac minute costs $0.062 and this repository gets no free
+#     ones, so a Mac never starts because someone pushed. Someone with write
+#     access starts it, against the branch they choose, usually with
+#     `scripts/ios-cloud.py preview` from any computer.
+#
+#   Spend: the `budget` job runs first on Linux and refuses the Mac when
+#     today's Mac minutes plus the preview's 30 minute timeout could pass the
+#     5 dollar day, unless it was started with `owner_approved_spend`, which is
+#     only for the owner's word on one build and is reported, never refused.
+#     The `cost` job runs last and writes the run's Mac minutes and their price
+#     on the run's summary page.
+#
+#   Permissions: `contents: read` for the whole workflow, and `actions: read`
+#     for the two jobs that count Mac minutes. Nothing here writes to the
+#     repository, comments on anything, or publishes a package.
+#
+#   Secrets: none. The simulator build runs with code signing switched off, so
+#     it needs no certificate, no profile, no team id and no App Store Connect
+#     key. Releasing is ios-release.yml, the only workflow given a secret.
+#
+# The Python CI in ci.yml is a separate workflow and is not touched by this one.
+# The path filters below keep the Linux checks off changes that have nothing to
+# do with the app.
+
+name: ios-ci
+
+on:
+  workflow_dispatch:
+    inputs:
+      owner_approved_spend:
+        description: 'Only on the owner''s word: this preview may pass the 5 dollar day'
+        type: boolean
+        default: false
+      lane:
+        description: 'fix: build, unit tests and the UI tests named below. full: also every UI test and both films, for the commit going to TestFlight'
+        type: choice
+        options: [fix, full]
+        default: fix
+      unit_tests:
+        description: 'Unit tests for the fix lane, by class or class/test; empty runs all unit tests'
+        type: string
+        default: ''
+      ui_tests:
+        description: 'UI tests for the fix lane, by class or class/test inside HouseholdAssistantUITests, separated by spaces'
+        type: string
+        default: ''
+      screenshots:
+        description: 'Screenshot states a change touches, by id or the start of one, separated by spaces, or all for every screen. Empty renders none'
+        type: string
+        default: ''
+      film_ui_tests:
+        description: 'Also film the simulator while the UI tests run, for a change''s before and after'
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'apps/ios/**'
+      - 'scripts/macos/**'
+      - 'services/voicebox/**'
+      - '.github/workflows/ios-ci.yml'
+      - '.github/workflows/ios-release.yml'
+      - '.github/workflows/ios-testers.yml'
+      - '.github/workflows/ios-capabilities.yml'
+      - 'scripts/ios-cloud.py'
+  pull_request:
+    paths:
+      - 'apps/ios/**'
+      - 'scripts/macos/**'
+      - 'services/voicebox/**'
+      - '.github/workflows/ios-ci.yml'
+      - '.github/workflows/ios-release.yml'
+      - '.github/workflows/ios-testers.yml'
+      - '.github/workflows/ios-capabilities.yml'
+      - 'scripts/ios-cloud.py'
+
+permissions:
+  contents: read
+
+# A push never cancels a preview someone started by hand: its Mac minutes are
+# already spent.
+concurrency:
+  group: ios-ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+env:
+  ACTIONLINT_VERSION: '1.7.12'
+
+jobs:
+  # Everything that can be checked without a Mac, checked on a throwaway
+  # Linux runner on every change.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: shellcheck
+        run: shellcheck -x scripts/macos/*.sh
+
+      - name: actionlint
+        run: |
+          curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}" actionlint
+          "${RUNNER_TEMP}/actionlint" -color
+
+      # The Voicebox self-check is not repeated here. ci.yml runs on every pull
+      # request with no path filter, and tests/test_voicebox.py runs the same
+      # check from the Python suite, so it is covered whether or not a change
+      # touches the paths this workflow filters on.
+
+      - name: project.yml is valid YAML and declares every target
+        run: |
+          pip install --quiet pyyaml
+          python3 - <<'PY'
+          import sys
+
+          import yaml
+
+          spec = yaml.safe_load(open("apps/ios/project.yml"))
+          expected = {
+              "HouseholdAssistant",
+              "HouseholdAssistantWidgets",
+              "HouseholdAssistantTests",
+              "HouseholdAssistantUITests",
+          }
+          missing = expected - set(spec["targets"])
+          if missing:
+              sys.exit(f"project.yml is missing targets: {sorted(missing)}")
+          for name, target in spec["targets"].items():
+              sources = [entry["path"] for entry in target["sources"]]
+              print(name, target["type"], sources)
+          PY
+
+      - name: every documented command is labelled
+        # Explicit owner direction: a command in these documents that has not
+        # been run on Apple hardware must say so, and one that has says
+        # `# verified`.
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import sys
+
+          DOCS = [
+              "docs/apple-signing.md",
+              "docs/testflight.md",
+              "docs/voicebox.md",
+              "docs/apple-activation-checklist.md",
+          ]
+          MARKERS = ("# not yet run on Apple hardware", "# verified")
+
+          unlabelled = []
+          for name in DOCS:
+              lines = pathlib.Path(name).read_text(encoding="utf-8").splitlines()
+              index = 0
+              while index < len(lines):
+                  if lines[index].strip() in ("```bash", "```sh", "```console"):
+                      following = lines[index + 1].strip() if index + 1 < len(lines) else ""
+                      if not following.startswith(MARKERS):
+                          unlabelled.append(f"{name}:{index + 1}")
+                      index += 1
+                      while index < len(lines) and lines[index].strip() != "```":
+                          index += 1
+                  index += 1
+
+          if unlabelled:
+              sys.exit("unlabelled command blocks: " + ", ".join(unlabelled))
+          print("every command block in the Apple documents is labelled")
+          PY
+
+      - name: no secret-shaped strings
+        # A placeholder is fine and expected. A real key is not. This catches
+        # the shapes that actually leak: a PEM block, an App Store Connect key
+        # id or issuer id written out, or an Apple ID address.
+        run: |
+          if grep -rInE --exclude-dir=.git -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' .; then
+            echo "a private key block is present in the repository"; exit 1
+          fi
+          if grep -rInE --exclude-dir=.git \
+              -e '(APP_STORE_CONNECT_KEY_ID|APP_STORE_CONNECT_ISSUER_ID|DEVELOPMENT_TEAM)[=:][[:space:]]*["'"'"']?[A-Z0-9]{8,}' .; then
+            echo "a signing identifier looks like it was written out rather than referenced"; exit 1
+          fi
+          echo "no secret-shaped strings found"
+
+  # The app's own test suite. Package.swift exists so the Protocol and Model
+  # directories, which need neither SwiftUI nor UIKit, build and test on Linux
+  # with no Xcode; this job runs them on a throwaway runner so a change to the
+  # codec or the view models is checked whether or not the Mac is online.
+  swift-test:
+    runs-on: ubuntu-latest
+    container: swift:6.1-jammy
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: swift test
+        working-directory: apps/ios
+        run: swift test
+
+  # The Mac, by hand only. Nothing below runs on a push or a pull request.
+  budget:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: refuse a Mac run that could pass the daily cap
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IS_APPROVED: ${{ inputs.owner_approved_spend }}
+          # The preview job's own limit below, so the worst case is the most it can run.
+          CEILING_MINUTES: ${{ inputs.lane == 'full' && 55 || 30 }}
+        run: |
+          if [ "${IS_APPROVED}" = "true" ]; then
+            python3 scripts/ios-cloud.py budget --ceiling-minutes "${CEILING_MINUTES}" --approved
+          else
+            python3 scripts/ios-cloud.py budget --ceiling-minutes "${CEILING_MINUTES}"
+          fi
+
+  # One step per part, so the run page shows where the minutes go. The fix lane
+  # is the build, the unit tests and only the UI tests a fix names. The full
+  # lane adds every UI test and both films, for the commit going to TestFlight.
+  # Screenshots render only the states the screenshots input names, the ones a
+  # change touches, and every screen only when it says all: the whole set and
+  # the films took 744 of the 968 seconds of a whole preview on 15 October.
+  # A failed test step does not stop the test steps after it, and the job
+  # still fails. The full lane has 55 minutes: on 18 October its UI tests alone
+  # came to about 35 and it was cut off at 30, where on 17 October the whole
+  # lane had fitted in 30.
+  preview:
+    needs: [lint, budget]
+    runs-on: macos-26
+    timeout-minutes: ${{ inputs.lane == 'full' && 55 || 30 }}
+    # Named, so every step runs with pipefail and a step that fails under tee fails.
+    defaults:
+      run:
+        shell: bash
+    env:
+      HA_IOS_RECORDING: ${{ inputs.lane == 'full' && 'apps/ios/build/preview/recording.mp4' || '' }}
+      HA_IOS_UI_TESTS: ${{ inputs.ui_tests }}
+      HA_IOS_UI_RECORDING: ${{ inputs.film_ui_tests && 'apps/ios/build/preview/ui-tests.mp4' || '' }}
+      LOG: apps/ios/build/preview/test-ios.log
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: xcodegen
+        run: brew install xcodegen
+
+      - name: what this Mac has
+        id: mac
+        run: |
+          xcodebuild -version
+          xcodegen --version
+          sysctl -n machdep.cpu.brand_string hw.ncpu
+          xcrun simctl list devices available | grep -E '^ +iPhone' || true
+          echo "xcode=$(xcodebuild -version | tr -s ' \n' '-')" >> "${GITHUB_OUTPUT}"
+
+      # The last build of these packages, so a run does not compile swift-syntax
+      # and the other packages from scratch. Keyed on the Xcode and on
+      # project.yml, which pins every package: Package.resolved is generated
+      # each run, not kept. Xcode's build system takes a file with a new inode
+      # for a changed one, and every restored file has one, so it is told to
+      # look at the rest of what it records instead.
+      - name: restore the last build
+        id: derived
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            apps/ios/build/DerivedData
+            !apps/ios/build/DerivedData/Logs
+            !apps/ios/build/DerivedData/Index.noindex
+          key: ios-derived-${{ steps.mac.outputs.xcode }}-${{ hashFiles('apps/ios/project.yml') }}
+          restore-keys: ios-derived-${{ steps.mac.outputs.xcode }}-
+
+      - name: build
+        id: build
+        run: |
+          defaults write com.apple.dt.XCBuild IgnoreFileSystemDeviceInodeChanges -bool YES
+          mkdir -p apps/ios/build/preview
+          ./scripts/macos/test-ios.sh build 2>&1 | tee -a "${LOG}"
+
+      - name: keep the build for the next run
+        if: steps.build.outcome == 'success' && steps.derived.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            apps/ios/build/DerivedData
+            !apps/ios/build/DerivedData/Logs
+            !apps/ios/build/DerivedData/Index.noindex
+          key: ${{ steps.derived.outputs.cache-primary-key }}
+
+      - name: unit tests
+        env:
+          HA_IOS_UNIT_TESTS: ${{ inputs.lane == 'fix' && inputs.unit_tests || '' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ./scripts/macos/test-ios.sh unit 2>&1 | tee -a "${LOG}"
+
+      - name: UI tests
+        id: ui
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && (inputs.lane == 'full' || inputs.ui_tests != '') }}
+        run: ./scripts/macos/test-ios.sh ui 2>&1 | tee -a "${LOG}"
+
+      # XCTHitchMetric printed nothing to the log on the simulator, so each UI
+      # test's metrics, hitch count, hitch time ratio and total hitch time
+      # included, are read back from the result bundle. Only a reading: it
+      # cannot fail the preview.
+      - name: UI test metrics
+        if: ${{ !cancelled() && (steps.ui.outcome == 'success' || steps.ui.outcome == 'failure') }}
+        continue-on-error: true
+        run: |
+          xcrun xcresulttool get test-results metrics \
+            --path apps/ios/build/ui-test-results.xcresult |
+            tee apps/ios/build/preview/ui-test-metrics.json
+
+      - name: export UI test screenshots
+        if: ${{ !cancelled() && (steps.ui.outcome == 'success' || steps.ui.outcome == 'failure') }}
+        continue-on-error: true
+        run: >-
+          xcrun xcresulttool export attachments
+          --path apps/ios/build/ui-test-results.xcresult
+          --output-path apps/ios/build/ui-test-attachments
+
+      - name: screenshots
+        id: screenshots
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && inputs.screenshots != '' }}
+        env:
+          HA_IOS_SCREENSHOTS: ${{ inputs.screenshots }}
+        run: ./scripts/macos/test-ios.sh screenshots 2>&1 | tee -a "${LOG}"
+
+      # Small enough to look at: 256 colours where that keeps the picture, and
+      # the original where it would not. Only a squeeze: it cannot fail the run.
+      - name: compress the screenshots
+        if: ${{ !cancelled() && (steps.screenshots.outcome == 'success' || steps.screenshots.outcome == 'failure') }}
+        continue-on-error: true
+        run: |
+          brew install pngquant
+          du -sh apps/ios/build/screenshots
+          pngquant --force --ext .png --quality 80-100 --speed 3 apps/ios/build/screenshots/*.png || true
+          du -sh apps/ios/build/screenshots
+
+      - name: films
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && inputs.lane == 'full' }}
+        run: ./scripts/macos/test-ios.sh films 2>&1 | tee -a "${LOG}"
+
+      # Each kept on its own, so a page beside the mockups can fetch one by name.
+      # A green full preview has both the states and the films.
+      - name: keep the screenshots
+        if: ${{ always() && inputs.screenshots != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-screenshots
+          path: apps/ios/build/screenshots/*.png
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: keep the demo films, with and without Reduce Motion
+        if: ${{ always() && inputs.lane == 'full' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-motion-demo
+          path: apps/ios/build/preview/*.mp4
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: keep the film of the UI tests
+        if: ${{ always() && inputs.film_ui_tests }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ui-test-film
+          path: apps/ios/build/preview/ui-tests.mp4
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: keep UI test screenshots
+        if: ${{ always() && (steps.ui.outcome == 'success' || steps.ui.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ui-test-attachments
+          path: apps/ios/build/ui-test-attachments
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: keep the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-preview
+          path: |
+            apps/ios/build/preview/test-ios.log
+            apps/ios/build/preview/ui-test-metrics.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: keep the result bundles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-preview-results
+          path: apps/ios/build/*.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
+
+  cost:
+    needs: [budget, preview]
+    if: always() && needs.budget.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: what this run's Mac minutes cost
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ios-cloud.py cost --run "${GITHUB_RUN_ID}"

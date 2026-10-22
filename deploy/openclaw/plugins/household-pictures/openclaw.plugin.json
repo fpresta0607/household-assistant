@@ -1,0 +1,31 @@
+{
+  "id": "household-pictures",
+  "name": "Household pictures",
+  "description": "Makes a picture or a short video someone asks for through OpenRouter, sends it to the chat, and holds what each person's pictures and videos may cost in a day.",
+  "enabledByDefault": false,
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": ["picture", "video"]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["pictureDayDollars", "videoDayDollars"],
+    "properties": {
+      "pictureDayDollars": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 100,
+        "description": "The most one person's pictures may cost on this gateway in a day, in dollars."
+      },
+      "videoDayDollars": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 100,
+        "description": "The most one person's videos may cost on this gateway in a day, in dollars."
+      }
+    }
+  }
+}

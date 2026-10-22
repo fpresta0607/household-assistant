@@ -1,0 +1,16 @@
+# Every night at half past four in the morning, Chicago time, when the family is
+# asleep and the assistants are idle. A run missed while the box was down happens
+# when it comes back.
+#
+# Lives at /etc/systemd/system/household-backup.timer on the box.
+
+[Unit]
+Description=Nightly backup of both household gateways
+
+[Timer]
+OnCalendar=*-*-* 04:30:00 America/Chicago
+Persistent=true
+Unit=household-backup.service
+
+[Install]
+WantedBy=timers.target

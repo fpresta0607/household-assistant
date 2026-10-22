@@ -1,0 +1,291 @@
+{
+  "type": "res",
+  "id": "377e16da-13d4-498c-854c-d30c960cc1dc",
+  "ok": true,
+  "payload": {
+    "workspaceDir": "/home/node/.openclaw/workspace",
+    "managedSkillsDir": "/home/node/.openclaw/skills",
+    "agentId": "main",
+    "skills": [
+      {
+        "name": "1password",
+        "description": "Set up and use 1Password CLI for sign-in, desktop integration, and reading or injecting secrets.",
+        "source": "openclaw-bundled",
+        "bundled": true,
+        "filePath": "/app/skills/1password/SKILL.md",
+        "baseDir": "/app/skills/1password",
+        "skillKey": "1password",
+        "emoji": "🔐",
+        "homepage": "https://developer.1password.com/docs/cli/get-started/",
+        "always": false,
+        "disabled": false,
+        "blockedByAllowlist": false,
+        "blockedByAgentFilter": false,
+        "eligible": false,
+        "platformIncompatible": false,
+        "modelVisible": false,
+        "userInvocable": true,
+        "commandVisible": false,
+        "requirements": {
+          "bins": [
+            "op"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": []
+        },
+        "missing": {
+          "bins": [
+            "op"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": []
+        },
+        "configChecks": [],
+        "install": [
+          {
+            "id": "brew",
+            "kind": "brew",
+            "label": "Install 1Password CLI (brew)",
+            "bins": [
+              "op"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "apple-notes",
+        "description": "Create, view, edit, delete, search, move, or export Apple Notes via the memo CLI on macOS.",
+        "source": "openclaw-bundled",
+        "bundled": true,
+        "filePath": "/app/skills/apple-notes/SKILL.md",
+        "baseDir": "/app/skills/apple-notes",
+        "skillKey": "apple-notes",
+        "emoji": "📝",
+        "homepage": "https://github.com/antoniorodr/memo",
+        "always": false,
+        "disabled": false,
+        "blockedByAllowlist": false,
+        "blockedByAgentFilter": false,
+        "eligible": false,
+        "platformIncompatible": true,
+        "modelVisible": false,
+        "userInvocable": true,
+        "commandVisible": false,
+        "requirements": {
+          "bins": [
+            "memo"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": [
+            "darwin"
+          ]
+        },
+        "missing": {
+          "bins": [
+            "memo"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": [
+            "darwin"
+          ]
+        },
+        "configChecks": [],
+        "install": []
+      },
+      {
+        "name": "apple-reminders",
+        "description": "List, add, edit, complete, or delete Apple Reminders and reminder lists via remindctl.",
+        "source": "openclaw-bundled",
+        "bundled": true,
+        "filePath": "/app/skills/apple-reminders/SKILL.md",
+        "baseDir": "/app/skills/apple-reminders",
+        "skillKey": "apple-reminders",
+        "emoji": "⏰",
+        "homepage": "https://github.com/steipete/remindctl",
+        "always": false,
+        "disabled": false,
+        "blockedByAllowlist": false,
+        "blockedByAgentFilter": false,
+        "eligible": false,
+        "platformIncompatible": true,
+        "modelVisible": false,
+        "userInvocable": true,
+        "commandVisible": false,
+        "requirements": {
+          "bins": [
+            "remindctl"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": [
+            "darwin"
+          ]
+        },
+        "missing": {
+          "bins": [
+            "remindctl"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": [
+            "darwin"
+          ]
+        },
+        "configChecks": [],
+        "install": []
+      },
+      {
+        "name": "bear-notes",
+        "description": "Create, search, and manage Bear notes via grizzly CLI.",
+        "source": "openclaw-bundled",
+        "bundled": true,
+        "filePath": "/app/skills/bear-notes/SKILL.md",
+        "baseDir": "/app/skills/bear-notes",
+        "skillKey": "bear-notes",
+        "emoji": "🐻",
+        "homepage": "https://bear.app",
+        "always": false,
+        "disabled": false,
+        "blockedByAllowlist": false,
+        "blockedByAgentFilter": false,
+        "eligible": false,
+        "platformIncompatible": true,
+        "modelVisible": false,
+        "userInvocable": true,
+        "commandVisible": false,
+        "requirements": {
+          "bins": [
+            "grizzly"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": [
+            "darwin"
+          ]
+        },
+        "missing": {
+          "bins": [
+            "grizzly"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": [
+            "darwin"
+          ]
+        },
+        "configChecks": [],
+        "install": []
+      },
+      {
+        "name": "blogwatcher",
+        "description": "Monitor blogs and RSS/Atom feeds for updates using the blogwatcher CLI.",
+        "source": "openclaw-bundled",
+        "bundled": true,
+        "filePath": "/app/skills/blogwatcher/SKILL.md",
+        "baseDir": "/app/skills/blogwatcher",
+        "skillKey": "blogwatcher",
+        "emoji": "📰",
+        "homepage": "https://github.com/Hyaxia/blogwatcher",
+        "always": false,
+        "disabled": false,
+        "blockedByAllowlist": false,
+        "blockedByAgentFilter": false,
+        "eligible": false,
+        "platformIncompatible": false,
+        "modelVisible": false,
+        "userInvocable": true,
+        "commandVisible": false,
+        "requirements": {
+          "bins": [
+            "blogwatcher"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": []
+        },
+        "missing": {
+          "bins": [
+            "blogwatcher"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": []
+        },
+        "configChecks": [],
+        "install": [
+          {
+            "id": "go",
+            "kind": "go",
+            "label": "Install blogwatcher (go)",
+            "bins": [
+              "blogwatcher"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "blucli",
+        "description": "BluOS CLI (blu) for discovery, playback, grouping, and volume.",
+        "source": "openclaw-bundled",
+        "bundled": true,
+        "filePath": "/app/skills/blucli/SKILL.md",
+        "baseDir": "/app/skills/blucli",
+        "skillKey": "blucli",
+        "emoji": "🫐",
+        "homepage": "https://blucli.sh",
+        "always": false,
+        "disabled": false,
+        "blockedByAllowlist": false,
+        "blockedByAgentFilter": false,
+        "eligible": false,
+        "platformIncompatible": false,
+        "modelVisible": false,
+        "userInvocable": true,
+        "commandVisible": false,
+        "requirements": {
+          "bins": [
+            "blu"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": []
+        },
+        "missing": {
+          "bins": [
+            "blu"
+          ],
+          "anyBins": [],
+          "env": [],
+          "config": [],
+          "os": []
+        },
+        "configChecks": [],
+        "install": [
+          {
+            "id": "go",
+            "kind": "go",
+            "label": "Install blucli (go)",
+            "bins": [
+              "blu"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

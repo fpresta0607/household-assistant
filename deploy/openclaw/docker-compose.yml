@@ -1,0 +1,214 @@
+# The OpenClaw gateway that Corey and Denise run inside, on the shared IONOS VPS.
+#
+# Pinned by digest, and never built on this box: a source build wants ~6 GB and
+# the whole assistant budget is 4,480 MiB, so the kernel would kill it.
+#
+# Everything binds to loopback. The published port is 127.0.0.1:18789, which
+# takes no firewall change and adds no internet-reachable port. The gateway
+# binds `lan` *inside its own network namespace* because a loopback bind inside
+# a bridge-networked container is unreachable from the host; the host-side
+# publish is what keeps it private.
+#
+# Lives at /opt/household-assistant/docker-compose.yml on the box.
+
+# SIQsermon's own compose network, joined so the `scripture` skill can reach
+# `deploy-backend-1:8000` and the `verses` collection on `deploy-qdrant-1:6333`.
+# Joining an external network changes nothing about it or its members: no
+# published port, no Caddy route, nothing internet-facing. Declared external
+# because SIQsermon creates and owns it; this stack must never define it.
+networks:
+  deploy_default:
+    external: true
+
+services:
+  openclaw-gateway:
+    image: openclaw/openclaw:2026.9.4@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101
+    container_name: openclaw-gateway
+    restart: unless-stopped
+    # Holds OPENCLAW_GATEWAY_TOKEN, mode 0600, generated on the box and never
+    # committed. openclaw.json stores an env reference to it, not the value.
+    env_file:
+      - /etc/household-assistant/openclaw.env
+    environment:
+      HOME: /home/node
+      OPENCLAW_HOME: /home/node
+      # Pin the container-side paths so a host path arriving through env_file
+      # cannot leak into path resolution inside the container (upstream #77436).
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      OPENCLAW_GATEWAY_PORT: "18789"
+      # No mDNS advertisement on a VPS.
+      OPENCLAW_DISABLE_BONJOUR: "1"
+      # The household is in US Central and every time either assistant speaks
+      # aloud is Central. Running the container on UTC put a 7pm concert on the
+      # calendar at breakfast time and made Corey correct itself in the group.
+      # This is the root fix; the note in USER.md is only a mitigation.
+      TZ: America/Chicago
+      # The Google Workspace CLI (gog) keeps its OAuth client and per-account
+      # refresh tokens under the state mount, in its encrypted file keyring;
+      # the keyring password comes from the root-only env file.
+      GOG_HOME: /home/node/.openclaw/gog
+      GOG_KEYRING_BACKEND: file
+    volumes:
+      # State outside the container, so replacing the image never loses memory.
+      # The workspace lives inside this tree, so one mount covers both.
+      - /var/lib/household-assistant/openclaw:/home/node/.openclaw
+      # The local key that recovers legacy encrypted OAuth sidecar credentials.
+      # Upstream keeps it beside the state and deliberately outside it.
+      - /var/lib/household-assistant/openclaw-auth-secrets:/home/node/.config/openclaw
+      # The Codex harness's own working state: goals, memories, queue, skills.
+      # Unmounted, every container replacement wiped it. The OAuth token itself
+      # is a row in the openclaw auth store above, not a file here.
+      - /var/lib/household-assistant/codex:/home/node/.codex
+      # Binaries the bundled skills need (gog today). The image has no package
+      # manager and is never rebuilt here, so they live beside the state.
+      - /var/lib/household-assistant/bin:/home/node/.local/bin
+      # The household's own OpenClaw plugins (deploy/openclaw/plugins), root-owned on
+      # the host and read-only here: they run inside the gateway, so nothing the
+      # assistant runs may rewrite them. openclaw.json loads each from this path.
+      - /opt/household-assistant/plugins:/opt/household-plugins:ro
+    # `default` must be listed: naming any network opts the service out of the
+    # implicit one, and dropping it would cut the gateway off from this stack.
+    networks:
+      - default
+      - deploy_default
+    ports:
+      - "127.0.0.1:18789:18789"
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    command:
+      ["node", "dist/index.js", "gateway", "--bind", "lan", "--port", "18789"]
+    healthcheck:
+      test: ["CMD", "node", "dist/docker-healthcheck.js"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          # Leave RSS headroom below OpenClaw's memory-pressure threshold;
+          # docs/deploy/openclaw.md explains the split and the measurements.
+          # The ceiling caps a runaway without reserving unused memory.
+          # 768M of the 2432M it had went to homeassistant on 15 Oct 2026, which
+          # still leaves 600M over the 1,058 MiB its longest run held.
+          cpus: "2.50"
+          memory: 1664M
+
+  # Denise runs in her own container. One container would let anything Corey can
+  # run read Gia's mail configuration, which the coordination design forbids;
+  # two containers on one box keep the administration central and the state
+  # apart. Same image, same shape, own state, own env file, own port.
+  openclaw-denise:
+    image: openclaw/openclaw:2026.9.4@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101
+    container_name: openclaw-denise
+    restart: unless-stopped
+    env_file:
+      - /etc/household-assistant/openclaw-denise.env
+    environment:
+      HOME: /home/node
+      OPENCLAW_HOME: /home/node
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      OPENCLAW_GATEWAY_PORT: "18789"
+      OPENCLAW_DISABLE_BONJOUR: "1"
+      # The household is in US Central and every time either assistant speaks
+      # aloud is Central. Running the container on UTC put a 7pm concert on the
+      # calendar at breakfast time and made Corey correct itself in the group.
+      # This is the root fix; the note in USER.md is only a mitigation.
+      TZ: America/Chicago
+      # Gia's own Google account (Gmail and Calendar) through gog, as Corey has
+      # Franco's: tokens in an encrypted file keyring under her own state, the
+      # keyring password from her root-only env file. Corey's keyring is never here.
+      GOG_HOME: /home/node/.openclaw/gog
+      GOG_KEYRING_BACKEND: file
+    volumes:
+      - /var/lib/household-assistant/openclaw-denise:/home/node/.openclaw
+      - /var/lib/household-assistant/openclaw-denise-auth-secrets:/home/node/.config/openclaw
+      - /var/lib/household-assistant/codex-denise:/home/node/.codex
+      # himalaya (IMAP) for Gia's mailbox and gog for her Google account live here
+      # and nowhere Corey can reach.
+      - /var/lib/household-assistant/bin-denise:/home/node/.local/bin
+      # himalaya's account config (Gia's Yahoo mailbox over IMAP, read-only: no
+      # send backend is configured). The password is an env reference.
+      - /var/lib/household-assistant/openclaw-denise-himalaya:/home/node/.config/himalaya
+      # The same household plugins as Corey's gateway, read-only for the same reason.
+      - /opt/household-assistant/plugins:/opt/household-plugins:ro
+    networks:
+      - default
+      - deploy_default
+    ports:
+      - "127.0.0.1:18790:18789"
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    command:
+      ["node", "dist/index.js", "gateway", "--bind", "lan", "--port", "18789"]
+    healthcheck:
+      test: ["CMD", "node", "dist/docker-healthcheck.js"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 2048M
+
+  # Home Assistant, for the ecobee and Spotify only: ecobee gives no new developer
+  # keys, and since 2026.3 Home Assistant's ecobee integration signs in with the
+  # ecobee.com account instead. Container is the smallest supported install and has
+  # no add-ons. It publishes on loopback only, and the gateways reach it on this
+  # stack's own network, never SIQsermon's. docs/deploy/openclaw.md, Home Assistant.
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2026.10.1@sha256:130241f28d01fa80dfa3b44f7d89781c188d8642ecab9024f079f19f9f82baa0
+    container_name: homeassistant
+    restart: unless-stopped
+    environment:
+      TZ: America/Chicago
+    volumes:
+      - /var/lib/household-assistant/homeassistant:/config
+    networks:
+      - default
+    ports:
+      - "127.0.0.1:8123:8123"
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          # The 768M taken from openclaw-gateway, so the three still sum to the
+          # 4,480 MiB budget. Measured for a week from 15 Oct 2026, then trimmed
+          # to its peak with margin, and what it does not use goes back to Corey.
+          cpus: "0.50"
+          memory: 768M

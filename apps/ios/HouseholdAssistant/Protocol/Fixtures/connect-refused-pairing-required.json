@@ -1,0 +1,21 @@
+{
+  "type": "res",
+  "id": "c86be94f-75eb-403b-b19d-3d2b0860fd12",
+  "ok": false,
+  "error": {
+    "code": "NOT_PAIRED",
+    "message": "pairing required: device is not approved yet",
+    "details": {
+      "code": "PAIRING_REQUIRED",
+      "reason": "not-paired",
+      "requestId": "cbb1b77a-0611-48c8-8028-415cf002591b",
+      "remediationHint": "Approve this device from the pending pairing requests.",
+      "deviceId": "7382a412d8455d8fdc9408f9a1472480f73182bd73c99b66981576166ccb87fb",
+      "requestedRole": "operator",
+      "requestedScopes": [
+        "operator.read",
+        "operator.write"
+      ]
+    }
+  }
+}

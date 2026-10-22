@@ -1,0 +1,34 @@
+{
+  "type": "res",
+  "id": "fixture-settings",
+  "ok": true,
+  "payload": {
+    "assistant": { "name": "Corey", "voice": "will", "tone": 64, "length": "balanced" },
+    "voices": [
+      { "id": "will", "name": "Will", "summary": "Young man, warm and easy" },
+      { "id": "jessica", "name": "Jessica", "summary": "Young woman, bright and kind" }
+    ],
+    "model": {
+      "id": "z-ai/glm-5.3-flash",
+      "name": "GLM 5.3 Flash",
+      "company": "Z.ai",
+      "icon": "zai",
+      "fallbacks": [{ "id": "z-ai/glm-5.3", "name": "GLM 5.3", "company": "Z.ai", "icon": "zai" }]
+    },
+    "connectors": [
+      { "id": "pocket-piggies", "name": "PocketPiggies", "category": "money", "icon": "pocketpiggies", "summary": "Budgets, balances and spending", "isOn": true, "signIn": null, "accounts": 0 },
+      { "id": "scripture", "name": "SIQsermon", "category": "faith", "icon": "siqsermon", "summary": "Scripture, sermons and word studies", "isOn": true, "signIn": null, "accounts": 0 },
+      { "id": "icloud", "name": "iCloud", "category": "calendar-and-mail", "icon": "icloud", "summary": "Calendars and reminders in iCloud", "isOn": true, "signIn": "password", "accounts": 1 },
+      { "id": "gog", "name": "Google", "category": "calendar-and-mail", "icon": "google", "summary": "Gmail and Google Calendar", "isOn": true, "signIn": "oauth", "accounts": 0 },
+      { "id": "outlook-hack", "name": "Outlook", "category": "calendar-and-mail", "icon": "symbol:envelope", "summary": "Outlook mail and calendar", "isOn": true, "signIn": null, "accounts": 0 },
+      { "id": "notion", "name": "Notion", "category": "notes", "icon": "notion", "summary": "Pages and databases in Notion", "isOn": true, "signIn": null, "accounts": 0 },
+      { "id": "perplexity", "name": "Perplexity", "category": "web", "icon": "perplexity", "summary": "Searches the web", "isOn": true, "signIn": null, "accounts": 0 },
+      { "id": "web-readability", "name": "Reading pages", "category": "web", "icon": "symbol:doc.text.magnifyingglass", "summary": "Opens a link and reads the page", "isOn": true, "signIn": null, "accounts": 0 },
+      { "id": "browser-automation", "name": "Browser", "category": "web", "icon": "symbol:safari", "summary": "Uses a browser for sites that need one", "isOn": false, "signIn": null, "accounts": 0 },
+      { "id": "image-generation", "name": "Pictures", "category": "pictures-and-video", "icon": "symbol:photo", "summary": "Makes a picture from a description", "isOn": true, "signIn": null, "accounts": 0 },
+      { "id": "video-generation", "name": "Videos", "category": "pictures-and-video", "icon": "symbol:film", "summary": "Makes a short video from a description", "isOn": true, "signIn": null, "accounts": 0 },
+      { "id": "weather", "name": "Weather", "category": "everyday", "icon": "symbol:cloud.sun", "summary": "Forecasts and conditions", "isOn": true, "signIn": null, "accounts": 0 }
+    ],
+    "notifications": { "family": "mentions" }
+  }
+}

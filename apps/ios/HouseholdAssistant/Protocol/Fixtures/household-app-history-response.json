@@ -1,0 +1,116 @@
+{
+  "type": "res",
+  "id": "fixture-history",
+  "ok": true,
+  "payload": {
+    "messages": [
+      {
+        "id": "m-1b6f0c1e-0000-4000-8000-000000000001",
+        "rev": 1,
+        "kind": "message",
+        "conversation": "family",
+        "author": "franco",
+        "at": 1792018799500,
+        "origin": "local",
+        "text": "Corey, can you add milk to the list?",
+        "media": [],
+        "replyTo": null,
+        "signature": "eOOE2EFYGFk79icBiUYk8fwOCvlmgKEbtg1B7WIM6r5-ZhnagaO2fb1FJegArSxjM8_zQOqQG8R3L6FJOEGqBg"
+      },
+      {
+        "id": "a-c2f4f72c-c008-4903-b0bb-1e0db014b113",
+        "rev": 2,
+        "kind": "message",
+        "conversation": "family",
+        "author": "corey",
+        "at": 1792018804000,
+        "origin": "local",
+        "text": "Done, milk is on the shopping list.",
+        "media": [],
+        "replyTo": null,
+        "runId": "run-fixture-1"
+      },
+      {
+        "id": "m-1b6f0c1e-0000-4000-8000-000000000002",
+        "rev": 3,
+        "kind": "message",
+        "conversation": "family",
+        "author": "gia",
+        "at": 1792018863500,
+        "origin": "peer",
+        "text": "",
+        "media": [
+          {
+            "id": "e039b0f71fec38a1f1510e273cca76515a822e1ad543df58f702ce1a230db345",
+            "kind": "voice",
+            "mime": "audio/mp4",
+            "bytes": 24,
+            "durationMs": 4200,
+            "waveform": [
+              0.1,
+              0.4,
+              0.9,
+              0.6,
+              0.2
+            ]
+          }
+        ],
+        "replyTo": null,
+        "signature": "C1ZG-A4VdNzjAFwEtQmxj5YK0MRxHYW9SHCOi9SMt6utAIRUHEbFoF5IY_D1_zZa9LU4mlkNSWlHq2-UfeCiBw"
+      }
+    ],
+    "hasMore": false,
+    "reactions": {
+      "m-1b6f0c1e-0000-4000-8000-000000000001": [
+        {
+          "author": "gia",
+          "emoji": "❤️"
+        }
+      ],
+      "a-c2f4f72c-c008-4903-b0bb-1e0db014b113": [],
+      "m-1b6f0c1e-0000-4000-8000-000000000002": []
+    },
+    "reads": [
+      {
+        "author": "gia",
+        "messageId": "m-1b6f0c1e-0000-4000-8000-000000000001"
+      }
+    ],
+    "self": {
+      "person": "franco",
+      "assistant": "corey"
+    },
+    "sessionKeys": {
+      "family": "agent:main:household:group:family",
+      "direct": "agent:main:household:direct:franco"
+    },
+    "participants": [
+      {
+        "id": "franco",
+        "name": "Franco",
+        "kind": "person",
+        "isOwner": true
+      },
+      {
+        "id": "gia",
+        "name": "Gia",
+        "kind": "person",
+        "isOwner": false
+      },
+      {
+        "id": "corey",
+        "name": "Corey",
+        "kind": "assistant",
+        "isOwner": false,
+        "emoji": "🦉"
+      },
+      {
+        "id": "denise",
+        "name": "Denise",
+        "kind": "assistant",
+        "isOwner": false,
+        "emoji": "🌸"
+      }
+    ]
+  }
+}

@@ -1,0 +1,67 @@
+# One assistant's home key holder: household-home@corey and @denise.
+#
+# It holds the assistants' Home Assistant token and the living room Apple TV's pairing
+# on the host, under its own system user, in a state directory no container mounts.
+# The gateway reaches it only through a Unix socket in the gateway's own state
+# directory, which the instance drop-in binds here at /run/household-home, and gets
+# back what the house read back, never a token or the pairing.
+#
+# Lives at /etc/systemd/system/household-home@.service on the box. pyatv and what it
+# needs come from deploy/home/requirements.txt, hash-checked, in the venv beside the code.
+# The instance drop-in names the gateway directory to bind.
+
+[Unit]
+Description=Home key holder for %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=household-home-%i
+Group=household-home-%i
+Environment=PYTHONPATH=/opt/household-assistant/home
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/household-assistant/home/venv/bin/python /opt/household-assistant/home/home-keyholder.py %i
+Restart=on-failure
+RestartSec=5
+StateDirectory=household-home/%i
+StateDirectoryMode=0700
+UMask=0077
+# Only the socket directory is shared, and only with this instance's gateway.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateIPC=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Home Assistant on its loopback port and the TV on the tailnet, nothing else.
+IPAddressDeny=any
+IPAddressAllow=localhost 100.64.0.0/10
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=1000
+# Small and in the background: SIQsermon is this host's primary tenant. pyatv loads
+# aiohttp, protobuf and cryptography for a TV step, so it is measured at rollout.
+MemoryMax=160M
+TasksMax=32
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

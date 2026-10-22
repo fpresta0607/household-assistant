@@ -1,0 +1,179 @@
+{
+  "id": "household-app",
+  "name": "Household app",
+  "description": "The family's own app as a channel: the family room both people and both assistants share, and each person's own thread with their assistant.",
+  "enabledByDefault": false,
+  "activation": {
+    "onStartup": true
+  },
+  "channels": ["household"],
+  "contracts": {
+    "tools": ["household_location", "household_cart", "household_brief", "household_today", "household_home", "household_react", "household_note"]
+  },
+  "toolMetadata": {
+    "household_location": {
+      "optional": true,
+      "replaySafe": true,
+      "sideEffecting": false
+    },
+    "household_cart": {
+      "optional": true,
+      "replaySafe": false,
+      "sideEffecting": true
+    },
+    "household_brief": {
+      "optional": true,
+      "replaySafe": true,
+      "sideEffecting": true
+    },
+    "household_today": {
+      "optional": true,
+      "replaySafe": true,
+      "sideEffecting": true
+    },
+    "household_home": {
+      "optional": true,
+      "replaySafe": false,
+      "sideEffecting": true
+    },
+    "household_react": {
+      "optional": true,
+      "replaySafe": true,
+      "sideEffecting": true
+    },
+    "household_note": {
+      "optional": true,
+      "replaySafe": false,
+      "sideEffecting": true
+    }
+  },
+  "channelConfigs": {
+    "household": {
+      "label": "Household app",
+      "description": "Who this gateway's app channel belongs to, and who is on the other gateway in the family room.",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["owner", "assistant", "peer"],
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "owner": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name"],
+            "description": "The person whose phones pair with this gateway.",
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+              "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+              "deviceKeys": {
+                "type": "array",
+                "maxItems": 8,
+                "description": "The Ed25519 public keys of this person's paired phones, unpadded base64url, which sign their messages in the family room and their own thread.",
+                "items": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" }
+              }
+            }
+          },
+          "assistant": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name"],
+            "description": "This gateway's assistant, as the family room names it.",
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+              "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+              "emoji": { "type": "string", "maxLength": 16 }
+            }
+          },
+          "peer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["person", "assistant"],
+            "description": "Who is on the other gateway in the family room.",
+            "properties": {
+              "person": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "name"],
+                "properties": {
+                  "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+                  "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+                  "deviceKeys": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "description": "The other person's paired phones, pinned by root from the other gateway, whose signatures this gateway believes.",
+                    "items": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" }
+                  }
+                }
+              },
+              "assistant": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "name"],
+                "properties": {
+                  "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+                  "name": { "type": "string", "minLength": 1, "maxLength": 40 }
+                }
+              }
+            }
+          },
+          "push": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "topic": { "type": "string", "pattern": "^[A-Za-z0-9.-]+$" }
+            }
+          },
+          "phoneUrl": {
+            "type": "string",
+            "pattern": "^wss://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?$",
+            "description": "Where the owner's phones reach this gateway, the box's tailnet route. The /app setup code carries it, so nobody types an address."
+          },
+          "googleClientId": {
+            "type": "string",
+            "pattern": "^[0-9]+-[a-z0-9]+\\.apps\\.googleusercontent\\.com$",
+            "description": "The household's Google OAuth client of type iOS, the same id the app is built with. Not a secret. Without it, Connect Google from the app is refused."
+          },
+          "approver": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$",
+            "description": "The person who lets in a phone that signed in with Apple and nobody linked yet, from his own app. The same person on both gateways."
+          },
+          "orderMail": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["account"],
+            "description": "The owner's own Gmail, where the plugin reads Amazon's order emails itself, with no model, to follow the household cart's orders. Off when unset.",
+            "properties": {
+              "account": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 254,
+                "pattern": "^[^\\s@]+@[^\\s@]+$",
+                "description": "The owner's Gmail address, which gog on this gateway must hold already. Only Amazon mail sent to it counts."
+              }
+            }
+          },
+          "talkDailyCharacters": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000,
+            "description": "The most characters this gateway speaks for Talk and voice samples in a day, beside the voice-note ceiling in household-speech. 20000 when unset."
+          },
+          "familyTools": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true,
+            "description": "The only tools a family-room turn may use: this gateway's Telegram family group's tools.allow, which scripts/openclaw-household-app.py copies here. Without it a family-room turn gets no tools at all.",
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" }
+          }
+        }
+      }
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

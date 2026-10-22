@@ -1,0 +1,8 @@
+{
+  "type": "event",
+  "event": "connect.challenge",
+  "payload": {
+    "nonce": "01379a3a-340d-4a69-973f-0566ca4f92b8",
+    "ts": 1789787358959
+  }
+}

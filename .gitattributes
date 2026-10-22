@@ -1,0 +1,21 @@
+# These run on the box. CRLF would make bash reject the shebang.
+*.sh text eol=lf
+
+# The compose file is copied to the box too; a stray CR would end up inside values.
+*.yml text eol=lf
+
+# The scripture skill's script is copied into both agent workspaces and run
+# there, so it needs the same shebang protection the shell scripts get.
+*.py text eol=lf
+
+# Every Markdown file, for two different reasons.
+#
+# Runtime, for the skill files: one is copied into both agent workspaces and its
+# YAML frontmatter is parsed on the box, so a stray CR would ride along inside the
+# description the model is shown. That rule used to live on its own line above and
+# this one superseded it, because gitattributes takes the last match.
+#
+# Review, for everything else: an editor that rewrites the endings turns a
+# fourteen-line change into a thirteen-hundred-line diff and buries it, which has
+# happened twice on this work.
+*.md text eol=lf

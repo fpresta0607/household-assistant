@@ -1,0 +1,12 @@
+{
+  "type": "res",
+  "id": "3cd7e7fe-ea12-4b3a-be41-f1ff69c5c3ab",
+  "ok": true,
+  "payload": {
+    "agentId": "main",
+    "name": "Denise",
+    "nameSource": "agent",
+    "avatar": "🌿",
+    "emoji": "🌿"
+  }
+}

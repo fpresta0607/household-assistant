@@ -1,0 +1,12 @@
+{
+  "name": "household-memory",
+  "version": "1.0.0",
+  "private": true,
+  "description": "What a family member asks a household assistant to keep, and finding older chats",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

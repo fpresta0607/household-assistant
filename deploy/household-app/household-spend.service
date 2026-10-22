@@ -1,0 +1,26 @@
+# Adds up the household's OpenRouter month for the Steward app's Spend page:
+# scripts/household-spend.py.
+#
+# Started by household-spend.timer every ten minutes on the clock. Runs on the host
+# rather than in either gateway, because only the host can ask both: it reads each
+# through the gateway's own CLI, keeps the key's readings in a ledger only root reads,
+# and hands the month to each gateway through spend-in.mjs inside its container, as the
+# gateway's own user.
+#
+# Lives at /etc/systemd/system/household-spend.service on the box.
+
+[Unit]
+Description=Add up the household's OpenRouter month for the Steward app
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/household-assistant/app-relay/household-spend.py tick
+# Two reads of each gateway, each bounded at 120 seconds by GATEWAY_TIMEOUT_SECONDS, and
+# a 60 second delivery to each: 600 seconds is a wedged run, and the next tick is due.
+TimeoutStartSec=600
+# SIQsermon is this host's primary tenant, so the job yields CPU under contention, as
+# the relays do.
+Nice=10

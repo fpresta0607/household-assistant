@@ -1,0 +1,27 @@
+# Gate configuration for this repository.
+#
+# The managed gate requires this file readable both on a task branch and on
+# origin's default branch, so it lives on main and every branch inherits it.
+#
+# Model, effort and agent are all inherited from the owned global profile
+# rather than pinned here, so a fleet-wide policy change reaches this
+# repository without a commit. The agent was pinned here once and that is
+# exactly what it cost: the fleet moved to version 2, which reviews with Codex
+# at high effort, and the stale pin overrode it and refused every run in this
+# repository until it was removed.
+
+# Frozen automatic repair limits. Review stays 0 on purpose: a review finding
+# is a decision, not something the gate silently repairs.
+auto_fix:
+  review: 0
+  test: 1
+  lint: 1
+  rebase: 1
+  ci: 1
+
+# The test step runs this itself, so it takes the machine's heavy-run turn on its
+# own. The gate runs on Windows, where tests that need a POSIX capability skip with
+# the reason (tests/capabilities.py); CI on Linux runs every test. The glob is
+# quoted because Node 24 reads a bare directory as a module to run.
+commands:
+  test: 'uv run --extra dev pytest && node --test "tests/js/*.test.mjs"'

@@ -1,0 +1,12 @@
+{
+  "name": "household-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The family's own app as an OpenClaw channel: the family room and each person's thread with their assistant",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

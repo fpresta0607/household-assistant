@@ -1,0 +1,20 @@
+# One proactive planner run a week, Wednesday morning, which leaves the weekend far
+# enough away to book something and close enough to be real.
+#
+# Deliberately NOT enabled by the install script. The first proposal goes to the CFO
+# and not to the family group, so this timer is started by hand once he has read it
+# and said go live.
+#
+# Lives at /etc/systemd/system/household-coordination@plan.timer on the box.
+
+[Unit]
+Description=Weekly household date-night proposal
+
+[Timer]
+OnCalendar=Wed *-*-* 09:00:00 America/Chicago
+# A missed Wednesday is skipped on purpose. The next proposal waits for the following
+# Wednesday instead of arriving unpredictably when the host comes back.
+Unit=household-coordination@plan.service
+
+[Install]
+WantedBy=timers.target

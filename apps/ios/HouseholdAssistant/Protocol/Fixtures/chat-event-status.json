@@ -1,0 +1,13 @@
+{
+  "type": "event",
+  "event": "chat",
+  "payload": {
+    "runId": "3cb45679-ae95-4602-9e16-90362ef588eb",
+    "sessionKey": "agent:main:steward-ios-v1-probe",
+    "agentId": "main",
+    "seq": 1,
+    "state": "status",
+    "phase": "preparing_workspace"
+  },
+  "seq": 4
+}

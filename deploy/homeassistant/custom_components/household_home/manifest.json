@@ -1,0 +1,9 @@
+{
+  "domain": "household_home",
+  "name": "Household home",
+  "version": "1.1.0",
+  "dependencies": ["spotify"],
+  "codeowners": [],
+  "documentation": "https://github.com/fpresta0607/household-assistant",
+  "iot_class": "cloud_polling"
+}

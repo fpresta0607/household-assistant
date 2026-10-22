@@ -1,0 +1,15 @@
+# Runs the PocketPiggies guard as soon as either gateway's config changes.
+# Lives at /etc/systemd/system/household-pocketpiggies-guard.path on the box.
+
+[Unit]
+Description=Watch the gateways' configs for PocketPiggies policy drift
+
+[Path]
+PathChanged=/var/lib/household-assistant/openclaw/openclaw.json
+PathChanged=/var/lib/household-assistant/openclaw-denise/openclaw.json
+Unit=household-pocketpiggies-guard.service
+# Every change starts a run, however often the config is rewritten.
+TriggerLimitIntervalSec=0
+
+[Install]
+WantedBy=paths.target

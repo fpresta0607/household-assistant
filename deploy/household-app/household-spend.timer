@@ -1,0 +1,16 @@
+# Starts household-spend.service every ten minutes on the clock, so one reading of the
+# OpenRouter key lands on each midnight in the household's time zone, a whole number of
+# hours from the box's UTC, and the Spend page's days end where the household's do.
+#
+# Lives at /etc/systemd/system/household-spend.timer on the box.
+
+[Unit]
+Description=Add up the household's OpenRouter month every ten minutes
+
+[Timer]
+OnCalendar=*:0/10
+AccuracySec=1s
+Unit=household-spend.service
+
+[Install]
+WantedBy=timers.target
