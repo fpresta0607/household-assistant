@@ -270,7 +270,9 @@ test("a weigh-in said in a voice note is logged as rows from its turn, the uncle
     // Assert
     assert.match(channel.contexts[0].supplemental.groupSystemPrompt, /^This message is a voice note/);
     assert.match(channel.contexts[0].supplemental.groupSystemPrompt, /never guess it: give that row with unsure/);
-    assert.match(channel.contexts[0].supplemental.groupSystemPrompt, /answer in one line that says what you logged, such as "logged 7 kittens, Day 17"/);
+    assert.match(channel.contexts[0].supplemental.groupSystemPrompt, /Answer it as you would the same words typed\./, "a voice note is a plain message first");
+    assert.match(channel.contexts[0].supplemental.groupSystemPrompt, /Only when it plainly asks you to log or keep something/);
+    assert.match(channel.contexts[0].supplemental.groupSystemPrompt, /Answer a log in one line that says what you logged, such as "logged 7 kittens, Day 17"/);
     assert.equal(channel.contexts[1].supplemental, undefined, "a typed message is no voice note");
     assert.match(answer.logged, /^3 rows under "Kitten weights", [A-Z][a-z]{2}, [A-Z][a-z]{2} \d+$/);
     assert.deepEqual(answer.ask, [{ item: "Biscuit", heard: "two-ten or two-twenty" }]);
