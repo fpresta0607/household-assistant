@@ -43,6 +43,7 @@ def node_or_skip() -> str:
         "household_app_connect.test.mjs",
         "household_app_connectors.test.mjs",
         "household_app_did.test.mjs",
+        "household_app_digest.test.mjs",
         "household_app_family_parity.test.mjs",
         "household_app_family_posts.test.mjs",
         "household_app_family_tools.test.mjs",
