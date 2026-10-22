@@ -1868,8 +1868,9 @@ A person's voice note in the app is heard once, on each gateway that answers to 
   OpenRouter lists `openai/whisper-large-v3-turbo` at $0.0002 a minute of audio through DeepInfra and $0.00067 through Groq on 17 October, so a half-minute family note heard on both gateways costs at most about $0.0007.
 - A note that cannot be heard keeps nothing and logs `household-app: a voice note could not be heard: <reason>`; the turn still starts, with whatever words were typed beside it.
 - An assistant's own spoken reply is never heard: it carries its own words.
-- **A log said aloud is logged as said.** A turn whose message is a voice note it heard is also told (`VOICE_NOTE_INSTRUCTION`, after the family room's own instruction there) to log what the note gives at once, in one call: a weigh-in, a reading or a dose as `household_note` `add` with `rows`, things to buy as `household_cart` `add` with `list`.
-  It answers in one line saying what it logged, such as "logged 7 kittens, Day 17".
+- **A log said aloud is logged as said.** A turn whose message is a voice note it heard is also told (`VOICE_NOTE_INSTRUCTION`, after the family room's own instruction there) to answer it as the same words typed, and only when it plainly asks to log or keep something, to log what the note gives at once, in one call: a weigh-in, a reading or a dose as `household_note` `add` with `rows`, things to buy as `household_cart` `add` with `list`.
+  A log is answered in one line saying what it logged, such as "logged 7 kittens, Day 17"; any other voice note gets the answer its words would get typed.
+  How a voice note shows in the app does not change.
   A value speech-to-text made unclear is never guessed: its row goes in with `unsure` (what was heard), is not logged, and the answer carries `ask` with that row, so the one-line reply asks about it alone.
   `add` with rows answers `logged` ("3 rows under "Kitten weights", Wed, Oct 21"), and the cart's list answers `logged` ("3 items in the cart").
   It is an instruction and two tool fields: no model call or wait is added to the turn.

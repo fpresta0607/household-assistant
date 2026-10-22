@@ -32,16 +32,17 @@ export function isNameSpoken(words, name) {
   return (String(words).match(/\p{L}+/gu) ?? []).some((word) => key(word) === wanted);
 }
 
-// A turn started by a person's voice note. The family lives in voice notes, so a weigh-in or a
-// grocery list said aloud is logged as it is, rows in the household note or items in the
-// cart, and answered with one line: no re-reading, no transcription chore. Speech-to-text
-// mishears a number or a name now and then, so the one unclear value is asked about, never
-// guessed. It is an instruction only: no model call is added for it.
+// A turn started by a person's voice note. A voice note is a message like any other, most of
+// them something said to the assistant, and it is answered as the same words typed would be.
+// Only one that plainly asks to log something, a weigh-in or a grocery list read out to be
+// kept, is logged as it is, rows in the household note or items in the cart, answered with
+// one line. Speech-to-text mishears a number or a name now and then, so the one unclear value
+// is asked about, never guessed. It is an instruction only: no model call is added for it.
 export const VOICE_NOTE_INSTRUCTION = [
-  "This message is a voice note, and you have its words as speech-to-text wrote them.",
-  "When it gives something the family keeps track of, such as a weigh-in, a reading, a dose or a list, log it at once, in one call: household_note add with rows, one row per item, or household_cart add with list for things to buy.",
-  "If one value is unclear in the words, such as a number misheard or a name that is no one's, never guess it: give that row with unsure saying what you heard, log the rest, and ask about that one value alone in a short question.",
-  "Then answer in one line that says what you logged, such as \"logged 7 kittens, Day 17\", plus that one question when there is one, and nothing else.",
+  "This message is a voice note, and you have its words as speech-to-text wrote them. Answer it as you would the same words typed.",
+  "Only when it plainly asks you to log or keep something the family tracks, such as a weigh-in, a reading, a dose or a list to buy, log it at once, in one call: household_note add with rows, one row per item, or household_cart add with list for things to buy.",
+  "Then, if one value is unclear in the words, such as a number misheard or a name that is no one's, never guess it: give that row with unsure saying what you heard, log the rest, and ask about that one value alone in a short question.",
+  "Answer a log in one line that says what you logged, such as \"logged 7 kittens, Day 17\", plus that one question when there is one.",
 ].join(" ");
 
 export function createHearing({ store, transcribe, assistantId, heard, log, now = Date.now }) {
