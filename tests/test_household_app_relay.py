@@ -108,6 +108,7 @@ def write_outbox(
         "approvals": approvals or [],
         "cart": (steps or {}).get("cart", []),
         "notes": (steps or {}).get("notes", []),
+        "wishes": (steps or {}).get("wishes", []),
     }
     (gateway.state / "household-app" / "outbox.json").write_text(
         json.dumps(outbox), encoding="utf-8"
@@ -532,8 +533,20 @@ def note_step(step_id: int, author: str) -> dict[str, Any]:
     }
 
 
-# The household cart's steps and the household note's, which travel the same way.
-STEP_LOGS = pytest.mark.parametrize(("key", "step"), [("cart", cart_step), ("notes", note_step)])
+def wish_step(step_id: int, author: str) -> dict[str, Any]:
+    return {
+        "id": f"ws-00000000-0000-4000-8000-{step_id:012d}",
+        "at": 1792540800000 + step_id,
+        "author": author,
+        "kind": "seen",
+        "step": "ws-00000000-0000-4000-8000-000000000099",
+    }
+
+
+# The household cart's steps, the household note's and the wishlist's, which travel the same way.
+STEP_LOGS = pytest.mark.parametrize(
+    ("key", "step"), [("cart", cart_step), ("notes", note_step), ("wishes", wish_step)]
+)
 
 
 @STEP_LOGS

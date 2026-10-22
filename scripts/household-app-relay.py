@@ -74,8 +74,9 @@ DELIVERY_TIMEOUT_SECONDS = 60
 MAX_ROUNDS = 20
 NO_SIGN_INS = json.dumps({"approvals": [], "signIns": []}, sort_keys=True)
 # What both assistants write and both gateways replay, each as the steps each assistant took:
-# the household cart (cart.js in the plugin) and the household note (notes.js).
-STEP_LOGS = ("cart", "notes")
+# the household cart (cart.js in the plugin) and the household note (notes.js), and the
+# wishlist's private steps (wishes.js), which no phone is shown.
+STEP_LOGS = ("cart", "notes", "wishes")
 NO_STEPS = json.dumps([])
 
 Runner = Callable[..., "subprocess.CompletedProcess[str]"]

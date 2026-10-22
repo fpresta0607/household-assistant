@@ -2343,6 +2343,24 @@ Corey asked for one command that gives the vet, poison control, the pediatrician
   In the family room the asker's own assistant answers it, since the app gives commands to the owner alone.
 - Asked in words or by voice, the assistant reads the topic and gives those lines, and reads them aloud with `speak` when asked by voice; on a call every reply is spoken already.
 
+### Gift and wishlist memory
+
+Corey asked that something someone wants, said in passing, be kept with who and when, and handed over three weeks before a birthday or Christmas.
+A gift for one parent must never reach that parent, and both parents read the household note and the assistants' line, so a wish goes in neither.
+
+- `household_wish` (`wish-tool.js`) keeps a wish (`wish`: who and what, in their words) quietly, in the owner's own turns only: their thread and their own session of the family room.
+  Its description tells the assistant never to say it kept one or for whom, and never to bring one up.
+- Each gateway keeps the wishes it hands to its own person in `household-app/wishes.sqlite` (`wishes.js`), and where a wish goes depends on whom it is for:
+  - A wish of the gateway's own person goes to the other gateway only, as a step of the relay's `wishes` log, and is kept there for the other parent.
+    The other side answers with a `seen` step, and the sending side then deletes the wish's step, so its words leave that person's own side once delivered.
+  - A wish of the other parent is kept on this side for this gateway's own person, and never crosses.
+  - Anyone else's, such as a child's, is kept on this side and sent to the other, so both parents get it.
+- `birthday` keeps someone's birthday (MM-DD or YYYY-MM-DD) and it crosses to the other side, the later one winning; Christmas is 25 December for everyone.
+- Every hour, and as the channel starts, each gateway posts its own person, with no model, the wishes of the last year of each person whose birthday or Christmas is 21 days away or less, once a year for each occasion: "Gia's birthday is in 21 days, Thu, Nov 12. Things Gia said they wanted:" and a line for each, with when it was said.
+- `view` shows only the wishes kept for the owner, which are never the owner's own.
+- The host relay carries the `wishes` log beside the cart's and the note's (`STEP_LOGS` in `household-app-relay.py`), only the source assistant's own steps, and no phone is shown any of it.
+- A wish of a person's own waits in that gateway's outbox until the other side has it, so a relay that is down keeps it there longer; nothing in that gateway's turns, pages or line shows it.
+
 ### The house
 
 - `household_home` is the assistant's tool for the thermostat, the music and the living room TV, in the owner's own thread and the family room, by the same turn proof as `household_location` (`turn.js`).
