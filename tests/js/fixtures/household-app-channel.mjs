@@ -117,12 +117,13 @@ export async function runningChannel(cfg, {
     call,
     send: (message) => call("household-app.send", message),
     // OpenClaw's before_tool_call for one call: each of the plugin's handlers whose matcher
-    // covers the tool, in the order the plugin registered them, until one blocks it.
+    // covers the tool, in the order the plugin registered them, until one blocks it or asks
+    // for an approval.
     async beforeToolCall(event, context = {}) {
       for (const hook of hooks) {
         if (hook.name !== "before_tool_call" || (hook.matcher && !hook.matcher.includes(event.toolName))) continue;
         const result = await hook.handler(event, { ...context, toolName: event.toolName });
-        if (result?.block) return result;
+        if (result?.block || result?.requireApproval) return result;
       }
       return undefined;
     },

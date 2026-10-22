@@ -2363,6 +2363,21 @@ A turn on Telegram keeps Telegram's approvals exactly as before, and the househo
 - Exec approvals set on the box still apply as before.
   There is no config to add: OpenClaw starts the channel's native approvals when the channel starts, and the hook is part of the plugin.
 
+### One tap sends it
+
+Corey could draft an email but never send one, so every message ended with the owner doing the last mile.
+`household_send` (`send-tool.js`) takes a whole draft in one call: an `email` or a `booking` request by email (the address, the subject and every word), or the household cart's `order` (each item's price in dollars, from its page).
+
+- It is offered only in the owner's own turns, their thread and their own session of the family room, and the plugin's `before_tool_call` asks the owner's yes for every call there and refuses it anywhere else.
+- The yes is OpenClaw's plugin approval, shown as the card above, which freezes the call's parameters: it covers that one draft, and a changed draft is a new call and a new card.
+  OpenClaw keeps 512 characters of a request's words, so the card carries the whole draft, found by the request's tool call: `approval.detail` is every word, and `approval.send` says its kind and where it goes, or an order's items and total.
+- An email asks as a `message-send` to its one address; an order asks as a `payment` at its total, `critical`, and its title says the total before the tap, such as "Order 2 items, $28.97".
+- The tool sends only when that call's own approval resolved `allow-once`, and only the draft whose hash the card showed, once: a denial, no answer, a changed draft and a second send are each refused (`not_approved`, `changed`).
+- Email goes from the owner's own Gmail, the account `orderMail` names, through `gog gmail send` with no shell; a gateway with no `orderMail` offers only an order.
+  Amazon has no way for anyone but the buyer to place an order, so an order's tap hands over the cart's checkout link with the total the owner approved, and the buyer pays there.
+- A command's own Gmail send, `gog gmail send` or a draft's `send`, as a command's program, after variables it sets, or inside `sh -c`, is refused in every session, Telegram's included, so mail goes out after a tap or not at all.
+- The phone shows a send's card with where it goes or its total, every word with no line limit, and Approve named for what it does: Send, Book or Order.
+
 ### The Spend page
 
 **The Spend page shows one month for the whole household, the same on both phones: one graph of the total by day, then a line each for Corey, Denise and Other use of the key, which add up to the total to the cent.**

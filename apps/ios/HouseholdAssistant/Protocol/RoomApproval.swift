@@ -3,6 +3,10 @@
 // and the answers it may be given. OpenClaw decides what needs a yes; the card only asks.
 //
 // How it ended arrives later as an `approval` entry about the card, whoever answered it.
+//
+// A draft the assistant would send, an email, a booking request or the cart's order, is such
+// a card too, with `send` saying what it is and where it goes, or for an order its items and
+// total, and `detail` every word of it. Approve sends that one draft.
 
 import Foundation
 
@@ -28,9 +32,32 @@ struct RoomApproval: Decodable, Equatable, Sendable {
     let isCommand: Bool
     /// The answers the card offers, of those this version can give.
     let decisions: [Decision]
+    /// The draft Approve sends, when the step is a send.
+    let send: Send?
+
+    struct Send: Decodable, Equatable, Sendable {
+        enum Kind: String, Decodable, Sendable {
+            case email, booking, order
+        }
+
+        struct Item: Decodable, Equatable, Sendable {
+            let name: String
+            let quantity: Int
+            /// Each, as the card shows it, such as "$3.49".
+            let price: String
+        }
+
+        let kind: Kind
+        /// The address an email or a booking request goes to.
+        let to: String?
+        let subject: String?
+        /// An order's total, as the card shows it before the tap, such as "$28.97".
+        let total: String?
+        let items: [Item]?
+    }
 
     private enum CodingKeys: String, CodingKey {
-        case id, kind, title, detail, decisions
+        case id, kind, title, detail, decisions, send
     }
 
     init(from decoder: Decoder) throws {
@@ -40,6 +67,8 @@ struct RoomApproval: Decodable, Equatable, Sendable {
         detail = try container.decodeIfPresent(String.self, forKey: .detail)
         isCommand = try container.decodeIfPresent(String.self, forKey: .kind) == "exec"
         decisions = try container.decode([String].self, forKey: .decisions).compactMap(Decision.init(rawValue:))
+        // A send of a kind a later gateway adds is shown as an ordinary card.
+        send = try? container.decodeIfPresent(Send.self, forKey: .send)
     }
 }
 

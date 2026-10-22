@@ -106,8 +106,8 @@ APPROVER = "franco"
 FAMILY_GROUP = IDENTIFIERS.family_group
 # The plugin's tools: where the owner is while they share it, the household's shared
 # cart, the assistant's Today card and its line for the day, the house's thermostat and
-# music, and a tapback
-# on a person's message. They are optional, so under a tool profile only
+# music, a tapback on a person's message, the household note, and a draft the owner sends
+# with one tap. They are optional, so under a tool profile only
 # `tools.alsoAllow` hands them to the model.
 APP_TOOLS = [
     "household_location",
@@ -117,6 +117,7 @@ APP_TOOLS = [
     "household_home",
     "household_react",
     "household_note",
+    "household_send",
 ]
 # The PocketPiggies guard rewrites `tools.alsoAllow` as everything else in its order,
 # then these three. Putting the new tool before them leaves the guard nothing to do.

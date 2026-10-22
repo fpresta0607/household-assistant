@@ -12,6 +12,10 @@
 //
 // Only approvals from a turn in this channel come here. A turn on Telegram keeps its own
 // approvals, exactly as before.
+//
+// A draft the owner sends with one tap (send-tool.js) is such an approval too. OpenClaw keeps
+// only a few lines of a request's words, so its card carries the whole draft, found by the
+// tool call it is for: where it goes, every word, or every item and the total.
 
 import { createHash } from "node:crypto";
 
@@ -71,8 +75,9 @@ function stateOf(decision) {
 }
 
 // `announce` tells the phones about an entry, and pushes a message to them. `ownerKeys`
-// answers with the keys of the owner's phones, and `resolve` hands an answer to OpenClaw.
-export function createApprovals({ store, assistant, sessionKeys, now = Date.now, announce, ownerKeys, isSignedBy, resolve }) {
+// answers with the keys of the owner's phones, `resolve` hands an answer to OpenClaw, and
+// `draftFor` answers a send's whole draft by its tool call, or null.
+export function createApprovals({ store, assistant, sessionKeys, now = Date.now, announce, ownerKeys, isSignedBy, resolve, draftFor = () => null }) {
   const sessions = new Set(Object.values(sessionKeys));
 
   return {
@@ -83,8 +88,15 @@ export function createApprovals({ store, assistant, sessionKeys, now = Date.now,
       return source ? source === CHANNEL : sessions.has(request?.request?.sessionKey);
     },
 
-    async present({ approvalId, approvalKind, card }) {
-      const { title, detail, decisions } = card;
+    async present({ approvalId, approvalKind, card, toolCallId }) {
+      const { title, decisions } = card;
+      const draft = typeof toolCallId === "string" ? draftFor(toolCallId) : null;
+      const detail = draft ? draft.text : card.detail;
+      const send = draft && {
+        kind: draft.kind,
+        ...(draft.to ? { to: draft.to, subject: draft.subject } : {}),
+        ...(draft.total ? { total: draft.total, items: draft.items } : {}),
+      };
       const { added, entry } = store.addMessage({
         id: messageIdFor(approvalId),
         conversation: DIRECT,
@@ -94,7 +106,7 @@ export function createApprovals({ store, assistant, sessionKeys, now = Date.now,
         media: [],
         replyTo: null,
         origin: "local",
-        approval: { id: approvalId, kind: approvalKind, title, ...(detail ? { detail } : {}), decisions },
+        approval: { id: approvalId, kind: approvalKind, title, ...(detail ? { detail } : {}), ...(send ? { send } : {}), decisions },
       });
       if (added) await announce(entry);
       return { messageId: entry.id };
@@ -145,7 +157,7 @@ export const approvalNativeRuntime = {
   transport: {
     prepareTarget: ({ plannedTarget }) => ({ dedupeKey: plannedTarget.target.to, target: plannedTarget.target }),
     deliverPending: ({ context, request, approvalKind, pendingPayload }) =>
-      context.approvals.present({ approvalId: request.id, approvalKind, card: pendingPayload }),
+      context.approvals.present({ approvalId: request.id, approvalKind, card: pendingPayload, toolCallId: request.request?.toolCallId }),
     updateEntry: ({ context, entry, payload }) => context.approvals.settle(entry, payload.state),
   },
 };
