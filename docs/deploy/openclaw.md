@@ -1806,6 +1806,9 @@ An assistant's post to the family lands in the app's family room first, and Tele
 - `deploy/openclaw/plugins/household-app` registers the channel.
   A phone talks to it through the plugin's `household-app.*` gateway methods over the connection it already pairs with, and hears about changes through the `plugin.household-app.changed` and `plugin.household-app.typing` events.
 - Everything said in the app is kept in `household-app/room.sqlite` under the gateway's state, with attachments under `household-app/media/`, each named by its SHA-256.
+- A reply that carries a file, such as a chart or a PDF the assistant made, is handed to the channel as soon as the assistant writes it: OpenClaw sends it as a block even with block streaming off, or as a tool's result, and leaves it out of the final that follows.
+  The channel keeps a block as a reply like the final, a tool's result only when it carries a file, and never posts the same file twice in one turn.
+  Until 22 October it kept finals only, so such a reply was lost whole, words and file, with nothing in any log: OpenClaw reports a delivery that answers nothing only at verbose level.
 - A turn in the app is a channel turn like a Telegram one: it carries who sent it, the family room's last twenty messages as group history, and the tools the same turn has on Telegram, as [What a family-room turn may use](#what-a-family-room-turn-may-use) says.
   In the family room an assistant answers only when a message names it, by name or emoji, or replies to one of its messages, and a voice note is heard first to find out, as [Voice notes in the app](#voice-notes-in-the-app) says.
 - One assistant hands a request to the other by @mentioning it in the family room, `@Corey` or `@Denise`, the way PR 92 does in The Fam.
