@@ -100,7 +100,9 @@ Until then only a cart order can be sent, and its tap opens Amazon's checkout, w
 
 Times are in the household's own time zone.
 
-## Rules that do not bend
+## Phase 1 - identity and privacy spine
+
+These rules do not bend.
 
 - **Identity comes from the channel, never from the text.** A display name, a message body or a model-supplied id is ignored on purpose, and the default is to refuse.
 - **Private stays private.** A group route never carries a private scope, or a tool that reaches one person's mail, calendar or approvals.
