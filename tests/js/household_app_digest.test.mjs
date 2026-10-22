@@ -151,3 +151,82 @@ test("through the plugin, the Sunday run's digest reaches the owner's thread wit
     await channel.stop();
   }
 });
+
+// The week drawn the way the Overlord asked for the day snapshot on 22 October: an agenda card,
+// each day a calendar mark beside one row for each thing, in bold with its time. Made up.
+const EVENTS = [
+  { title: "Piano lesson", start: "2026-10-26T16:30:00-05:00" },
+  { title: "Dentist", start: "2026-10-26T09:00:00-05:00" },
+  { title: "School picture day", day: "2026-10-28" },
+  { title: "Bake sale", start: "2026-10-31T10:00:00-05:00" },
+];
+const agendaOf = (text) => JSON.parse(/```steward-card\n(\{"type":"agenda".*\})\n```/.exec(text)[1]);
+
+test("given the week's events, the digest shows them as an agenda card, each day once with its things in order", () => {
+  // Act
+  const lines = composeDigest({ week: [], events: EVENTS, decide: [], due: { overdue: [], soon: [], promises: [], later: 0 }, log: null, cartItems: 0, now: SUNDAY, timeZone: "America/Chicago" });
+
+  // Assert
+  assert.equal(lines[0], "Sunday digest, the week of Mon, Oct 26");
+  assert.deepEqual(agendaOf(lines.join("\n")), {
+    type: "agenda",
+    title: "The week ahead",
+    skill: "calendar",
+    days: [
+      { date: "2026-10-26", events: [{ title: "Dentist", time: "9:00 AM" }, { title: "Piano lesson", time: "4:30 PM" }] },
+      { date: "2026-10-28", events: [{ title: "School picture day" }] },
+      { date: "2026-10-31", events: [{ title: "Bake sale", time: "10:00 AM" }] },
+    ],
+  });
+  assert.deepEqual(lines.slice(4), ["Slipping: nothing.", "Cart: empty.", "Promises: none open."], "the rest of the digest as before");
+});
+
+test("the tool takes the week's events and refuses one with no start or day, both, or a time with no offset", async () => {
+  // Arrange
+  const posted = [];
+  const tool = createDigestTool({ context: SCHEDULED, owner: "franco", owners: [], post: async (week, decide, events) => (posted.push({ week, decide, events }), 7) });
+  const run = async (args) => JSON.parse((await tool.execute("call-1", args)).content[0].text);
+
+  // Act
+  const good = await run({ events: [{ title: " Dentist ", start: "2026-10-26T09:00:00-05:00" }, { title: "Picture day", day: "2026-10-28" }], decide: [] });
+  const refused = await Promise.all([
+    run({ events: [{ title: "Dentist" }], decide: [] }),
+    run({ events: [{ title: "Dentist", start: "2026-10-26T09:00:00-05:00", day: "2026-10-26" }], decide: [] }),
+    run({ events: [{ title: "Dentist", start: "2026-10-26T09:00:00" }], decide: [] }),
+    run({ events: Array.from({ length: 13 }, () => ({ title: "Dentist", day: "2026-10-26" })), decide: [] }),
+    run({ decide: [] }),
+  ]);
+
+  // Assert
+  assert.deepEqual(good, { posted: true, lines: 7 });
+  assert.deepEqual(posted, [{ week: [], decide: [], events: [{ title: "Dentist", start: "2026-10-26T09:00:00-05:00" }, { title: "Picture day", day: "2026-10-28" }] }]);
+  assert.deepEqual(refused.map((answer) => answer.code), Array(5).fill("invalid_arguments"));
+});
+
+test("through the plugin, the Sunday run's events reach the owner's thread as one agenda card", async () => {
+  // Arrange
+  const channel = await runningChannel({
+    channels: {
+      household: {
+        owner: { id: "franco", name: "Franco" },
+        assistant: { id: "corey", name: "Corey" },
+        peer: { person: { id: "gia", name: "Gia" }, assistant: { id: "denise", name: "Denise" } },
+      },
+    },
+  });
+  try {
+    const tool = channel.tools.find(({ options }) => options.names.includes(DIGEST_TOOL)).factory(SCHEDULED);
+
+    // Act
+    await tool.execute("call-1", { events: EVENTS, decide: ["Who drives Saturday"] });
+    const digest = (await channel.call("household-app.history", { conversation: "direct" })).payload.messages.at(-1);
+
+    // Assert
+    assert.equal(digest.author, "corey");
+    assert.equal(agendaOf(digest.text).days.length, 3);
+    assert.doesNotMatch(digest.text, /^- Dentist/m, "the week is the card, not lines");
+    assert.match(digest.text, /\nTo decide:\n- Who drives Saturday$/);
+  } finally {
+    await channel.stop();
+  }
+});

@@ -20,6 +20,7 @@ enum CardContent: Equatable, Sendable {
     case sermon(SermonCard)
     case pocketPiggies(PocketPiggiesCard)
     case sources(SourcesCard)
+    case agenda(AgendaCard)
 
     /// The skill a card of this type always comes from, so it wears that skill's badge
     /// without naming it. Nil for a type any skill, or none, may send.
@@ -35,7 +36,7 @@ enum CardContent: Equatable, Sendable {
             return .web
         case .cart, .order:
             return .lists
-        case .table, .chart, .checklist, .event, .reminder, .map, .placeReminder, .email, .copy, .product, .message:
+        case .table, .chart, .checklist, .event, .reminder, .map, .placeReminder, .email, .copy, .product, .message, .agenda:
             return nil
         }
     }
@@ -46,7 +47,7 @@ enum CardContent: Equatable, Sendable {
         switch self {
         case .checklist, .event, .placeReminder, .email, .copy, .product, .message, .cart, .scripture, .sermon, .sources:
             return true
-        case .table, .chart, .reminder, .map, .order, .pocketPiggies:
+        case .table, .chart, .reminder, .map, .order, .pocketPiggies, .agenda:
             return false
         }
     }

@@ -64,6 +64,10 @@ enum MessagePlainText {
             lines = piggiesLines(of: piggies)
         case .sources(let sources):
             lines = ["Sources:"] + sources.links.map { "\($0.name) \($0.url.absoluteString)" }
+        case .agenda(let agenda):
+            lines = [agenda.title].compactMap { $0 } + agenda.days.flatMap { day in
+                ["\(day.mark.month) \(day.mark.day)"] + day.events.map { "\($0.title), \($0.time ?? "all day")" }
+            }
         }
         return lines.joined(separator: "\n")
     }

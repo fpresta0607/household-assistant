@@ -33,6 +33,7 @@ In the app, send a card when the answer has a shape the family would otherwise h
 | rows and columns | `table` (or an ordinary Markdown table, which the app also draws natively) |
 | a list someone will tick off | `checklist` |
 | something with a date and time | `event` |
+| a day's or a week's plans at a glance, such as what is on today or this week | `agenda` |
 | a reminder you set | `reminder` |
 | where a place is, or how far someone is from it | `map` |
 | a reminder for when someone gets somewhere or leaves it | `place-reminder` |
@@ -166,6 +167,16 @@ An event you read from the family calendar names it, and the app shows the day o
 
 ```steward-card
 {"type":"event","title":"Dentist, Gia","start":"2026-10-15T15:30:00-04:00","end":"2026-10-15T16:15:00-04:00","skill":"calendar"}
+```
+
+### agenda
+
+A day, or up to a week, at a glance: the app draws each day as a little calendar page, the month in three letters over the day's number, beside one row for each thing, the thing in bold and its time.
+Each day is `date`, YYYY-MM-DD, and its `events`, at most twelve, each a short `title` and its `time` as people say it, such as `"9:00 AM"`; leave `time` out for something all day.
+`title` is optional; add `"skill":"calendar"` when the calendar gave you the plans.
+
+```steward-card
+{"type":"agenda","title":"This week","skill":"calendar","days":[{"date":"2026-10-26","events":[{"title":"Dentist","time":"9:00 AM"},{"title":"Piano lesson","time":"4:30 PM"}]},{"date":"2026-10-28","events":[{"title":"School picture day"}]}]}
 ```
 
 ### reminder

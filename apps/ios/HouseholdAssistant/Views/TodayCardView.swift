@@ -1,8 +1,10 @@
 // The day at a glance above the pins on Chats (CFO notes section 21c): the assistant's face
 // in its gold ring and "Corey · Today", or Tonight in the evening, with that word the one
-// small gold mark; the next thing first with the line that helps with it; two more at
-// most; and the day's verse at the bottom, which opens in the Bible app. A tap anywhere
-// else opens the whole day. Absent when nothing is left to show. Each person's comes from
+// small gold mark; then the day the way the Overlord asked for it on 22 October, clean
+// rather than wordy: the calendar mark of the day, the month in three letters over the day's
+// number, and beside it the next thing and two more at most, each in bold with its time
+// (AgendaDayView); and the day's verse at the bottom, which opens in the Bible app. A tap
+// anywhere else opens the whole day, with each thing's helping line. Absent when nothing is left to show. Each person's comes from
 // their own assistant, kept on the phone so it shows offline too (TodayModel).
 //
 // Whole the first time each day. Once seen, as its person leaves Chats or the app with it on
@@ -17,7 +19,6 @@ struct TodayCardView: View {
     @Environment(\.reducesMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var isDayOpen = false
-    @ScaledMetric(relativeTo: .subheadline) private var timeWidth: CGFloat = 64
 
     var body: some View {
         if let glance = model.today.glance {
@@ -147,35 +148,12 @@ struct TodayCardView: View {
                 .tracking(0.7)
                 Spacer(minLength: 0)
             }
-            if let next = glance.next {
-                VStack(alignment: .leading, spacing: 2) {
-                    // As written: the assistant's words, never read as Markdown.
-                    Text(verbatim: sentence(next))
-                        .font(.headline)
-                        .foregroundStyle(Palette.text)
-                    if let detail = next.detail {
-                        Text(verbatim: detail)
-                            .font(.subheadline)
-                            .foregroundStyle(Palette.secondaryText)
-                    }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            } else {
+            if glance.next == nil {
                 Text(glance.heading == .tonight ? "Nothing else tonight" : "Nothing else today")
                     .font(.subheadline)
                     .foregroundStyle(Palette.secondaryText)
-            }
-            ForEach(Array(glance.more.enumerated()), id: \.offset) { _, line in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(verbatim: line.time ?? "All day")
-                        .monospacedDigit()
-                        .foregroundStyle(Palette.secondaryText)
-                        .frame(minWidth: timeWidth, alignment: .leading)
-                    Text(verbatim: line.title)
-                        .foregroundStyle(Palette.text)
-                        .lineLimit(1)
-                }
-                .font(.subheadline)
+            } else {
+                AgendaDayView(day: glance.agendaDay(at: Date(), calendar: .current))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

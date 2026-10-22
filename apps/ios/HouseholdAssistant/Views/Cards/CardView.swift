@@ -59,6 +59,8 @@ struct CardView: View {
             PocketPiggiesCardView(card: piggies, isArriving: isArriving)
         case .sources(let sources):
             SourcesCardView(sources: sources)
+        case .agenda(let agenda):
+            AgendaCardView(agenda: agenda)
         }
     }
 }
