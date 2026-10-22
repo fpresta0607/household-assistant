@@ -1648,12 +1648,17 @@ test("a picture the assistant sends keeps its width and height, so the phone dra
 // The household note's claim steps, as notes.js keeps them, and the bound's task, run by hand.
 function claimsKept({ claimedBy = null } = {}) {
   const taken = [];
+  const standing = new Map();
   return {
     taken,
+    standing,
     claims: {
       claim: (message, { forWho }) => taken.push(["claim", message, forWho]) > 0,
       took: (message) => taken.push(["took", message]) > 0,
       claimOf: () => ({ claimedBy, tookBy: null }),
+      standDown: (message, bound) => standing.set(message, { message, ...bound }),
+      standingDown: () => [...standing.values()],
+      settled: (message) => standing.delete(message),
     },
   };
 }
@@ -1721,6 +1726,53 @@ test("the assistant that stood down does not take over once the other's claim ha
   later[0]();
   assert.deepEqual(taken, []);
   assert.equal(seen.dispatched.length, 0);
+});
+
+// A restart inside the bound used to lose it, and with it the takeover.
+test("a question stood down from is kept until its bound is checked, and a restart inside the bound still takes it over once", async () => {
+  // Arrange: Gia asks both, and Corey stands down.
+  const later = [];
+  const { claims, taken, standing } = claimsKept();
+  const first = await setup({ peerAddressed: BOTH, claims, schedule: (task, milliseconds) => later.push({ task, milliseconds }) });
+  await first.room.acceptPeer({ entries: [{ kind: "message", author: "gia", ...signedBy(GIA, said("m-00000020", "Corey and Denise, is church at ten?")) }] });
+  assert.deepEqual([...standing.values()], [{ message: "m-00000020", since: NOW - 5000, deadline: NOW + 20_000 }]);
+
+  // Act: the gateway restarts 15 seconds in, before the bound passes, on the same store.
+  const resumed = [];
+  const second = await setup({ peerAddressed: BOTH, claims, store: first.store, now: () => NOW + 15_000, schedule: (task, milliseconds) => resumed.push({ task, milliseconds }) });
+  second.room.resumeStandDowns();
+  resumed[0].task();
+  second.room.resumeStandDowns();
+
+  // Assert
+  assert.deepEqual(resumed.map(({ milliseconds }) => milliseconds), [5000], "only what is left of the bound");
+  assert.deepEqual(taken, [["took", "m-00000020"]]);
+  assert.equal(second.seen.dispatched.length, 1);
+  assert.equal(second.seen.dispatched[0].claim, "tookOver");
+  assert.equal(standing.size, 0, "a bound is checked once");
+});
+
+test("after a restart, the other's answer kept before it stops the takeover, and a question past the handover bound is let go", async () => {
+  // Arrange
+  const { claims, taken, standing } = claimsKept();
+  const first = await setup({ peerAddressed: BOTH, claims, schedule: () => {} });
+  await first.room.acceptPeer({ entries: [{ kind: "message", author: "gia", ...signedBy(GIA, said("m-00000020", "Corey and Denise, is church at ten?")) }] });
+  await first.room.acceptPeer({ entries: [fromDenise("a-00000021", "Church is at ten.", { at: NOW + 2000 })] });
+  await first.room.acceptPeer({ entries: [{ kind: "message", author: "gia", ...signedBy(GIA, said("m-00000030", "Corey and Denise, who feeds the kittens?", { at: NOW - 11 * 60_000 })) }] });
+  standing.set("m-00000030", { message: "m-00000030", since: NOW - 11 * 60_000, deadline: NOW - 10 * 60_000 });
+
+  // Act
+  const resumed = [];
+  const second = await setup({ peerAddressed: BOTH, claims, store: first.store, now: () => NOW + 30_000, schedule: (task, milliseconds) => resumed.push({ task, milliseconds }) });
+  second.room.resumeStandDowns();
+  for (const { task } of resumed) task();
+
+  // Assert
+  assert.equal(resumed.length, 1, "the question past the handover bound is not re-armed");
+  assert.deepEqual(resumed.map(({ milliseconds }) => milliseconds), [0]);
+  assert.deepEqual(taken, []);
+  assert.equal(second.seen.dispatched.length, 0);
+  assert.equal(standing.size, 0);
 });
 
 test("a question for one assistant alone is that one's, with no claim", async () => {

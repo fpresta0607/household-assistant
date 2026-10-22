@@ -96,6 +96,11 @@ const SCHEMA = `
     origin TEXT NOT NULL,
     body TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS stand_downs (
+    message TEXT PRIMARY KEY,
+    since INTEGER NOT NULL,
+    deadline INTEGER NOT NULL
+  );
 `;
 
 export class NoteError extends Error {
@@ -158,6 +163,9 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
     latest: db.prepare("SELECT COALESCE(MAX(at), 0) AS at FROM steps"),
     claims: db.prepare("SELECT body FROM steps WHERE json_extract(body, '$.message') = ? AND json_extract(body, '$.kind') IN ('claim', 'took') ORDER BY at, id"),
     local: db.prepare("SELECT body FROM steps WHERE origin = 'local' ORDER BY seq"),
+    standDown: db.prepare("INSERT OR IGNORE INTO stand_downs (message, since, deadline) VALUES (?, ?, ?)"),
+    standingDown: db.prepare("SELECT message, since, deadline FROM stand_downs ORDER BY deadline"),
+    settled: db.prepare("DELETE FROM stand_downs WHERE message = ?"),
   };
   const everyone = [...people, assistant, peerAssistant];
   const names = new Map(everyone.map((who) => [who.id, who.name]));
@@ -597,6 +605,22 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
       if (!MESSAGE_ID.test(message) || this.claimOf(message).tookBy) return false;
       take({ kind: "took", message });
       return true;
+    },
+
+    // A question this assistant stood down from, waiting for its bound: kept on this gateway
+    // alone, never in the outbox, so a restart inside the bound still checks it once. `since`
+    // is how far back a sign of the other's answer counts, `deadline` when the bound passes.
+    standDown(message, { since, deadline }) {
+      if (MESSAGE_ID.test(message)) statements.standDown.run(message, since, deadline);
+    },
+
+    standingDown() {
+      return statements.standingDown.all().map(({ message, since, deadline }) => ({ message, since: Number(since), deadline: Number(deadline) }));
+    },
+
+    // The bound of a question stood down from has been checked.
+    settled(message) {
+      statements.settled.run(message);
     },
 
     // Who claimed a family-room question, and who took it over, as far as this gateway knows.

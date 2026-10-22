@@ -695,9 +695,26 @@ function startRoom(ctx) {
   // Taken here, while the channel starts, so a phone's turn runs as the channel's, and
   // an approval the owner answers reaches OpenClaw as this channel's.
   const runInChannel = AsyncLocalStorage.snapshot();
+  // The bounds of questions stood down from, cleared when the channel stops, so a bound set
+  // before a restart in the same process never checks the closed note: the started channel
+  // resumes it from the note's file instead.
+  const bounds = new Set();
+  const schedule = (task, milliseconds) => {
+    const timer = setTimeout(() => {
+      bounds.delete(timer);
+      task();
+    }, milliseconds);
+    timer.unref();
+    bounds.add(timer);
+  };
+  const stopBounds = () => {
+    for (const timer of bounds) clearTimeout(timer);
+    bounds.clear();
+  };
   const room = createRoom({
     identity: { owner, assistant, peer: { person: peerPerson, assistant: peerAssistant } },
     sessionKeys,
+    schedule,
     ownersFamilySession: ownersFamilySession(owner.id),
     // When the two assistants' line last moved, for the family room's quiet marker.
     pairLastAt: () => notes.lastAt(),
@@ -707,6 +724,9 @@ function startRoom(ctx) {
       claim: (message, options) => notes.claim(message, options),
       took: (message) => notes.took(message),
       claimOf: (message) => notes.claimOf(message),
+      standDown: (message, bound) => notes.standDown(message, bound),
+      standingDown: () => notes.standingDown(),
+      settled: (message) => notes.settled(message),
     },
     phoneKeys: async () => phoneKeysFrom(await listDevicePairing()),
     notificationChoices: (phone) => ownSettings().store.notifications(phone),
@@ -870,7 +890,7 @@ function startRoom(ctx) {
 
   return {
     room, media, store, inbox, drain, owner, peerPerson, pairing, nonces, appleSignIn, tick, location, approvals, cart, cartOrdered,
-    notes, videos, images,
+    notes, videos, images, stopBounds,
     orderMail,
     log,
     peerAssistantName: configuredPeerAssistantName,
@@ -1049,6 +1069,12 @@ export const householdChannel = createChatChannelPlugin({
           }
         };
         remind();
+        // A question this assistant stood down from just before a restart is still checked once.
+        try {
+          started.room.resumeStandDowns();
+        } catch (error) {
+          ctx.log?.warn?.(`${PLUGIN_ID}: questions stood down from were not resumed: ${error?.message ?? error}`);
+        }
         const remindersTimer = setInterval(remind, REMINDERS_MS);
         remindersTimer.unref();
         void started.drain();
@@ -1062,6 +1088,7 @@ export const householdChannel = createChatChannelPlugin({
           clearInterval(mailTimer);
           clearInterval(callsTimer);
           clearInterval(remindersTimer);
+          started.stopBounds();
           await reading;
           await started.drain();
           if (live === started) live = null;

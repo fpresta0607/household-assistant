@@ -2267,7 +2267,8 @@ Each gateway answered its own name, and nothing said which of them had it.
 - **The claim.** The asker's assistant claims the question as its turn starts, a `claim` step in the household note with the message's id and whom it is for, so the other side and both phones see who took it, and its turn is told the other was asked too and leaves it to it, to give the one answer for both from the household note and what it knows, without saying it will check with the other.
 - **The bound.** The other assistant stands down and waits 20 seconds for a sign of that answer: the other assistant's typing in the room (from up to five seconds before), its claim crossing, or a message of its own.
   With none, it takes the question over, a `took` step, and answers it, told the other was asked first and has not answered.
-  The timer is lost if its gateway restarts within those 20 seconds.
+  The bound is kept in `notes.sqlite`'s own `stand_downs` table (the message id, how far back a sign counts, and the deadline), on that gateway alone and never in the outbox, and cleared once checked.
+  A gateway that restarts inside it re-arms it as the channel starts, for what is left of the 20 seconds, and still takes the question over once; a sign kept before the restart, the other assistant's message or claim, still stops it, and one whose question is ten minutes old or more is let go.
 - **The receiving gateway checks** that a `claim` names a message id and someone in the household, and a `took` a message id; the timeline shows each as `claimed` (with `for` and `message`) or `tookOver`.
 - **One answer from both assistants' facts.** The answer comes from the household note, which holds what both assistants wrote.
   A request to remember made in the app's family room is still kept by household-memory on the gateway that heard it, which the other assistant never reads, so its confirmation now tells the assistant to add it to the household note as well.
