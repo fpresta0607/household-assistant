@@ -658,3 +658,19 @@ test("a mistake comes back as a coded error the assistant can explain", async ()
     assert.equal((await run(found, { action, name: "x" })).code, "invalid_arguments", action);
   }
 });
+
+// A grocery list said in one voice note lands in one call.
+test("the tool adds a whole list at once, for whoever asked, and refuses a list beside one item", async () => {
+  // Arrange
+  const { cart, found } = tool(FAMILY);
+
+  // Act
+  const added = await run(found, { action: "add", list: [{ name: "Milk" }, { name: "Eggs" }, { name: "Bread", quantity: 2 }] });
+  const both = await run(found, { action: "add", name: "Butter", list: [{ name: "Jam" }] });
+
+  // Assert
+  assert.equal(added.logged, "3 items in the cart");
+  assert.deepEqual(cart.card().items.map((item) => [item.name, item.quantity]), [["Milk", 1], ["Eggs", 1], ["Bread", 2]]);
+  assert.equal(both.code, "invalid_arguments");
+  assert.equal(cart.card().items.length, 3);
+});

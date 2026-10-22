@@ -8,7 +8,7 @@ import { isOwnersTurn, turnOf } from "./turn.js";
 
 const ACTIONS = {
   view: [],
-  add: ["name", "url", "quantity"],
+  add: ["name", "url", "quantity", "list"],
   remove: ["item"],
   quantity: ["item", "quantity"],
   order: ["order", "items", "status", "at", "arriving"],
@@ -19,6 +19,8 @@ function result(payload, isError = false) {
 }
 
 const failure = (code, message) => result({ code, message }, true);
+// A list said in one breath, such as the week's groceries.
+const MAX_LIST = 30;
 
 export function createCartTool({ context, owner, people, cart }) {
   const turn = turnOf(context, { owner, people: people.map((person) => person.id) });
@@ -28,7 +30,8 @@ export function createCartTool({ context, owner, people, cart }) {
     label: "Household cart",
     description:
       "The household's one shared shopping cart, which Corey and Denise both add to and Franco and Gia both see. " +
-      "`view` shows it, `add` puts an item down for whoever asked, `quantity` and `remove` change one by its id. " +
+      "`view` shows it, `add` puts an item down for whoever asked, or with `list` a whole list at once, such as groceries said in a voice note, " +
+      "and `quantity` and `remove` change one by its id. " +
       "Give `url` only as a full amazon.com product link with /dp/ in it, from the person, a share or a web search, " +
       "and never open Amazon yourself. Every answer has `cart`, a ready cart card: in the app, send it as a " +
       "steward-card after any change. Its checkout link fills the buyer's own Amazon cart, and the buyer pays there. " +
@@ -43,6 +46,18 @@ export function createCartTool({ context, owner, people, cart }) {
         name: { type: "string", minLength: 1, maxLength: 120, description: "What to buy, in a few words." },
         url: { type: "string", maxLength: 500, description: "A full amazon.com product link." },
         quantity: { type: "integer", minimum: 1, maximum: 99 },
+        list: {
+          type: "array",
+          minItems: 1,
+          maxItems: MAX_LIST,
+          description: "Several items to add at once, each with its name and, when more than one, its quantity.",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["name"],
+            properties: { name: { type: "string", minLength: 1, maxLength: 120 }, quantity: { type: "integer", minimum: 1, maximum: 99 } },
+          },
+        },
         item: { type: "string", description: "A cart item's id, from the cart." },
         items: { type: "array", maxItems: 40, items: { type: "string" }, description: "The cart items' ids a new order took." },
         status: { type: "string", enum: ["ordered", "shipped", "out_for_delivery", "delivered"] },
@@ -60,6 +75,13 @@ export function createCartTool({ context, owner, people, cart }) {
         return failure("owner_thread_only", "Orders are recorded in the owner's own thread, from the owner's own mail.");
       }
       try {
+        if (args.action === "add" && args.list !== undefined) {
+          if (args.name !== undefined || args.url !== undefined || args.quantity !== undefined || !Array.isArray(args.list) || args.list.length > MAX_LIST) {
+            return failure("invalid_arguments", `Give either one item or a list of at most ${MAX_LIST}, not both.`);
+          }
+          const added = args.list.map((each) => cart.add({ name: each?.name, quantity: each?.quantity, forPerson: turn.sender }));
+          return result({ logged: `${added.length} ${added.length === 1 ? "item" : "items"} in the cart`, cart: cart.card() });
+        }
         if (args.action === "add") cart.add({ name: args.name, url: args.url, quantity: args.quantity, forPerson: turn.sender });
         else if (args.action === "remove") cart.remove(args.item);
         else if (args.action === "quantity") cart.setQuantity(args.item, args.quantity);

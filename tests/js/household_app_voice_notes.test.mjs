@@ -232,6 +232,77 @@ test("a voice note in the owner's own thread reaches the turn as its words, hear
   }
 });
 
+// Part 1 of the follow-through: a weigh-in said aloud lands as rows, answered in one line, and
+// the one value speech-to-text made unclear is asked about rather than guessed.
+test("a weigh-in said in a voice note is logged as rows from its turn, the unclear one asked about, and a typed message gets no such ask", async () => {
+  // Arrange
+  const said = "Day 17 weights: Mochi 212, Pepper 198, Biscuit two-ten or two-twenty, Olive 205.";
+  const { bytes, note, message } = voiceNote("direct", said);
+  const { channel } = await channelHearing("corey", new Map([[note.id, said]]));
+  try {
+    await keepMedia(channel, bytes, note.id);
+
+    // Act: the voice note's turn, then the call its model makes, as OpenClaw offers the tool.
+    await channel.send(signedBy(FRANCO, message));
+    await until("the turn", () => channel.contexts.length === 1);
+    await channel.send(signedBy(FRANCO, { conversation: "direct", id: `t-${String(++sequence).padStart(8, "0")}`, at: Date.now(), replyTo: null, text: "Thanks", media: [] }));
+    await until("the typed turn", () => channel.contexts.length === 2);
+    const tool = channel.tools.find(({ options }) => options.names.includes("household_note")).factory({
+      agentId: "main",
+      agentAccountId: "default",
+      messageChannel: "household",
+      deliveryContext: { channel: "household", accountId: "default", to: "household:franco" },
+      requesterSenderId: "franco",
+      sessionKey: "agent:main:household:direct:franco",
+    });
+    const answer = JSON.parse((await tool.execute("call-1", {
+      action: "add",
+      topic: "Kitten weights",
+      rows: [
+        { item: "Mochi", text: "212 g" },
+        { item: "Pepper", text: "198 g" },
+        { item: "Biscuit", text: "210 g", unsure: "two-ten or two-twenty" },
+        { item: "Olive", text: "205 g" },
+      ],
+    })).content[0].text);
+    const outboxFile = path.join(channel.stateDir, "household-app", "outbox.json");
+    await until("the rows in the outbox", async () => (await readFile(outboxFile, "utf8").catch(() => "")).includes("205 g"));
+    const outbox = JSON.parse(await readFile(outboxFile, "utf8"));
+
+    // Assert
+    assert.match(channel.contexts[0].supplemental.groupSystemPrompt, /^This message is a voice note/);
+    assert.match(channel.contexts[0].supplemental.groupSystemPrompt, /never guess it: give that row with unsure/);
+    assert.match(channel.contexts[0].supplemental.groupSystemPrompt, /answer in one line that says what you logged, such as "logged 7 kittens, Day 17"/);
+    assert.equal(channel.contexts[1].supplemental, undefined, "a typed message is no voice note");
+    assert.match(answer.logged, /^3 rows under "Kitten weights", [A-Z][a-z]{2}, [A-Z][a-z]{2} \d+$/);
+    assert.deepEqual(answer.ask, [{ item: "Biscuit", heard: "two-ten or two-twenty" }]);
+    assert.deepEqual(outbox.notes.map((step) => [step.line.item, step.line.text]), [["Mochi", "212 g"], ["Pepper", "198 g"], ["Olive", "205 g"]], "the unclear one is not logged");
+  } finally {
+    await channel.stop();
+  }
+});
+
+test("a voice note in the family room is told both whose turn it is and to log what it gives", async () => {
+  // Arrange
+  const said = "Corey, add milk, eggs and two loaves of bread to the cart.";
+  const { bytes, note, message } = voiceNote("family", said);
+  const { channel } = await channelHearing("corey", new Map([[note.id, said]]));
+  try {
+    await keepMedia(channel, bytes, note.id);
+
+    // Act
+    await channel.send(signedBy(FRANCO, message));
+    await until("the turn", () => channel.contexts.length === 1);
+
+    // Assert
+    const instructions = channel.contexts[0].supplemental.groupSystemPrompt;
+    assert.match(instructions, /\n\nThis message is a voice note/);
+    assert.ok(instructions.indexOf("voice note") > 0, "the family room's own instruction comes first");
+  } finally {
+    await channel.stop();
+  }
+});
+
 test("a voice note's words come with the history page the phone reads, and stay this gateway's own", async () => {
   // Arrange
   const said = "Corey, are the kids' shoes in the car?";

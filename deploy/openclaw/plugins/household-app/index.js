@@ -127,7 +127,7 @@ import { createSpend, mediaSpentSince } from "./spend.js";
 import { openRoomStore } from "./store.js";
 import { ownersFamilySession } from "./turn.js";
 import { createVideoSummaries, videoSource } from "./video-summary.js";
-import { createHearing, isNameSpoken } from "./voice-notes.js";
+import { VOICE_NOTE_INSTRUCTION, createHearing, isNameSpoken } from "./voice-notes.js";
 
 export const PLUGIN_ID = "household-app";
 export const CHANNEL = "household";
@@ -499,7 +499,8 @@ function startRoom(ctx) {
   // return stays out of everyone else's turns. Everyone else's runs in the room's own.
   //
   // A voice note reaches the turn as its words, the way OpenClaw's own channels hand over
-  // a note they heard first, and is marked heard so OpenClaw never transcribes it again.
+  // a note they heard first, and is marked heard so OpenClaw never transcribes it again. Its
+  // turn is asked to log what it gives and answer in one line (voice-notes.js).
   //
   // Photos and image files are read by the selected Vision model after admission.
   // Only its reading reaches the chat model, preventing native vision from bypassing
@@ -523,6 +524,9 @@ function startRoom(ctx) {
       const video = author.isAssistant ? "" : await videos.describe(videoSource(message, store));
       const image = author.isAssistant ? "" : await images.describe(imageSource(message, store), [message.text, words].filter(Boolean).join("\n"));
       const body = [withPlace(message).trim(), words ? formatAudioTranscriptForAgent(words) : "", video, image].filter(Boolean).join("\n");
+      // A call never leaves the owner's own thread, and a voice note heard is logged as said.
+      const instructions = [isCall && CALL_TURN_INSTRUCTION, isGroup && familyTurnInstruction(author, claim), words && VOICE_NOTE_INSTRUCTION]
+        .filter(Boolean).join("\n\n");
       const ctxPayload = await channelRuntime.inbound.buildContext({
         channel: CHANNEL,
         accountId: ACCOUNT,
@@ -550,8 +554,7 @@ function startRoom(ctx) {
           commandBody: message.text,
           ...(isGroup ? { inboundHistory: historyBefore(message) } : {}),
         },
-        ...(isCall ? { supplemental: { groupSystemPrompt: CALL_TURN_INSTRUCTION } } : {}),
-        ...(isGroup ? { supplemental: { groupSystemPrompt: familyTurnInstruction(author, claim) } } : {}),
+        ...(instructions ? { supplemental: { groupSystemPrompt: instructions } } : {}),
         media: toInboundMediaFacts(message.media.filter((item) => item.kind !== "video" && !isImageAttachment(item)).map((item) => ({
           path: media.path(item.id),
           contentType: item.mime,
