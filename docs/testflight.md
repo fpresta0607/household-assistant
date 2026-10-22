@@ -80,8 +80,12 @@ A run on any branch but `main` is refused before a Mac starts, and so is a run w
 
 ## What it costs
 
-GitHub bills a hosted Mac minute at $0.062, rounded up per job (docs.github.com/en/billing/reference/actions-runner-pricing, read 14 October 2026).
-This repository gets no free Mac minutes: September's runs billed in full.
+This repository is public since 22 October 2026, and GitHub's standard hosted Macs, `macos-26` among them, are free on a public repository (docs.github.com/en/billing/concepts/product-billing/github-actions, read 22 October 2026).
+`scripts/ios-cloud.py` reads the repository's visibility each time it counts the day, so its Mac minutes cost $0.00 and the cap never refuses a run.
+A larger runner, such as `macos-26-xlarge`, bills even on a public repository, and no workflow here uses one.
+
+While private, the repository paid $0.062 a Mac minute, rounded up per job (docs.github.com/en/billing/reference/actions-runner-pricing, read 14 October 2026), with no free Mac minutes.
+The figures below are from then, and hold again if it ever goes private:
 
 | run | about | at most |
 |---|---|---|
@@ -106,7 +110,7 @@ python scripts/ios-cloud.py preview --ref main --screenshots "call. room.direct.
 ```
 
 Every Mac run is started by hand, and the `budget` job refuses one that could take the day past 5 dollars.
-The cap is `DAILY_CAP_USD` in `scripts/ios-cloud.py`, and the price is `MAC_MINUTE_USD` beside it.
+The cap is `DAILY_CAP_USD` in `scripts/ios-cloud.py`, and the private price is `MAC_MINUTE_USD` beside it.
 To read back what a run cost:
 
 ```bash

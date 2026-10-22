@@ -19,8 +19,10 @@
 
 The owner chose GitHub's hosted Macs on 14 October 2026, with a cap of 5 dollars
 a day. Every Mac run is started by hand, stops at its job's timeout, and is
-refused when today's Mac minutes plus that timeout could pass the cap. Needs the
-GitHub CLI, signed in with access to this repository.
+refused when today's Mac minutes plus that timeout could pass the cap. The
+repository went public on 22 October 2026, where GitHub's standard Macs are free,
+so each minute is priced by the repository's visibility. Needs the GitHub CLI,
+signed in with access to this repository.
 """
 
 from __future__ import annotations
@@ -40,10 +42,10 @@ from typing import Any
 
 REPOSITORY = os.environ.get("GITHUB_REPOSITORY", "fpresta0607/household-assistant")
 ROOT = Path(__file__).resolve().parent.parent
-# GitHub's price for a standard macOS runner minute, rounded up per job, from
-# docs.github.com/en/billing/reference/actions-runner-pricing, read 2026-10-14.
-# This repository gets no included minutes against it: September's Mac runs
-# billed in full.
+# GitHub's price for a standard macOS runner minute in a private repository,
+# rounded up per job, from docs.github.com/en/billing/reference/actions-runner-pricing,
+# read 2026-10-14 and again 2026-10-22. While private, this repository got no included
+# minutes against it: September's Mac runs billed in full.
 MAC_MINUTE_USD = 0.062
 DAILY_CAP_USD = 5.00
 # One-day headroom requested by the owner on 17 October 2026 at 20:37 Chicago
@@ -110,14 +112,34 @@ def mac_jobs(gh: Gh, run_id: int) -> list[Json]:
     return [job for page in pages for job in page["jobs"] if is_mac(job)]
 
 
+def minute_usd(gh: Gh) -> float:
+    """What a Mac minute costs this repository.
+
+    GitHub's standard hosted runners, macos-26 among them, are free on a public
+    repository. Larger runners bill even there, and no workflow here uses one.
+    """
+    repository: Json = json.loads(gh(["api", f"repos/{REPOSITORY}"]))
+    return 0.0 if repository["visibility"] == "public" else MAC_MINUTE_USD
+
+
 @dataclass(frozen=True)
 class Day:
     billed_minutes: int
     running_jobs: int
+    minute_usd: float
 
     @property
     def committed_minutes(self) -> int:
         return self.billed_minutes + self.running_jobs * LONGEST_MAC_JOB_MINUTES
+
+    @property
+    def so_far(self) -> str:
+        free = "" if self.minute_usd else "This repository is public, so its Mac minutes are free. "
+        spent = f"{self.billed_minutes} Mac minutes, {self.dollars(self.billed_minutes)}"
+        return f"{free}Today so far: {spent}"
+
+    def dollars(self, minutes: int) -> str:
+        return f"${minutes * self.minute_usd:.2f}"
 
 
 def today(gh: Gh, now: datetime, leave_out: int | None) -> Day:
@@ -149,11 +171,7 @@ def today(gh: Gh, now: datetime, leave_out: int | None) -> Day:
                     job.get("completed_at") and parse_time(job["completed_at"]).date() == now.date()
                 ):
                     billed += billed_minutes(job)
-    return Day(billed, running)
-
-
-def dollars(minutes: int) -> str:
-    return f"${minutes * MAC_MINUTE_USD:.2f}"
+    return Day(billed, running, minute_usd(gh))
 
 
 def daily_cap(now: datetime) -> float:
@@ -165,11 +183,11 @@ def daily_cap(now: datetime) -> float:
 
 def budget(gh: Gh, now: datetime, ceiling_minutes: int, cap: float, this_run: int | None) -> str:
     day = today(gh, now, this_run)
-    worst = (day.committed_minutes + ceiling_minutes) * MAC_MINUTE_USD
+    worst = (day.committed_minutes + ceiling_minutes) * day.minute_usd
     so_far = (
-        f"Today so far: {day.billed_minutes} Mac minutes, {dollars(day.billed_minutes)}"
+        day.so_far
         + (f", and {day.running_jobs} Mac job(s) still running" if day.running_jobs else "")
-        + f". This run can take at most {ceiling_minutes} minutes, {dollars(ceiling_minutes)}."
+        + f". This run can take at most {ceiling_minutes} minutes, {day.dollars(ceiling_minutes)}."
     )
     if worst > cap + 1e-9:
         raise CloudError(
@@ -191,10 +209,13 @@ def fit(
     job's time up and the cleanup after a timeout still runs.
     """
     day = today(gh, now, this_run)
-    left = math.floor((cap - day.committed_minutes * MAC_MINUTE_USD) / MAC_MINUTE_USD + 1e-9) - 1
-    minutes = min(ceiling_minutes, left)
+    minutes = ceiling_minutes
+    if day.minute_usd:
+        price = day.minute_usd
+        left = math.floor((cap - day.committed_minutes * price) / price + 1e-9) - 1
+        minutes = min(ceiling_minutes, left)
     so_far = (
-        f"Today so far: {day.billed_minutes} Mac minutes, {dollars(day.billed_minutes)}"
+        day.so_far
         + (f", and {day.running_jobs} Mac job(s) still running" if day.running_jobs else "")
         + "."
     )
@@ -205,7 +226,7 @@ def fit(
             "It can run after midnight UTC."
         )
     return (
-        f"{so_far} This run may take {minutes} minutes, {dollars(minutes)}, which keeps the "
+        f"{so_far} This run may take {minutes} minutes, {day.dollars(minutes)}, which keeps the "
         f"day under the ${cap:.2f} cap. Going ahead.",
         minutes,
     )
@@ -251,10 +272,12 @@ def cost(gh: Gh, run_id: int, now: datetime) -> list[str]:
         ]
     total = sum(billed_minutes(job) for job in jobs)
     day = today(gh, now, None)
-    lines.append(f"This run: {total} Mac minutes, {dollars(total)} at ${MAC_MINUTE_USD}/minute.")
+    lines.append(
+        f"This run: {total} Mac minutes, {day.dollars(total)} at ${day.minute_usd:g}/minute."
+    )
     lines.append(
         f"Today on this repository: {day.billed_minutes} Mac minutes, "
-        f"{dollars(day.billed_minutes)} of the ${daily_cap(now):.2f} daily cap."
+        f"{day.dollars(day.billed_minutes)} of the ${daily_cap(now):.2f} daily cap."
     )
     return lines
 
@@ -335,9 +358,9 @@ def approved(gh: Gh, now: datetime, ceiling_minutes: int, this_run: int | None) 
     """A run the owner approved past the cap: it is reported, never refused."""
     day = today(gh, now, this_run)
     return (
-        f"Today so far: {day.billed_minutes} Mac minutes, {dollars(day.billed_minutes)}. "
+        f"{day.so_far}. "
         f"The owner approved this run's spend past the daily cap, so it may take its full "
-        f"{ceiling_minutes} minutes, {dollars(ceiling_minutes)}. Going ahead."
+        f"{ceiling_minutes} minutes, {day.dollars(ceiling_minutes)}. Going ahead."
     )
 
 
