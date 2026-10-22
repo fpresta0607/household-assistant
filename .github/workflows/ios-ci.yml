@@ -10,8 +10,9 @@
 #     access and the repository's secrets against a fork's code.
 #
 #   The Mac only by hand: `preview` runs on `workflow_dispatch` and on nothing
-#     else. A hosted Mac minute costs $0.062 and this repository gets no free
-#     ones, so a Mac never starts because someone pushed. Someone with write
+#     else, so a Mac never starts because someone pushed. Its minutes are free
+#     while the repository is public, and $0.062 each if it is ever private
+#     again (docs/testflight.md, "What it costs"). Someone with write
 #     access starts it, against the branch they choose, usually with
 #     `scripts/ios-cloud.py preview` from any computer.
 #
