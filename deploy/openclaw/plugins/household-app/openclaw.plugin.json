@@ -8,7 +8,7 @@
   },
   "channels": ["household"],
   "contracts": {
-    "tools": ["household_location", "household_cart", "household_brief", "household_today", "household_home", "household_react", "household_note"]
+    "tools": ["household_location", "household_cart", "household_brief", "household_today", "household_home", "household_react", "household_note", "household_digest"]
   },
   "toolMetadata": {
     "household_location": {
@@ -42,6 +42,11 @@
       "sideEffecting": true
     },
     "household_note": {
+      "optional": true,
+      "replaySafe": false,
+      "sideEffecting": true
+    },
+    "household_digest": {
       "optional": true,
       "replaySafe": false,
       "sideEffecting": true

@@ -84,6 +84,7 @@ import { DASHBOARD_TOOL, createCardTick, createCartOrdered, refuseDashboardInApp
 import { CART_TOOL, createCart } from "./cart.js";
 import { createCartTool } from "./cart-tool.js";
 import { createDid } from "./did.js";
+import { DIGEST_TOOL, WEIGHTS, composeDigest, createDigestTool } from "./digest.js";
 import { FAMILY_POST_TOOLS, createFamilyPosts, householdRoutingGuidance } from "./family-posts.js";
 import { gmailSource } from "./gmail-source.js";
 import { createOrderMail } from "./order-mail.js";
@@ -1513,6 +1514,36 @@ function registerFull(api) {
     { names: [BRIEF_TOOL], optional: true },
   );
   api.registerGatewayMethod(`${PLUGIN_ID}.brief`, method(() => ({ brief: ownSettings().brief.today() })), read);
+  // The Sunday night digest, in the same turns as the brief: its weekly scheduled run gives
+  // the week and the decisions, and the plugin adds the note's and the cart's own lines and
+  // posts it in the owner's thread (digest.js). There is nothing to post to without a channel.
+  api.registerTool(
+    (context) => {
+      const cfg = runtime.config.current();
+      const account = resolveAccount(cfg);
+      const running = live;
+      return account.configured && running
+        ? createDigestTool({
+            context,
+            owner: account.config.owner.id,
+            owners: cfg?.commands?.ownerAllowFrom,
+            post: async (week, decide) => {
+              const lines = composeDigest({
+                week,
+                decide,
+                due: running.notes.due(),
+                log: running.notes.rowsOf(WEIGHTS),
+                cartItems: running.cart.card().items.length,
+                now: Date.now(),
+              });
+              await running.room.reply({ conversation: "direct", text: lines.join("\n") });
+              return lines.length;
+            },
+          })
+        : null;
+    },
+    { names: [DIGEST_TOOL], optional: true },
+  );
   // The Today card: written by the assistant in the same turns as the brief, the morning's
   // and the evening's scheduled runs included, which writes today's brief beside it.
   api.registerTool(

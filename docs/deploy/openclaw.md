@@ -2310,14 +2310,27 @@ Each workspace's `AGENTS.md` gets one line for it under "Handing a request to De
 
 Corey asked for "pre-event prep, not just a reminder": a packet 48 hours out with the address, drive time from where the person will be, what to bring, any form to fill and the confirmation number in one place, for appointments, flights, school things and church events.
 
-- `scripts/openclaw-prep-packets.py apply --gateway <persona>` gives each gateway one scheduled job of its own, `household-app:prep-packets`, "Prep packets", the way `openclaw-household-app.py apply` gives it the Today card's: an isolated run of the main agent at 8:00 on the gateway's clock, announced to its person's own thread of the app (`household:<person>`).
+- `scripts/openclaw-scheduled-jobs.py apply --gateway <persona>` gives each gateway a scheduled job of its own, `household-app:prep-packets`, "Prep packets", the way `openclaw-household-app.py apply` gives it the Today card's: an isolated run of the main agent at 8:00 on the gateway's clock, announced to its person's own thread of the app (`household:<person>`).
 - Each run reads the family's shared calendar (the household file's, in iCloud) and its person's own, for events starting 36 to 60 hours later that the person goes to, and sends one packet for each, saying plainly what it could not find.
   Those windows meet end to end, so each event is in exactly one day's run, 36 to 60 hours before it.
   A day with nothing coming ends with `NO_REPLY` and no message.
 - Nothing is written to the household note: an appointment can be one person's own, and its packet goes to that person alone.
   Each assistant prepares its own person, so a family event gets one packet on each side.
-- `check` reads both gateways' job: `ok`, `missing`, `switched off`, or `changed:` with what differs from what apply writes; `apply` puts a changed one back and leaves a switched-off one off.
+- `check` reads both gateways' jobs, each `ok`, `missing`, `switched off`, or `changed:` with what differs from what apply writes; `apply` puts a changed one back and leaves a switched-off one off.
   `--dry-run` writes nothing.
+
+### The Sunday digest
+
+Corey's second list ranked it second: one message on Sunday night, about ten lines, read once, with the week's calendar, what is slipping, the litter's weight trend, the cart and the two or three things that need a decision.
+It goes to each parent from that parent's own assistant.
+
+- `scripts/openclaw-scheduled-jobs.py apply` also gives each gateway `household-app:sunday-digest`, "Sunday digest": an isolated run of the main agent at 19:00 on Sundays, which delivers nothing itself (`--no-deliver`).
+- The run reads the family's shared calendar and its person's own for the coming week, and calls `household_digest` once with `week`, at most four one-line events with their day and time, and `decide`, at most three things that need a decision (`digest.js`).
+- A run has every tool, so it never reads words someone else wrote into the household note.
+  The plugin itself adds those lines and posts the digest in its person's own thread: what is slipping (overdue lines and overdue promises, two named and a count), the trend of the most recently changed log whose topic says "weigh" (the latest weigh-in's count and average, and the change since the one before), how many items the cart holds, and the open promises, the first named.
+  The tool answers the run with the number of lines alone.
+- `household_digest` is offered in the turns `household_brief` is: a scheduled run, the owner's own thread and own family-room session, and the owner's private Telegram chat; never in the room's shared session.
+  It joins the manifest's tools and `openclaw-household-app.py`'s `tools.alsoAllow`.
 
 ### The house
 

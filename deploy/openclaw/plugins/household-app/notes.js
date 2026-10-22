@@ -570,6 +570,19 @@ function isAutomation(value) {
       return topicView(cleanedTopic);
     },
 
+    // A log's rows for the weekly digest (digest.js): the most recently changed topic whose
+    // name matches `pattern`, each open row's item, words and day, YYYY-MM-DD, the day it was
+    // kept when no other was given. Null when no topic matches.
+    rowsOf(pattern) {
+      const found = topics().find((topic) => pattern.test(topic.topic));
+      if (!found) return null;
+      const keptOn = (at) => new Date(at).toLocaleDateString("en-CA", { timeZone });
+      return {
+        topic: found.topic,
+        rows: found.lines.filter((line) => line.automation === undefined).map((line) => ({ item: line.item, text: line.text, day: line.day ?? keptOn(line.at) })),
+      };
+    },
+
     // One open line, as a view shows it.
     line(id) {
       return viewedLine(openLine(id));
