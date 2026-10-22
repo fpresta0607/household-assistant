@@ -174,6 +174,16 @@ def test_the_sunday_digest_runs_sunday_evening_and_posts_through_its_tool_alone(
     assert "Send nothing to any chat or person and change nothing" in prompt
 
 
+def test_the_sunday_digest_asks_for_the_weeks_events_with_their_starts(jobs: ModuleType) -> None:
+    # Arrange: the plugin draws the events as an agenda card, a calendar mark for each day.
+    prompt = jobs.SUNDAY_DIGEST.prompt
+
+    # Act and Assert
+    assert "household_digest once: events, the week's main events" in prompt
+    assert "its start as the calendar gives it, with its offset" in prompt
+    assert "its day when it is all day" in prompt
+
+
 def test_apply_adds_both_jobs_once_and_check_sees_them(
     jobs: ModuleType, schedulers: FakeSchedulers, capsys: pytest.CaptureFixture[str]
 ) -> None:

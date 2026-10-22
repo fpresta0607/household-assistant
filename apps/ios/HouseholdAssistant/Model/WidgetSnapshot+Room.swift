@@ -125,6 +125,8 @@ extension WidgetSnapshot {
             return "PocketPiggies"
         case .sources:
             return "Sources"
+        case .agenda(let agenda):
+            return agenda.title ?? "Agenda"
         }
     }
 

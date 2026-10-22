@@ -1676,9 +1676,10 @@ function registerFull(api) {
             context,
             owner: account.config.owner.id,
             owners: cfg?.commands?.ownerAllowFrom,
-            post: async (week, decide) => {
+            post: async (week, decide, events) => {
               const lines = composeDigest({
                 week,
+                events,
                 decide,
                 due: running.notes.due(),
                 log: running.notes.rowsOf(WEIGHTS),
