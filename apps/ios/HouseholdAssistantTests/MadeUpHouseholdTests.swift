@@ -25,11 +25,14 @@ final class MadeUpHouseholdTests: XCTestCase {
 
     func testNothingTheDemoFixturesOrTestsDrawNamesARealHouseholdMember() throws {
         // A name as it is written for people: capitalized, at the start of an address, or
-        // after an @. A lowercase name on its own is an id, which stays.
+        // after an @. A lowercase name on its own is an id, which stays. A word starts after
+        // anything but a letter or a digit, and also after an escape such as "\n", whose
+        // letter would otherwise hide it.
+        let start = #"(?:(?<![A-Za-z0-9_])|(?<=\\[nrt]))"#
         let pattern = HouseholdMember.allCases.map { member in
             let name = NSRegularExpression.escapedPattern(for: member.rawValue)
             let written = NSRegularExpression.escapedPattern(for: member.rawValue.prefix(1).uppercased() + member.rawValue.dropFirst())
-            return #"\b\#(written)\b|\b\#(name)(\.[a-z]+)?@|@\#(name)\b"#
+            return #"\#(start)\#(written)\b|\#(start)\#(name)(\.[a-z]+)?@|@\#(name)\b"#
         }.joined(separator: "|")
         let expression = try NSRegularExpression(pattern: pattern)
         var found: [String] = []

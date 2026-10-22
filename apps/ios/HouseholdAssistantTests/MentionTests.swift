@@ -39,7 +39,7 @@ final class MentionTests: XCTestCase {
 
     func testWhatIsTypedNarrowsTheOfferByTheStartOfTheName() {
         XCTAssertEqual(Mention.candidates(matching: "d", participants: room, me: me).map(\.participant.id), ["denise"])
-        XCTAssertEqual(Mention.candidates(matching: "GI", participants: room, me: me).map(\.participant.id), ["gia"])
+        XCTAssertEqual(Mention.candidates(matching: "RO", participants: room, me: me).map(\.participant.id), ["gia"])
         XCTAssertEqual(Mention.candidates(matching: "x", participants: room, me: me).map(\.participant.id), [])
     }
 

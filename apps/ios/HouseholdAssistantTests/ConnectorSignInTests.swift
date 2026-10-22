@@ -303,7 +303,7 @@ final class ConnectorSignInTests: XCTestCase {
         let disconnect = ConnectorChange(at: 1_760_000_000_000, connector: "gog", action: .disconnect(account: nil))
 
         XCTAssertEqual(google.signedText, "household-app/connect/v1\n1760000000000\nconnect\ngog\nc\nv\nr")
-        XCTAssertEqual(password.signedText, "household-app/connect/v1\n1760000000000\nconnect\nhimalaya\ngia@example.com\nabcd-efgh-ijkl-mnop")
+        XCTAssertEqual(password.signedText, "household-app/connect/v1\n1760000000000\nconnect\nhimalaya\nrosa@example.com\nabcd-efgh-ijkl-mnop")
         XCTAssertEqual(disconnect.signedText, "household-app/connect/v1\n1760000000000\ndisconnect\ngog")
         XCTAssertEqual(google.method, "household-app.connector.connect")
         XCTAssertEqual(disconnect.method, "household-app.connector.disconnect")
@@ -742,7 +742,7 @@ final class ConnectorSignInTests: XCTestCase {
 
         XCTAssertEqual(gateway.signed, [
             "household-app/settings/v1\n1760000000000\ntone\n40",
-            "household-app/connect/v1\n1760000000001\nconnect\nicloud\ngia@example.com\nabcd-efgh-ijkl-mnop",
+            "household-app/connect/v1\n1760000000001\nconnect\nicloud\nrosa@example.com\nabcd-efgh-ijkl-mnop",
             "household-app/connect/v1\n1760000000002\ndisconnect\nicloud",
         ], "the gateway's replay guard is shared, so each is later than the last")
         XCTAssertEqual(gateway.requests("household-app.connector.disconnect").first?.params, .object([
