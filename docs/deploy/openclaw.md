@@ -2332,6 +2332,17 @@ It goes to each parent from that parent's own assistant.
 - `household_digest` is offered in the turns `household_brief` is: a scheduled run, the owner's own thread and own family-room session, and the owner's private Telegram chat; never in the room's shared session.
   It joins the manifest's tools and `openclaw-household-app.py`'s `tools.alsoAllow`.
 
+### The emergency card
+
+Corey asked for one command that gives the vet, poison control, the pediatrician, the insurance details and the neighbor's number, readable out loud in a panic.
+
+- The card's entries are household note lines under the topic "Emergency card" (`emergency.js`): one per contact, its item who it is (Vet, Poison control, Pediatrician, Insurance, Neighbor) and its words the name and number.
+  Both assistants keep it current with `household_note`, as anything else the family shares, and the note tool's description tells them where it lives.
+- `/emergency` answers at once with no model, wherever the gateway's own person types it (the app and Telegram): "Emergency: call 911 first.", then one line per contact in that order, anything else after them.
+  Poison control's public United States number is on the card until the family keeps one of its own, and an empty card says how to fill it.
+  In the family room the asker's own assistant answers it, since the app gives commands to the owner alone.
+- Asked in words or by voice, the assistant reads the topic and gives those lines, and reads them aloud with `speak` when asked by voice; on a call every reply is spoken already.
+
 ### The house
 
 - `household_home` is the assistant's tool for the thermostat, the music and the living room TV, in the owner's own thread and the family room, by the same turn proof as `household_location` (`turn.js`).

@@ -3,6 +3,7 @@
 // app turn already starts with the note, the other assistant's handed-over turns included,
 // so this is only for writing it and for reading what the start of a turn left out.
 
+import { EMERGENCY_GUIDANCE } from "./emergency.js";
 import { MAX_ITEM, MAX_ROWS, MAX_TEXT, MAX_TOPIC, NOTE_TOOL, NoteError, REPEATS } from "./notes.js";
 import { turnOf } from "./turn.js";
 
@@ -83,7 +84,8 @@ export function createNoteTool({ context, owner, people, notes, peerAssistantNam
       "every turn starts with the promises still open, so a restart drops nothing, and `done` closes one as soon as it is done. " +
       "In your own person's chats a turn starts with only the lines you kept for them there, and counts the rest: `view` them when they matter. " +
       "`correct` changes a line by its id when someone says it is wrong, `remove` takes out one that no longer matters, and `view` shows a topic, " +
-      "or every topic. Both people read everything here, so never write anyone's private things, such as money, mail or health, unless they ask you to share them.",
+      "or every topic. Both people read everything here, so never write anyone's private things, such as money, mail or health, unless they ask you to share them. " +
+      EMERGENCY_GUIDANCE,
     parameters: {
       type: "object",
       additionalProperties: false,
