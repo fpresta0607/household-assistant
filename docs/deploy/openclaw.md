@@ -2306,6 +2306,19 @@ Each workspace's `AGENTS.md` gets one line for it under "Handing a request to De
 
 > When Franco or Gia asks you to tell Denise something, or you need something from her side, hand it to her with `household_note` and `hand`, never as a message in the family room: her side marks it seen at once and answers in a turn of her own, and your turns show where it stands. Franco and Gia can read that line, so hand over only what the family shares. In the family room, when Denise puts a question to you by name, answer it once, in the room. When someone asks you both, the asker's own assistant answers for both and the other stays quiet; the turn says which you are.
 
+### Prep packets
+
+Corey asked for "pre-event prep, not just a reminder": a packet 48 hours out with the address, drive time from where the person will be, what to bring, any form to fill and the confirmation number in one place, for appointments, flights, school things and church events.
+
+- `scripts/openclaw-prep-packets.py apply --gateway <persona>` gives each gateway one scheduled job of its own, `household-app:prep-packets`, "Prep packets", the way `openclaw-household-app.py apply` gives it the Today card's: an isolated run of the main agent at 8:00 on the gateway's clock, announced to its person's own thread of the app (`household:<person>`).
+- Each run reads the family's shared calendar (the household file's, in iCloud) and its person's own, for events starting 36 to 60 hours later that the person goes to, and sends one packet for each, saying plainly what it could not find.
+  Those windows meet end to end, so each event is in exactly one day's run, 36 to 60 hours before it.
+  A day with nothing coming ends with `NO_REPLY` and no message.
+- Nothing is written to the household note: an appointment can be one person's own, and its packet goes to that person alone.
+  Each assistant prepares its own person, so a family event gets one packet on each side.
+- `check` reads both gateways' job: `ok`, `missing`, `switched off`, or `changed:` with what differs from what apply writes; `apply` puts a changed one back and leaves a switched-off one off.
+  `--dry-run` writes nothing.
+
 ### The house
 
 - `household_home` is the assistant's tool for the thermostat, the music and the living room TV, in the owner's own thread and the family room, by the same turn proof as `household_location` (`turn.js`).
