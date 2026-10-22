@@ -83,6 +83,7 @@ class FakeGh:
         self.listed: list[dict[str, Any]] = []
         self.billing: dict[str, Any] | None = None
         self.artifacts: dict[str, list[str]] = {}
+        self.visibility = "private"
 
     def __call__(self, arguments: Sequence[str]) -> str:
         arguments = list(arguments)
@@ -93,6 +94,8 @@ class FakeGh:
                 return json.dumps([{"workflow_runs": [{"id": run} for run in self.runs]}])
             run_id = int(path.split("/")[-2])
             return json.dumps([{"jobs": self.runs[run_id]}])
+        if arguments == ["api", f"repos/{REPOSITORY}"]:
+            return json.dumps({"full_name": REPOSITORY, "visibility": self.visibility})
         if arguments[0] == "api" and "billing" in arguments[1]:
             if self.billing is None:
                 raise cloud.CloudError("gh api failed: needs the user scope")
@@ -408,7 +411,7 @@ def test_cost_reports_the_temporary_cap_only_while_it_applies() -> None:
 def test_release_fit_uses_todays_cap_and_keeps_its_timeout(
     summary: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(cloud, "today", lambda *_args: cloud.Day(55, 1))
+    monkeypatch.setattr(cloud, "today", lambda *_args: cloud.Day(55, 1, cloud.MAC_MINUTE_USD))
 
     status = cloud.main(
         ["budget", "--ceiling-minutes", "45", "--fit-minimum", "10"],
@@ -436,6 +439,55 @@ def test_an_upload_he_asked_for_is_cut_to_what_is_left_of_the_day() -> None:
     assert minutes == 11
     assert 68 * cloud.MAC_MINUTE_USD + (minutes + 1) * cloud.MAC_MINUTE_USD < 5.0
     assert "may take 11 minutes, $0.68" in said
+
+
+@pytest.mark.parametrize(("visibility", "price"), [("public", 0.0), ("private", 0.062)])
+def test_a_mac_minute_costs_what_the_repository_visibility_says(
+    visibility: str, price: float
+) -> None:
+    gh = FakeGh({})
+    gh.visibility = visibility
+
+    assert cloud.minute_usd(gh) == price
+
+
+def test_budget_lets_any_run_start_on_a_public_repository() -> None:
+    # Arrange: 89 Mac minutes today, past the $5.00 cap at the private price.
+    gh = FakeGh({1: [job("preview", (59, 0))], 2: [job("preview", (30, 0))]})
+    gh.visibility = "public"
+
+    # Act
+    said = cloud.budget(gh, NOW, ceiling_minutes=45, cap=5.0, this_run=None)
+
+    # Assert
+    assert said.startswith("This repository is public, so its Mac minutes are free.")
+    assert "89 Mac minutes, $0.00" in said
+    assert "At most $0.00 of the $5.00 daily cap. Going ahead." in said
+
+
+def test_an_upload_keeps_its_full_timeout_on_a_public_repository() -> None:
+    # Arrange: a day that would leave a private repository nothing.
+    gh = FakeGh({1: [job("preview", (59, 0))], 2: [job("preview", (59, 0))]})
+    gh.visibility = "public"
+
+    # Act
+    said, minutes = cloud.fit(
+        gh, NOW, ceiling_minutes=45, minimum_minutes=10, cap=5.0, this_run=None
+    )
+
+    # Assert
+    assert minutes == 45
+    assert "may take 45 minutes, $0.00" in said
+
+
+def test_cost_on_a_public_repository_is_free() -> None:
+    gh = FakeGh({3: [job("preview", (7, 10))]})
+    gh.visibility = "public"
+
+    lines = cloud.cost(gh, 3, NOW)
+
+    assert lines[1] == "This run: 8 Mac minutes, $0.00 at $0/minute."
+    assert lines[2] == "Today on this repository: 8 Mac minutes, $0.00 of the $5.00 daily cap."
 
 
 def test_an_upload_keeps_its_full_timeout_when_the_day_has_room() -> None:
