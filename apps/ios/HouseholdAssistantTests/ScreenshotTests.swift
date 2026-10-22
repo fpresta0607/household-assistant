@@ -212,12 +212,12 @@ final class ScreenshotTests: XCTestCase {
         try await snap("room.family.typing") { roomScreen(.family, gateway) }
         gateway.typing("gia", in: .family, active: false)
 
-        // The scene ends the way the mockup does: Gia's heart on Franco's reply, and
-        // "Read by Gia" under it.
+        // The scene ends the way the mockup does: Rosa's heart on Leo's reply, and
+        // "Read by Rosa" under it.
         try await snap("room.family.read") { roomScreen(.family, gateway) }
 
         // A long press lifts the photo above the blurred thread, the five tapbacks over it
-        // with Franco's heart lit among them. Where it sat comes from the finger on the
+        // with Leo's heart lit among them. Where it sat comes from the finger on the
         // phone; here it is a place a photo of that size sits.
         let photo = try gateway.message(.family) { $0.media.first?.kind == .photo }
         let photoRow = CGRect(x: 0, y: 380, width: 402, height: 214)
@@ -288,8 +288,8 @@ final class ScreenshotTests: XCTestCase {
     }
 
     /// Tapbacks from a person and an assistant alike, on the bubbles that end the family
-    /// room: Gia's heart and Denise's thumbs up on Franco's answer, at its top left, and
-    /// Corey's exclamation marks on Gia's voice note, at its top right. Then his answer
+    /// room: Rosa's heart and Denise's thumbs up on Leo's answer, at its top left, and
+    /// Corey's exclamation marks on Rosa's voice note, at its top right. Then his answer
     /// lifted, its badges in the lift and the five tapbacks over it.
     func testTapbacks() async throws {
         let gateway = FixtureGateway()
@@ -308,7 +308,7 @@ final class ScreenshotTests: XCTestCase {
         }
     }
 
-    /// Franco's own voice note, whose words are heard while it is on screen and unfold
+    /// Leo's own voice note, whose words are heard while it is on screen and unfold
     /// under it.
     func testVoiceNoteTranscript() async throws {
         let gateway = FixtureGateway()
@@ -327,7 +327,7 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - Typing and working
 
     /// While Corey's run uses a tool, the thread says what he is doing: checking the budget
-    /// in Franco's own thread, as a line under the question where his typing bubble was,
+    /// in Leo's own thread, as a line under the question where his typing bubble was,
     /// and searching the web in the family room, in his typing bubble while Denise types
     /// beside him.
     func testWorking() async throws {
@@ -674,7 +674,7 @@ final class ScreenshotTests: XCTestCase {
         try await capture("room.direct.card-arrived-streaming")
     }
 
-    /// Franco's list for Friday's trip with the slip ticked, which Corey sees, then a
+    /// Leo's list for Friday's trip with the slip ticked, which Corey sees, then a
     /// question he asked by voice and Corey's answer by voice, each with its words under it.
     func testVoiceAnswer() async throws {
         let gateway = FixtureGateway()
@@ -725,20 +725,20 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: - A text to send
 
-    /// A text Corey drafted for Franco, with who it is for as his Contacts would answer:
-    /// one Gia, a choice of two, nobody by that name, Contacts not allowed, then sent. The
+    /// A text Corey drafted for Leo, with who it is for as his Contacts would answer:
+    /// one Rosa, a choice of two, nobody by that name, Contacts not allowed, then sent. The
     /// tests have no Contacts, so each answer is set on the room as the lookup would set it.
     /// Apple's message sheet is the system's own and is left to the phone.
     func testMessageCard() async throws {
         let gateway = FixtureGateway()
         await gateway.connect()
-        gateway.room.say("Text Gia that I'm running late", by: DemoRoom.person, in: .direct)
-        gateway.room.say(RichAnswers.textGia, by: DemoRoom.assistant, in: .direct)
+        gateway.room.say("Text Rosa that I'm running late", by: DemoRoom.person, in: .direct)
+        gateway.room.say(RichAnswers.textRosa, by: DemoRoom.assistant, in: .direct)
         await gateway.changed()
-        let draft = try gateway.message(.direct) { $0.text == RichAnswers.textGia }
-        let card = MessageCard(to: "Gia", text: "Running 10 minutes late, start dinner without me.")
-        let gia = MessageContact(id: "c-1", name: "Gia Marlowe", names: ["Gia", "Marlowe"], address: "+1 (317) 555-0142")
-        let giaRomano = MessageContact(id: "c-2", name: "Gia Romano", names: ["Gia", "Romano"], address: "gia@romano.example")
+        let draft = try gateway.message(.direct) { $0.text == RichAnswers.textRosa }
+        let card = MessageCard(to: "Rosa", text: "Running 10 minutes late, start dinner without me.")
+        let rosa = MessageContact(id: "c-1", name: "Rosa Marlowe", names: ["Rosa", "Marlowe"], address: "+1 (317) 555-0142")
+        let rosaRomano = MessageContact(id: "c-2", name: "Rosa Romano", names: ["Rosa", "Romano"], address: "rosa@romano.example")
 
         func show(_ change: (inout MessageCardState) -> Void) {
             var state = MessageCardState(card: card)
@@ -746,15 +746,15 @@ final class ScreenshotTests: XCTestCase {
             gateway.model.room.messageCards[draft.id] = state
         }
 
-        show { $0.recipient = .one(gia) }
+        show { $0.recipient = .one(rosa) }
         try await snap("room.direct.card-message") { roomScreen(.direct, gateway) }
         try await snap("room.direct.card-message.dark", dark: true) { roomScreen(.direct, gateway) }
         try await snap("room.direct.card-message.xxl", type: .accessibility2) { roomScreen(.direct, gateway) }
-        show { $0.recipient = .several([gia, giaRomano]) }
+        show { $0.recipient = .several([rosa, rosaRomano]) }
         try await snap("room.direct.card-message-several") { roomScreen(.direct, gateway) }
         show {
-            $0.recipient = .several([gia, giaRomano])
-            $0.chosen = giaRomano
+            $0.recipient = .several([rosa, rosaRomano])
+            $0.chosen = rosaRomano
         }
         try await snap("room.direct.card-message-chosen") { roomScreen(.direct, gateway) }
         show { $0.recipient = .nobody }
@@ -762,7 +762,7 @@ final class ScreenshotTests: XCTestCase {
         show { $0.recipient = .noAccess }
         try await snap("room.direct.card-message-no-access") { roomScreen(.direct, gateway) }
         show {
-            $0.recipient = .one(gia)
+            $0.recipient = .one(rosa)
             $0.words = "Running 15 minutes late, start dinner without me. Save me some pasta!"
             $0.finish(.sent)
         }
@@ -778,7 +778,7 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: - The household cart and the order
 
-    /// Daisy's cart in the family room, then Franco tapping Ordered after checking out: the
+    /// Daisy's cart in the family room, then Leo tapping Ordered after checking out: the
     /// gateway posts the cart as it now stands, which takes the old card's place, and the
     /// order in his own thread. Daisy's order on its way, and an order that strays into the
     /// family room, which is not drawn.
@@ -847,12 +847,12 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: - What it did
 
-    /// Under an answer, a glass chip for each thing its run changed. In Franco's own thread
-    /// Corey added an event and set a reminder; in the family room Denise put Gia's flight on
+    /// Under an answer, a glass chip for each thing its run changed. In Leo's own thread
+    /// Corey added an event and set a reminder; in the family room Denise put Rosa's flight on
     /// the calendar and Corey put candles on the cart. The skill badge, when an answer has
     /// one, stays above the bubble.
     func testDidChips() async throws {
-        // The family room stops before its scene's end, so Denise answers Gia here once.
+        // The family room stops before its scene's end, so Denise answers Rosa here once.
         let gateway = FixtureGateway(isSceneFinished: false)
         await gateway.connect()
         let today = Calendar.current.startOfDay(for: Date())
@@ -871,9 +871,9 @@ final class ScreenshotTests: XCTestCase {
         )
         gateway.room.say("Denise, my flight lands tomorrow at 4:10. Can you put it on the calendar?", by: "gia")
         gateway.room.say(
-            "Gia's flight lands at 4:10. I put it on the family calendar \u{2708}\u{FE0F}",
+            "Rosa's flight lands at 4:10. I put it on the family calendar \u{2708}\u{FE0F}",
             by: "denise",
-            did: [DemoRoom.change("event", "added", title: "Gia lands", at: landing)]
+            did: [DemoRoom.change("event", "added", title: "Rosa lands", at: landing)]
         )
         gateway.room.say("Corey, add birthday candles to the cart", by: DemoRoom.person)
         gateway.room.say(
@@ -893,7 +893,7 @@ final class ScreenshotTests: XCTestCase {
 
     /// While Corey works, each thing it does is a line under the question, spinning and
     /// then ticked; the shopping list it read is a card, the five items the mockup lists;
-    /// and a step that waits for Franco's yes is a card with Deny and Approve that turns
+    /// and a step that waits for Leo's yes is a card with Deny and Approve that turns
     /// into what became of it. How the lines tick and the cards rise and unfold is left to
     /// the film.
     func testCoreyAtWork() async throws {
@@ -945,9 +945,9 @@ final class ScreenshotTests: XCTestCase {
         try await capture("room.direct.approval-expired")
 
         gateway.refuse("household-app.approval.answer", code: "INVALID_REQUEST", message: "that approval is no longer waiting", detailCode: "INVALID_REQUEST")
-        gateway.room.askApproval("Share the shopping list with Gia", detail: "Shopping list, 5 items")
+        gateway.room.askApproval("Share the shopping list with Rosa", detail: "Shopping list, 5 items")
         await gateway.changed()
-        let refused = try gateway.message(.direct) { $0.approval?.title == "Share the shopping list with Gia" }
+        let refused = try gateway.message(.direct) { $0.approval?.title == "Share the shopping list with Rosa" }
         await gateway.model.room.answer(refused, with: .approve)
         try await capture("room.direct.approval-refused")
     }
@@ -963,7 +963,7 @@ final class ScreenshotTests: XCTestCase {
     /// thinking, thinking while a tool runs, Corey speaking, muted, and muted while Corey
     /// finishes what he is saying, then reconnecting, on hold, a failure, today's voice used
     /// up, and the call ended. Then the call bar over Chats with the call left on, the call
-    /// kept as one row in Franco's thread, and what was said on it. The stages come from
+    /// kept as one row in Leo's thread, and what was said on it. The stages come from
     /// driving the call's own state as iOS and the gateway would.
     func testCall() async throws {
         let gateway = FixtureGateway()
@@ -989,7 +989,7 @@ final class ScreenshotTests: XCTestCase {
         try await snap("call.earpiece.dark", dark: true) { callScreen(listening, routing: earpiece, level: 0.6, gateway) }
 
         // AirPods in: they have the sound, and the button shows them as Audio.
-        let airPods = CallAudioRoutes.Device(id: "F0:5C:77:12:34:56-tsco", name: "Franco\u{2019}s AirPods Pro", kind: .bluetooth)
+        let airPods = CallAudioRoutes.Device(id: "F0:5C:77:12:34:56-tsco", name: "Leo\u{2019}s AirPods Pro", kind: .bluetooth)
         try await snap("call.audio.airpods") { callScreen(listening, routing: CallRouting(device: airPods), level: 0.6, gateway) }
 
         var thinking = listening
@@ -1036,7 +1036,7 @@ final class ScreenshotTests: XCTestCase {
         try await snap("call.reconnecting") { callScreen(listening, state: reconnecting, gateway) }
         try await snap("call.reconnecting.dark", dark: true) { callScreen(listening, state: reconnecting, gateway) }
 
-        // Held for a phone call Franco took: Corey stops, and goes on after.
+        // Held for a phone call Leo took: Corey stops, and goes on after.
         var held = Self.connectedCall(secondsIn: 247)
         held.handle(.held(true), at: Date())
         var heldSpeaking = speaking
@@ -1068,9 +1068,9 @@ final class ScreenshotTests: XCTestCase {
                 .environment(gateway.model)
         }
 
-        // The call kept as one row in Franco's thread, after what came before it.
+        // The call kept as one row in Leo's thread, after what came before it.
         gateway.room.say("What's on tomorrow morning?", by: DemoRoom.person, in: .direct, minutesAgo: 30)
-        gateway.room.say("Standup at 9. Then lunch with Gia at 12:30.", by: DemoRoom.assistant, in: .direct, minutesAgo: 29)
+        gateway.room.say("Standup at 9. Then lunch with Rosa at 12:30.", by: DemoRoom.assistant, in: .direct, minutesAgo: 29)
         gateway.room.call(lasting: 247, minutesAgo: 2, words: [
             (DemoRoom.person, words),
             (DemoRoom.assistant, reply),
@@ -1090,8 +1090,8 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - Settings
 
     func testSettings() async throws {
-        // Franco's phone with Corey: the demo settings are the approved page's names and
-        // numbers, Will's voice, GLM 5.3 Flash, ten connectors on until Franco signs in to
+        // Leo's phone with Corey: the demo settings are the approved page's names and
+        // numbers, Will's voice, GLM 5.3 Flash, ten connectors on until Leo signs in to
         // iCloud, Google and Notion, and $38.40 in October.
         let gateway = FixtureGateway()
         await gateway.connect()
@@ -1116,7 +1116,7 @@ final class ScreenshotTests: XCTestCase {
             RingColorSheet(target: .assistant(DemoRoom.assistant), name: "Corey").environment(gateway.model)
         }
         gateway.model.settings.assistantRings = [:]
-        // From the top of the family room, Denise as Gia's gateway carries her: nothing to change.
+        // From the top of the family room, Denise as Rosa's gateway carries her: nothing to change.
         XCTAssertNotNil(gateway.model.room.peerAssistant, "the sync page carried Denise")
         try await snap("settings.assistant.peer") { settingsPage(PeerAssistantPage(), gateway) }
         try await snap("settings.assistant.peer.dark", dark: true) { settingsPage(PeerAssistantPage(), gateway) }
@@ -1140,7 +1140,7 @@ final class ScreenshotTests: XCTestCase {
         try await snap("room.family.look") { roomScreen(.family, fam) }
         try await snap("chats.family-look", fam)
         // The name or face at the top of a conversation opens the same pages over it, here
-        // after Franco asked Corey to sound more relaxed, as the approved page draws it.
+        // after Leo asked Corey to sound more relaxed, as the approved page draws it.
         gateway.room.say("Can you sound a bit more relaxed?", by: DemoRoom.person, in: .direct)
         gateway.room.say("Sure. Tap my name up top and pick how I talk, or change my voice.", by: DemoRoom.assistant, in: .direct)
         gateway.room.say("Perfect", by: DemoRoom.person, in: .direct)
@@ -1157,7 +1157,7 @@ final class ScreenshotTests: XCTestCase {
         try await snap("settings.name") { settingsPage(NamePage(), gateway) }
 
         // Every connector Corey's gateway has, the connected ones on top, then iCloud, Google
-        // and Notion waiting for Franco's sign-in and switched off; Gia's mail account is not
+        // and Notion waiting for Leo's sign-in and switched off; Rosa's mail account is not
         // listed. Notion's own page, waiting, with Connect and its token's sheet over the list.
         try await snap("settings.connectors") { settingsPage(ConnectorsPage(), gateway) }
         try await snap("settings.connectors.dark", dark: true) { settingsPage(ConnectorsPage(), gateway) }
@@ -1173,7 +1173,7 @@ final class ScreenshotTests: XCTestCase {
         }
         XCTAssertEqual(gateway.model.assistantSettings.connectors(.unavailable).map(\.id), [], "the app never asks for what this gateway cannot have")
 
-        // Contacts, on this iPhone: on with only the people Franco chose, its own page with
+        // Contacts, on this iPhone: on with only the people Leo chose, its own page with
         // everyone shared, only some, and off in the iPhone's Settings, and how to let Corey
         // see the texts some people send. Off, as a new phone has it, is in the list above.
         gateway.model.settings.shouldLookInContacts = true
@@ -1268,7 +1268,7 @@ final class ScreenshotTests: XCTestCase {
         refused.refuse(
             "household-app.settings.change",
             code: "INVALID_REQUEST",
-            message: "Only Franco's iPhone can change Corey.",
+            message: "Only Leo's iPhone can change Corey.",
             detailCode: "SETTINGS_NOT_OWNER"
         )
         await refused.connect()
@@ -1292,7 +1292,7 @@ final class ScreenshotTests: XCTestCase {
         }
         try await snap("settings.pairing-pending") { SettingsView().environment(pending.model) }
 
-        // Franco's phone, with Gia's new iPhone waiting for him since two minutes ago, named
+        // Leo's phone, with Rosa's new iPhone waiting for him since two minutes ago, named
         // as the gateway names a phone that gave no name.
         let approver = FixtureGateway()
         let asked = ((Date().timeIntervalSince1970 - 120) * 1000).rounded()
@@ -1367,7 +1367,7 @@ final class ScreenshotTests: XCTestCase {
         "resetsOn": .string("2026-11-01"),
     ])
 
-    /// Franco's phone signing in: Google connected over the signed call, moved up among the
+    /// Leo's phone signing in: Google connected over the signed call, moved up among the
     /// connected and on its own page with the one account Corey's gateway lists, iCloud's
     /// app password sheet, and Google's sign-in refused by the gateway, in the app's one
     /// line for the rule it names.
@@ -1391,7 +1391,7 @@ final class ScreenshotTests: XCTestCase {
         }
         let connected = try XCTUnwrap(settings.current?.connectors.first { $0.id == "gog" })
         XCTAssertEqual(connected.state, .connected, "the gateway read it back")
-        XCTAssertEqual(connected.linkedAccounts.map(\.email), ["franco@example.com"])
+        XCTAssertEqual(connected.linkedAccounts.map(\.email), ["leo@example.com"])
         XCTAssertTrue(settings.connectors(.connected).contains { $0.id == "gog" })
         try await capture("settings.connectors.connected")
         try await snap("settings.connectors.connected.dark", dark: true) { settingsPage(ConnectorsPage(), gateway) }
@@ -1435,7 +1435,7 @@ final class ScreenshotTests: XCTestCase {
         try await snap("settings.connector.older-gateway") { settingsPage(ConnectorPage(connectorId: "icloud"), older) }
     }
 
-    /// Account's iPhones on Franco's phone: this one and his iPad Air, as the approved page
+    /// Account's iPhones on Leo's phone: this one and his iPad Air, as the approved page
     /// lists them, the yes that Remove asks for, and the code that pairs a new iPhone.
     func testAccountPhones() async throws {
         let gateway = FixtureGateway()
@@ -1531,13 +1531,13 @@ final class ScreenshotTests: XCTestCase {
         }
     }
 
-    /// The original Light and Dark bubble rims. Franco's own bubbles stay royal. His
+    /// The original Light and Dark bubble rims. Leo's own bubbles stay royal. His
     /// thread ends with the exchange the approved comparison draws.
     func testAssistantRim() async throws {
         let gateway = FixtureGateway()
         await gateway.connect()
         gateway.room.say("Are we free Friday night?", by: DemoRoom.person, in: .direct)
-        gateway.room.say("You are. Gia has yoga until 6:30, then the evening is open.", by: DemoRoom.assistant, in: .direct)
+        gateway.room.say("You are. Rosa has yoga until 6:30, then the evening is open.", by: DemoRoom.assistant, in: .direct)
         gateway.room.say("Book movie night", by: DemoRoom.person, in: .direct)
         gateway.room.say("Done. Movie night is on the family calendar for Friday at 7.", by: DemoRoom.assistant, in: .direct)
         await gateway.changed()
@@ -1550,24 +1550,24 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - Mentions and the room's header
 
     /// @mentions in the family room, in everyone's words: gold for an assistant, royal for
-    /// a person, white and bright gold on Franco's own bubble, and links in an assistant's.
+    /// a person, white and bright gold on Leo's own bubble, and links in an assistant's.
     func testMentions() async throws {
         let gateway = FixtureGateway()
         await gateway.connect()
         gateway.room.say("@Denise what time is Luca's recital on Thursday?", by: "gia")
-        gateway.room.say("6 PM at the school, @Gia. It is on the family calendar.", by: "denise")
-        gateway.room.say("@Gia I can drive if @Denise sends me the address", by: DemoRoom.person)
+        gateway.room.say("6 PM at the school, @Rosa. It is on the family calendar.", by: "denise")
+        gateway.room.say("@Rosa I can drive if @Denise sends me the address", by: DemoRoom.person)
         await gateway.changed()
         for isDark in [false, true] {
             try await snap("room.family.mentions" + (isDark ? ".dark" : ""), dark: isDark) { roomScreen(.family, gateway) }
         }
 
-        // Gia names Franco and then Corey, so both are lit on Franco's phone.
+        // Rosa names Leo and then Corey, so both are lit on Leo's phone.
         let mine = FixtureGateway()
         await mine.connect()
-        mine.room.say("@Franco can you grab basil on the way home?", by: "gia")
+        mine.room.say("@Leo can you grab basil on the way home?", by: "gia")
         mine.room.say("And @corey, put it on the shopping list please", by: "gia")
-        mine.room.say("Basil is on the shopping list, @Gia.", by: DemoRoom.assistant)
+        mine.room.say("Basil is on the shopping list, @Rosa.", by: DemoRoom.assistant)
         await mine.changed()
         for isDark in [false, true] {
             try await snap("room.family.mention-me" + (isDark ? ".dark" : ""), dark: isDark) { roomScreen(.family, mine) }
@@ -1602,7 +1602,7 @@ final class ScreenshotTests: XCTestCase {
         }
     }
 
-    /// Corey's and Denise's Telegram photos, by participant, as the extensions are given them.
+    /// Corey's and Denise's faces, by participant, as the extensions are given them.
     private static func assistantPhotos() throws -> [String: UIImage] {
         var photos: [String: UIImage] = [:]
         for assistant in ["corey", "denise"] {
@@ -1642,7 +1642,7 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - Location
 
     func testLocation() async throws {
-        // Franco shares with Corey and the family room until midnight: nothing on Chats, as it
+        // Leo shares with Corey and the family room until midnight: nothing on Chats, as it
         // runs in the background, the Location row in Settings, and Location itself.
         let sharing = FixtureGateway()
         sharing.model.settings.locationSharing = LocationSharing(audience: .family, span: .tonight, from: Date(), calendar: .current)
@@ -1718,7 +1718,7 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: - Maps
 
-    /// Franco downtown, a few streets north of home, measured a moment ago.
+    /// Leo downtown, a few streets north of home, measured a moment ago.
     private static func nearHome(north metres: Double = 1700) -> LocationReport.Position {
         LocationFix(latitude: 39.7684 + metres / 111_195, longitude: -86.1560, accuracy: 12, at: Date().addingTimeInterval(-20)).position
     }
@@ -1735,9 +1735,9 @@ final class ScreenshotTests: XCTestCase {
         try await capture(id)
     }
 
-    /// The assistant's small map, without the way and with it, Franco's live map in the
+    /// The assistant's small map, without the way and with it, Leo's live map in the
     /// family room with the share menu it came from, and reminders by place: his own to
-    /// set, one set, Denise asking his yes, and Corey's waiting for Gia's and answered.
+    /// set, one set, Denise asking his yes, and Corey's waiting for Rosa's and answered.
     /// MapKit draws the tiles on the Mac's simulator; without them each map shows its
     /// quiet panel, with the faces, pins, the way and the circles placed all the same.
     func testMaps() async throws {
@@ -1810,18 +1810,18 @@ final class ScreenshotTests: XCTestCase {
 
         let consent = FixtureGateway()
         await consent.connect()
-        consent.room.say("Denise, tell me when Franco leaves work.", by: "gia")
-        let asking = #"{"type":"place-reminder","text":"Tell Gia","place":{"label":"work","latitude":39.7817,"longitude":-86.1478,"radius":200},"when":"leave","for":"Franco"}"#
-        consent.room.say("Franco, Gia would like to know when you leave work. Only your iPhone can watch for it.\n\n```steward-card\n\(asking)\n```", by: "denise")
+        consent.room.say("Denise, tell me when Leo leaves work.", by: "gia")
+        let asking = #"{"type":"place-reminder","text":"Tell Rosa","place":{"label":"work","latitude":39.7817,"longitude":-86.1478,"radius":200},"when":"leave","for":"Leo"}"#
+        consent.room.say("Leo, Rosa would like to know when you leave work. Only your iPhone can watch for it.\n\n```steward-card\n\(asking)\n```", by: "denise")
         await consent.changed()
         try await snapMap("room.family.place-consent") { roomScreen(.family, consent) }
         try await snapMap("room.family.place-consent.dark", dark: true) { roomScreen(.family, consent) }
 
         let waiting = FixtureGateway()
         await waiting.connect()
-        waiting.room.say("Corey, tell me when Gia leaves work.", by: DemoRoom.person)
-        let corey = #"{"type":"place-reminder","text":"Tell Franco","place":{"label":"work","latitude":39.7817,"longitude":-86.1478,"radius":200},"when":"leave","for":"Gia"}"#
-        let request = waiting.room.say("I asked Gia's iPhone. It will tell you when she leaves, once she says yes.\n\n```steward-card\n\(corey)\n```", by: DemoRoom.assistant)
+        waiting.room.say("Corey, tell me when Rosa leaves work.", by: DemoRoom.person)
+        let corey = #"{"type":"place-reminder","text":"Tell Leo","place":{"label":"work","latitude":39.7817,"longitude":-86.1478,"radius":200},"when":"leave","for":"Rosa"}"#
+        let request = waiting.room.say("I asked Rosa's iPhone. It will tell you when she leaves, once she says yes.\n\n```steward-card\n\(corey)\n```", by: DemoRoom.assistant)
         await waiting.changed()
         try await snapMap("room.family.place-consent-waiting") { roomScreen(.family, waiting) }
         waiting.room.answerPlace(request.id, by: "gia", with: "yes")
@@ -1971,7 +1971,7 @@ final class ScreenshotTests: XCTestCase {
     /// Every widget size for both conversations, drawn from the snapshot the app keeps in
     /// the App Group for the demo household, with Corey's and Denise's photos. The family
     /// room is where its mockup draws it, Denise's line at 6:14 PM and three new for
-    /// Franco, before he answers her. They are drawn in full colour, the way the Home
+    /// Leo, before he answers her. They are drawn in full colour, the way the Home
     /// Screen draws them; the tinted and clear Home Screens and the Lock Screen's tint are
     /// the system's, and only a phone shows them.
     func testWidgets() async throws {
@@ -1979,7 +1979,7 @@ final class ScreenshotTests: XCTestCase {
         await gateway.connect()
         let pickup = "Leave for soccer pickup in 15 minutes \u{26BD}\u{FE0F}"
         gateway.room.say(pickup, by: DemoRoom.assistant, in: .direct)
-        gateway.room.say("Gia's flight lands at 4:10 \u{2708}\u{FE0F}", by: "denise", minutesAgo: gateway.room.minutesAgo(at: 18, 14))
+        gateway.room.say("Rosa's flight lands at 4:10 \u{2708}\u{FE0F}", by: "denise", minutesAgo: gateway.room.minutesAgo(at: 18, 14))
         await gateway.changed()
 
         // The app writes what the widgets show as the room changes.
@@ -1990,7 +1990,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertEqual(snapshot.assistantName, "Corey")
         XCTAssertEqual(snapshot.faces.map(\.id), ["franco", "corey", "denise", "gia"])
         XCTAssertEqual(snapshot.family.lines.last?.author, "denise")
-        XCTAssertEqual(snapshot.direct.unread, 3, "Franco had read Corey's thread up to Monday's answer")
+        XCTAssertEqual(snapshot.direct.unread, 3, "Leo had read Corey's thread up to Monday's answer")
 
         let photos = try Self.assistantPhotos()
         for conversation in RoomConversation.allCases {
@@ -2249,9 +2249,9 @@ final class ScreenshotTests: XCTestCase {
         let photos = try Self.assistantPhotos()
         let people: [(participant: RoomParticipant, photo: UIImage?, line: String)] = [
             (RoomParticipant(id: "corey", name: "Corey", kind: .assistant, isOwner: false, emoji: "\u{1F989}"), photos["corey"], "Leave for soccer pickup in 15 minutes"),
-            (RoomParticipant(id: "gia", name: "Gia", kind: .person, isOwner: false), nil, "Dinner is ready \u{1F35D}"),
+            (RoomParticipant(id: "gia", name: "Rosa", kind: .person, isOwner: false), nil, "Dinner is ready \u{1F35D}"),
             (RoomParticipant(id: "denise", name: "Denise", kind: .assistant, isOwner: false, emoji: "\u{1F338}"), photos["denise"], DemoRoom.flightWords),
-            (RoomParticipant(id: "franco", name: "Franco", kind: .person, isOwner: true), nil, "This phone's own person"),
+            (RoomParticipant(id: "franco", name: "Leo", kind: .person, isOwner: true), nil, "This phone's own person"),
         ]
         let faces = try people.map { try XCTUnwrap(NotificationFaces.face(of: $0.participant, photo: $0.photo), $0.participant.name) }
         for isDark in [false, true] {
@@ -2460,7 +2460,11 @@ final class ScreenshotTests: XCTestCase {
         let window = UIWindow(windowScene: scene)
         window.frame = scene.screen.bounds
         window.overrideUserInterfaceStyle = dark ? .dark : .light
-        let host = UIHostingController(rootView: content().environment(\.dynamicTypeSize, type))
+        // The demo household's names where a screen names a person before any gateway does,
+        // as in the onboarding, so no picture draws the real household's.
+        let host = UIHostingController(rootView: content()
+            .environment(\.dynamicTypeSize, type)
+            .environment(\.memberName, DemoRoom.memberName))
         if isContrastIncreased {
             host.traitOverrides.accessibilityContrast = .high
         }

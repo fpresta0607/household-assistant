@@ -65,7 +65,7 @@ final class RoomModelTests: XCTestCase {
         #"{"messages":[],"hasMore":false,"reactions":{},"reads":[],"participants":[],"self":{"person":"franco","assistant":"corey"},"sessionKeys":{"family":"agent:main:household:group:family","direct":"agent:main:household:direct:franco"}}"#
 
     private static func syncPage(rev: Int, entries: String = "[]", hasMore: Bool = false) -> String {
-        #"{"entries":\#(entries),"rev":\#(rev),"hasMore":\#(hasMore),"participants":[{"id":"franco","name":"Franco","kind":"person","isOwner":true},{"id":"gia","name":"Gia","kind":"person","isOwner":false},{"id":"corey","name":"Corey","kind":"assistant","isOwner":false,"emoji":"🦉"},{"id":"denise","name":"Denise","kind":"assistant","isOwner":false}],"self":{"person":"franco","assistant":"corey"},"sessionKeys":{"family":"agent:main:household:group:family","direct":"agent:main:household:direct:franco"}}"#
+        #"{"entries":\#(entries),"rev":\#(rev),"hasMore":\#(hasMore),"participants":[{"id":"franco","name":"Leo","kind":"person","isOwner":true},{"id":"gia","name":"Rosa","kind":"person","isOwner":false},{"id":"corey","name":"Corey","kind":"assistant","isOwner":false,"emoji":"🦉"},{"id":"denise","name":"Denise","kind":"assistant","isOwner":false}],"self":{"person":"franco","assistant":"corey"},"sessionKeys":{"family":"agent:main:household:group:family","direct":"agent:main:household:direct:franco"}}"#
     }
 
     private static func messageEntry(_ id: String, rev: Int, author: String = "gia", conversation: String = "family", text: String = "hello", runId: String? = nil) -> String {
@@ -458,7 +458,7 @@ final class RoomModelTests: XCTestCase {
         await room.send("From the beach", in: .family, attachments: [
             RoomAttachment(data: Data(repeating: 1, count: 30), kind: .photo, mime: "image/jpeg", width: 1600, height: 1200),
             RoomAttachment(data: Data(repeating: 2, count: 40), kind: .video, mime: "video/quicktime", durationMs: 24_000, width: 1920, height: 1080),
-            RoomAttachment(data: Data(repeating: 3, count: 50), kind: .file, mime: "text/vcard", name: "Gia.vcf"),
+            RoomAttachment(data: Data(repeating: 3, count: 50), kind: .file, mime: "text/vcard", name: "Rosa.vcf"),
         ])
 
         let uploads = gateway.requests("household-app.upload")
@@ -470,7 +470,7 @@ final class RoomModelTests: XCTestCase {
         XCTAssertEqual(media.compactMap { $0["id"]?.stringValue }, ["1", "2", "3"].map { String(repeating: $0, count: 64) })
         XCTAssertEqual(media[1]["durationMs"]?.intValue, 24_000)
         XCTAssertEqual(media[1]["width"]?.intValue, 1920)
-        XCTAssertEqual(media[2]["name"]?.stringValue, "Gia.vcf")
+        XCTAssertEqual(media[2]["name"]?.stringValue, "Rosa.vcf")
         let ids = ["1", "2", "3"].map { String(repeating: $0, count: 64) }.joined(separator: ",")
         XCTAssertEqual(gateway.signed.last?.components(separatedBy: "\n")[5], ids, "the signature covers all three, in order")
         XCTAssertEqual(room.thread(.family).messages.last?.status, .sent)
@@ -902,7 +902,7 @@ final class RoomModelTests: XCTestCase {
         let room = makeModel(gateway)
         await room.refresh()
         XCTAssertEqual(room.summary(.family).latestAuthor, "gia")
-        XCTAssertEqual(room.summary(.family).previewSymbol, "waveform", "Gia's voice note, which has no words")
+        XCTAssertEqual(room.summary(.family).previewSymbol, "waveform", "Rosa's voice note, which has no words")
         XCTAssertEqual(room.summary(.family).unread, 2)
         nonisolated(unsafe) var isTold = false
         withObservationTracking {
@@ -1020,7 +1020,7 @@ final class RoomModelTests: XCTestCase {
         )
     }
 
-    /// Franco's own family-room turns run in a session of their own on Corey's gateway, so
+    /// Leo's own family-room turns run in a session of their own on Corey's gateway, so
     /// Corey's replies to him there stream from it. Until 19 October the phone followed only
     /// the room's shared session, and those replies arrived whole after the dots.
     func testTheOwnersOwnFamilyRoomRepliesStreamIntoTheFamilyRoomWithTheirSteps() async {

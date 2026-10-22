@@ -2,8 +2,8 @@
 // The made-up household's two assistants on their direct line, in the shape the
 // household-app plugin answers `household-app.line` with (notes.js timeline): Corey logs
 // three seedlings at once and corrects one, hands Denise a question that she sees, answers
-// and marks done, takes a question Franco asked them both, and Denise hands him one of
-// Gia's, which he has just seen. Its last step is four minutes before the moment it is made,
+// and marks done, takes a question Leo asked them both, and Denise hands him one of
+// Rosa's, which he has just seen. Its last step is four minutes before the moment it is made,
 // so the family room's marker shows. Every word here is invented.
 
 import Foundation
@@ -18,7 +18,7 @@ struct DemoPair {
         let now = Int((moment.timeIntervalSince1970 * 1000).rounded())
         let minute = 60_000
         let library = Self.line("hn-demo0004", "Handoffs", "Can you check whether the library books are due this week?", owner: "denise")
-        let bakeSale = Self.line("hn-demo0005", "Handoffs", "Is the bake sale tray on Franco's list for Saturday?", owner: "corey")
+        let bakeSale = Self.line("hn-demo0005", "Handoffs", "Is the bake sale tray on Leo's list for Saturday?", owner: "corey")
         events = [
             Self.step(1, now - 190 * minute, "corey", "added", for: "franco", line: Self.line("hn-demo0001", "Seedlings", "4 cm", item: "Basil")),
             Self.step(2, now - 190 * minute + 1, "corey", "added", for: "franco", line: Self.line("hn-demo0002", "Seedlings", "2 cm", item: "Thyme")),

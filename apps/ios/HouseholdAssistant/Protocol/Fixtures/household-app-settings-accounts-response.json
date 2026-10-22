@@ -23,7 +23,7 @@
         "signInKind": null, "linkedAccounts": [], "oauth": null
       },
       {
-        "id": "scripture", "name": "SIQsermon", "category": "faith", "icon": "siqsermon", "summary": "Scripture, sermons and word studies",
+        "id": "scripture", "name": "Sermon notes", "category": "faith", "icon": "symbol:text.book.closed", "summary": "Scripture, sermons and word studies",
         "isOn": true, "signIn": null, "accounts": 0, "state": "connected", "reason": null,
         "capabilities": ["Looks up scripture and sermons", "Does word studies"],
         "signInKind": null, "linkedAccounts": [], "oauth": null
@@ -48,11 +48,11 @@
         "signInKind": "oauth",
         "linkedAccounts": [
           {
-            "id": "gog:app", "name": "Franco Marlowe", "email": "franco@example.com", "linkedAt": 1792018799500, "status": "ok",
+            "id": "gog:app", "name": "Leo Marlowe", "email": "leo@example.com", "linkedAt": 1792018799500, "status": "ok",
             "abilities": ["Reads your Gmail", "Reads and adds events in Google Calendar"], "canDisconnect": true
           },
           {
-            "id": "gog:box:1a2b3c4d", "name": "franco.work@example.com", "email": "franco.work@example.com", "linkedAt": 1789426800000, "status": "expired",
+            "id": "gog:box:1a2b3c4d", "name": "leo.work@example.com", "email": "leo.work@example.com", "linkedAt": 1789426800000, "status": "expired",
             "abilities": ["Reads your Gmail"], "canDisconnect": true
           }
         ],

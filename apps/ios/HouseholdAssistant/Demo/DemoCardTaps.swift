@@ -1,5 +1,5 @@
 #if DEBUG
-// Corey's message in Franco's own thread with an @mention and a checklist, for the UI test
+// Corey's message in Leo's own thread with an @mention and a checklist, for the UI test
 // that taps a link and a card's button inside a bubble now that a long-press opens the
 // message menu and a left drag shows the times (CardTapsTests).
 

@@ -42,7 +42,7 @@ final class CallSetupTests: XCTestCase {
         ]))
     }
 
-    /// Gia's retry on 17 October: 21 seconds calling, never connected, nothing said.
+    /// Rosa's retry on 17 October: 21 seconds calling, never connected, nothing said.
     func testACallThatNeverConnectedSendsOnlyWhatItReached() {
         // Arrange
         var state = CallState()

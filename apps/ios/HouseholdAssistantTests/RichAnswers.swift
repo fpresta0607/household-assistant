@@ -71,16 +71,16 @@ enum RichAnswers {
     ```
     """#
 
-    /// A text Corey drafted for Franco to send Gia from his own iPhone.
-    static let textGia = #"""
+    /// A text Corey drafted for Leo to send Rosa from his own iPhone.
+    static let textRosa = #"""
     Here it is, ready for you to send.
 
     ```steward-card
-    {"type":"message","to":"Gia","text":"Running 10 minutes late, start dinner without me."}
+    {"type":"message","to":"Rosa","text":"Running 10 minutes late, start dinner without me."}
     ```
     """#
 
-    /// A text Corey drafted for Franco to send Sarah, with movie night riding in it.
+    /// A text Corey drafted for Leo to send Sarah, with movie night riding in it.
     static let movieNightForSarah = #"""
     Here it is, with the invite.
 
@@ -96,7 +96,7 @@ enum RichAnswers {
         return "Added birthday candles. It has no Amazon link yet, so it stays out of checkout.\n\n```steward-card\n\(cart)\n```"
     }
 
-    /// Franco's order on its way: Daisy's example, as her gateway sends it.
+    /// Leo's order on its way: Daisy's example, as her gateway sends it.
     static func householdOrder() throws -> String {
         let order = try Fixtures.text("cards/order").trimmingCharacters(in: .whitespacesAndNewlines)
         return "It shipped this morning.\n\n```steward-card\n\(order)\n```"
@@ -106,7 +106,7 @@ enum RichAnswers {
     This came this morning:
 
     ```steward-card
-    {"type":"email","from":"Maple Elementary <office@maple.example>","to":["Gia","Franco"],"subject":"Field trip on Friday","body":"The bus leaves at 9:00 and is back by 3:00. Please send a packed lunch and the signed slip."}
+    {"type":"email","from":"Maple Elementary <office@maple.example>","to":["Rosa","Leo"],"subject":"Field trip on Friday","body":"The bus leaves at 9:00 and is back by 3:00. Please send a packed lunch and the signed slip."}
     ```
     """#
 
@@ -151,7 +151,7 @@ enum RichAnswers {
     Thursday at 3:30.
 
     ```steward-card
-    {"type":"event","title":"Dentist, Gia","start":"2026-10-15T15:30:00-04:00","end":"2026-10-15T16:15:00-04:00","skill":"calendar"}
+    {"type":"event","title":"Dentist, Rosa","start":"2026-10-15T15:30:00-04:00","end":"2026-10-15T16:15:00-04:00","skill":"calendar"}
     ```
     """#
 
@@ -195,17 +195,17 @@ enum RichAnswers {
     ```
     """#
 
-    /// What is on tonight, and three things Franco may want next, offered under it.
+    /// What is on tonight, and three things Leo may want next, offered under it.
     static let tonight = #"""
     **Tonight**
-    - 4:10 PM Gia lands
+    - 4:10 PM Rosa lands
     - 6:30 PM Dinner at home
     - 8:00 PM Movie night
 
     Want a reminder to leave at 3:45?
 
     ```steward-card
-    {"type":"followups","items":[{"text":"Remind me at 3:45","icon":"reminder"},{"text":"Text Gia"},{"text":"Add movie night","icon":"calendar"}]}
+    {"type":"followups","items":[{"text":"Remind me at 3:45","icon":"reminder"},{"text":"Text Rosa"},{"text":"Add movie night","icon":"calendar"}]}
     ```
     """#
 

@@ -9,7 +9,7 @@ import XCTest
 @MainActor
 final class MarkdownDocumentsTests: XCTestCase {
     private static let participants = [
-        RoomParticipant(id: "franco", name: "Franco", kind: .person, isOwner: true),
+        RoomParticipant(id: "franco", name: "Leo", kind: .person, isOwner: true),
         RoomParticipant(id: "corey", name: "Corey", kind: .assistant, isOwner: false),
     ]
 

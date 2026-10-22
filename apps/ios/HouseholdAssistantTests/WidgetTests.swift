@@ -60,9 +60,9 @@ final class WidgetTests: XCTestCase {
     // MARK: - The snapshot
 
     private static let household = [
-        RoomParticipant(id: "gia", name: "Gia", kind: .person, isOwner: false),
+        RoomParticipant(id: "gia", name: "Rosa", kind: .person, isOwner: false),
         RoomParticipant(id: "corey", name: "Corey", kind: .assistant, isOwner: false, emoji: "\u{1F989}"),
-        RoomParticipant(id: "franco", name: "Franco", kind: .person, isOwner: true),
+        RoomParticipant(id: "franco", name: "Leo", kind: .person, isOwner: true),
         RoomParticipant(
             id: "denise",
             name: "Denise",
@@ -171,7 +171,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(shown.family.lines.last?.author, "gia")
         XCTAssertEqual(shown.family.lines.last?.text, "line 7")
         XCTAssertEqual(shown.family.lines.last?.sentAt, family.messages.last?.sentAt)
-        XCTAssertEqual(shown.family.unread, 4, "everything after Franco's read marker but his own")
+        XCTAssertEqual(shown.family.unread, 4, "everything after Leo's read marker but his own")
         XCTAssertEqual(shown.direct.lines.map(\.text), ["Remind me to leave at 5:30", "Done. I will remind you at 5:30 PM"])
         XCTAssertEqual(shown.direct.unread, 1)
         XCTAssertEqual(shown.conversation(.family), shown.family)
@@ -269,7 +269,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(shown.faces.map(\.isOwner), [true, false, false, false])
         XCTAssertEqual(shown.faces.map(\.emoji), [nil, "\u{1F989}", "\u{1F338}", nil])
         XCTAssertEqual(shown.faces.map(\.hasPhoto), [false, false, true, false])
-        XCTAssertEqual(shown.face("gia")?.name, "Gia")
+        XCTAssertEqual(shown.face("gia")?.name, "Rosa")
         XCTAssertNil(shown.face("telegram"))
     }
 
@@ -283,7 +283,7 @@ final class WidgetTests: XCTestCase {
     func testTheSnapshotReadsBackInTheWidgetAsTheAppWroteIt() throws {
         var family = RoomThread(.family)
         family.apply(try entry("m-1", rev: 1, author: "gia", text: "", extra: ["media": .array([media("photo", "a")])]))
-        family.apply(try entry("m-2", rev: 2, author: "denise", text: "Gia's flight lands at 4:10"))
+        family.apply(try entry("m-2", rev: 2, author: "denise", text: "Rosa's flight lands at 4:10"))
         var written = snapshot(family: family)
         written.assistantName = "Corey"
         written.assistantEmoji = "\u{1F989}"

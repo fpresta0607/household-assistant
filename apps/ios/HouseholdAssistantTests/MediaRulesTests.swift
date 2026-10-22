@@ -74,7 +74,7 @@ final class MediaRulesTests: XCTestCase {
         let files: [(name: String?, mime: String, label: String)] = [
             ("Field trip permission slip.pdf", "application/pdf", "PDF"),
             ("Budget.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "XLSX"),
-            ("Gia Marlowe.vcf", "text/vcard", "VCF"),
+            ("Rosa Marlowe.vcf", "text/vcard", "VCF"),
             ("archive.tar.gz", "application/gzip", "GZ"),
             (nil, "application/pdf", "PDF"),
             (nil, "application/json", "JSON"),

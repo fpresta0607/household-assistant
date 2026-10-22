@@ -10,17 +10,17 @@ final class MessageCardTests: XCTestCase {
         StewardCardParser.segments(in: "```steward-card\n\(json)\n```", isStreaming: false).first
     }
 
-    private static let draft = MessageCard(to: "Gia", text: "Running 10 minutes late, start without me.")
+    private static let draft = MessageCard(to: "Rosa", text: "Running 10 minutes late, start without me.")
 
-    private static let giaPresta = MessageContact(id: "c-1", name: "Gia Marlowe", names: ["Gia", "Marlowe"], address: "+1 317 555 0142")
-    private static let giaRomano = MessageContact(id: "c-2", name: "Gia Romano", names: ["Gia", "Romano"], address: "gia@romano.example")
-    private static let giacomo = MessageContact(id: "c-3", name: "Giacomo Rossi", names: ["Giacomo", "Rossi"], address: "+1 317 555 0199")
-    private static let giaNoNumber = MessageContact(id: "c-4", name: "Gia Bianchi", names: ["Gia", "Bianchi"], address: nil)
+    private static let rosaMarlowe = MessageContact(id: "c-1", name: "Rosa Marlowe", names: ["Rosa", "Marlowe"], address: "+1 317 555 0142")
+    private static let rosaRomano = MessageContact(id: "c-2", name: "Rosa Romano", names: ["Rosa", "Romano"], address: "rosa@romano.example")
+    private static let rosalind = MessageContact(id: "c-3", name: "Rosalind Rossi", names: ["Rosalind", "Rossi"], address: "+1 317 555 0199")
+    private static let rosaNoNumber = MessageContact(id: "c-4", name: "Rosa Bianchi", names: ["Rosa", "Bianchi"], address: nil)
 
     // MARK: - The card
 
     func testAMessageCardReadsWhoItIsForAndTheWords() {
-        let found = card(#"{"type":"message","to":" Gia ","text":"Running 10 minutes late, start without me."}"#)
+        let found = card(#"{"type":"message","to":" Rosa ","text":"Running 10 minutes late, start without me."}"#)
 
         XCTAssertEqual(found, .card(StewardCard(content: .message(Self.draft), skill: nil)))
     }
@@ -29,8 +29,8 @@ final class MessageCardTests: XCTestCase {
         let cards = [
             #"{"type":"message","text":"Running late."}"#,
             #"{"type":"message","to":"","text":"Running late."}"#,
-            #"{"type":"message","to":"Gia","text":"  "}"#,
-            #"{"type":"message","to":"Gia"}"#,
+            #"{"type":"message","to":"Rosa","text":"  "}"#,
+            #"{"type":"message","to":"Rosa"}"#,
         ]
         for json in cards {
             XCTAssertEqual(card(json), .code(json), json)
@@ -38,9 +38,9 @@ final class MessageCardTests: XCTestCase {
     }
 
     func testAMessageCardReadsAsWhoItIsForAndTheWordsWhenCopied() {
-        let text = "Here is a text for Gia.\n\n```steward-card\n{\"type\":\"message\",\"to\":\"Gia\",\"text\":\"Running late.\"}\n```"
+        let text = "Here is a text for Rosa.\n\n```steward-card\n{\"type\":\"message\",\"to\":\"Rosa\",\"text\":\"Running late.\"}\n```"
 
-        XCTAssertEqual(MessagePlainText.text(of: text, calendar: .current), "Here is a text for Gia.\n\nTo Gia: Running late.")
+        XCTAssertEqual(MessagePlainText.text(of: text, calendar: .current), "Here is a text for Rosa.\n\nTo Rosa: Running late.")
     }
 
     // MARK: - An event in the text
@@ -100,31 +100,31 @@ final class MessageCardTests: XCTestCase {
     // MARK: - Finding who it is for
 
     func testOneContactByThatNameIsWhoItIsFor() {
-        XCTAssertEqual(MessageRecipient.matching("Gia", in: [Self.giaPresta]), .one(Self.giaPresta))
+        XCTAssertEqual(MessageRecipient.matching("Rosa", in: [Self.rosaMarlowe]), .one(Self.rosaMarlowe))
     }
 
     func testSeveralContactsByThatNameAreOfferedAsAChoice() {
-        XCTAssertEqual(MessageRecipient.matching("Gia", in: [Self.giaPresta, Self.giaRomano]), .several([Self.giaPresta, Self.giaRomano]))
+        XCTAssertEqual(MessageRecipient.matching("Rosa", in: [Self.rosaMarlowe, Self.rosaRomano]), .several([Self.rosaMarlowe, Self.rosaRomano]))
     }
 
     func testNoContactByThatNameLeavesTheChoiceToMessages() {
-        XCTAssertEqual(MessageRecipient.matching("Gia", in: []), .nobody)
+        XCTAssertEqual(MessageRecipient.matching("Rosa", in: []), .nobody)
     }
 
     func testWithoutAccessToContactsNobodyIsLookedUp() {
-        XCTAssertEqual(MessageRecipient.matching("Gia", in: nil), .noAccess)
+        XCTAssertEqual(MessageRecipient.matching("Rosa", in: nil), .noAccess)
     }
 
     func testANameThatIsWholeBeatsOneThatOnlyStartsTheSame() {
-        // Contacts finds "Giacomo" for "Gia" too, since it matches the start of a name.
-        XCTAssertEqual(MessageRecipient.matching("gia", in: [Self.giacomo, Self.giaPresta]), .one(Self.giaPresta))
-        XCTAssertEqual(MessageRecipient.matching("Gia Marlowe", in: [Self.giaPresta, Self.giaRomano]), .one(Self.giaPresta))
-        XCTAssertEqual(MessageRecipient.matching("Giac", in: [Self.giacomo]), .one(Self.giacomo), "with no whole match, what Contacts found stands")
+        // Contacts finds "Rosalind" for "Rosa" too, since it matches the start of a name.
+        XCTAssertEqual(MessageRecipient.matching("rosa", in: [Self.rosalind, Self.rosaMarlowe]), .one(Self.rosaMarlowe))
+        XCTAssertEqual(MessageRecipient.matching("Rosa Marlowe", in: [Self.rosaMarlowe, Self.rosaRomano]), .one(Self.rosaMarlowe))
+        XCTAssertEqual(MessageRecipient.matching("Rosal", in: [Self.rosalind]), .one(Self.rosalind), "with no whole match, what Contacts found stands")
     }
 
     func testAContactNoTextCanReachIsLeftOut() {
-        XCTAssertEqual(MessageRecipient.matching("Gia", in: [Self.giaNoNumber]), .nobody)
-        XCTAssertEqual(MessageRecipient.matching("Gia", in: [Self.giaNoNumber, Self.giaPresta]), .one(Self.giaPresta))
+        XCTAssertEqual(MessageRecipient.matching("Rosa", in: [Self.rosaNoNumber]), .nobody)
+        XCTAssertEqual(MessageRecipient.matching("Rosa", in: [Self.rosaNoNumber, Self.rosaMarlowe]), .one(Self.rosaMarlowe))
     }
 
     func testANameWithAccentsMatchesOneWithout() {
@@ -146,22 +146,22 @@ final class MessageCardTests: XCTestCase {
 
     func testOneMatchIsWhoTheSheetAddresses() {
         var state = MessageCardState(card: Self.draft)
-        state.recipient = .one(Self.giaPresta)
+        state.recipient = .one(Self.rosaMarlowe)
 
         XCTAssertEqual(state.address, "+1 317 555 0142")
-        XCTAssertEqual(state.recipientName(of: Self.draft), "Gia Marlowe")
+        XCTAssertEqual(state.recipientName(of: Self.draft), "Rosa Marlowe")
     }
 
     func testOfSeveralTheOneHeChoseIsWhoTheSheetAddresses() {
         var state = MessageCardState(card: Self.draft)
-        state.recipient = .several([Self.giaPresta, Self.giaRomano])
+        state.recipient = .several([Self.rosaMarlowe, Self.rosaRomano])
         XCTAssertNil(state.address, "until he chooses, To is his to fill in Messages")
-        XCTAssertEqual(state.recipientName(of: Self.draft), "Gia")
+        XCTAssertEqual(state.recipientName(of: Self.draft), "Rosa")
 
-        state.chosen = Self.giaRomano
+        state.chosen = Self.rosaRomano
 
-        XCTAssertEqual(state.address, "gia@romano.example")
-        XCTAssertEqual(state.recipientName(of: Self.draft), "Gia Romano")
+        XCTAssertEqual(state.address, "rosa@romano.example")
+        XCTAssertEqual(state.recipientName(of: Self.draft), "Rosa Romano")
     }
 
     func testWithNoMatchOrNoAccessTheSheetOpensWithAnEmptyTo() {
@@ -170,7 +170,7 @@ final class MessageCardTests: XCTestCase {
             state.recipient = recipient
 
             XCTAssertNil(state.address)
-            XCTAssertEqual(state.recipientName(of: Self.draft), "Gia")
+            XCTAssertEqual(state.recipientName(of: Self.draft), "Rosa")
             XCTAssertTrue(state.canSend)
         }
     }
@@ -189,7 +189,7 @@ final class MessageCardTests: XCTestCase {
 
     func testCancelledInMessagesTheCardStaysAsItWas() {
         var state = MessageCardState(card: Self.draft)
-        state.recipient = .one(Self.giaPresta)
+        state.recipient = .one(Self.rosaMarlowe)
         state.words = "Running 15 minutes late."
         let before = state
 

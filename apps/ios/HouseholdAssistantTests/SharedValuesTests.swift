@@ -49,7 +49,7 @@ final class SharedValuesTests: XCTestCase {
         await gateway.connect()
         let white = RingColor(red: 1, green: 1, blue: 1)
 
-        // Act: this phone picks the color, and Gia's phone, over the relay, the night.
+        // Act: this phone picks the color, and Rosa's phone, over the relay, the night.
         try await gateway.model.room.setFamilyColor(white)
         _ = gateway.room.add(DemoRoom.Entry(
             id: "look:gia:1",

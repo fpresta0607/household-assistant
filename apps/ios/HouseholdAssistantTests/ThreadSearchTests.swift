@@ -34,7 +34,7 @@ final class ThreadSearchTests: XCTestCase {
     func testCaseAccentsAndMarkdownDoNotMatter() {
         // Arrange
         let messages = [
-            message("a-1", "Here is the week:\n\n- **Monday** soccer at 5:45\n- *Café* with Gia", minute: 1),
+            message("a-1", "Here is the week:\n\n- **Monday** soccer at 5:45\n- *Café* with Rosa", minute: 1),
         ]
 
         // Act

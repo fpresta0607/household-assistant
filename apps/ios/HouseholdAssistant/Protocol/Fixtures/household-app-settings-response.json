@@ -17,7 +17,7 @@
     },
     "connectors": [
       { "id": "pocket-piggies", "name": "PocketPiggies", "category": "money", "icon": "pocketpiggies", "summary": "Budgets, balances and spending", "isOn": true, "signIn": null, "accounts": 0 },
-      { "id": "scripture", "name": "SIQsermon", "category": "faith", "icon": "siqsermon", "summary": "Scripture, sermons and word studies", "isOn": true, "signIn": null, "accounts": 0 },
+      { "id": "scripture", "name": "Sermon notes", "category": "faith", "icon": "symbol:text.book.closed", "summary": "Scripture, sermons and word studies", "isOn": true, "signIn": null, "accounts": 0 },
       { "id": "icloud", "name": "iCloud", "category": "calendar-and-mail", "icon": "icloud", "summary": "Calendars and reminders in iCloud", "isOn": true, "signIn": "password", "accounts": 1 },
       { "id": "gog", "name": "Google", "category": "calendar-and-mail", "icon": "google", "summary": "Gmail and Google Calendar", "isOn": true, "signIn": "oauth", "accounts": 0 },
       { "id": "outlook-hack", "name": "Outlook", "category": "calendar-and-mail", "icon": "symbol:envelope", "summary": "Outlook mail and calendar", "isOn": true, "signIn": null, "accounts": 0 },

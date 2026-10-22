@@ -8,8 +8,8 @@ final class CallAudioRoutesTests: XCTestCase {
     private let microphone = CallAudioRoutes.Port(id: "Built-In Microphone", name: "iPhone Microphone", kind: .phoneMicrophone)
     private let receiver = CallAudioRoutes.Port(id: "Built-In Receiver", name: "Receiver", kind: .receiver)
     private let speaker = CallAudioRoutes.Port(id: "Speaker", name: "Speaker", kind: .speaker)
-    private let airPods = CallAudioRoutes.Port(id: "F0:5C:77:12:34:56-tsco", name: "Franco\u{2019}s AirPods Pro", kind: .bluetooth)
-    private let car = CallAudioRoutes.Port(id: "CarPlay-0001", name: "Gia\u{2019}s Highlander", kind: .car)
+    private let airPods = CallAudioRoutes.Port(id: "F0:5C:77:12:34:56-tsco", name: "Leo\u{2019}s AirPods Pro", kind: .bluetooth)
+    private let car = CallAudioRoutes.Port(id: "CarPlay-0001", name: "Rosa\u{2019}s Highlander", kind: .car)
 
     private func device(_ port: CallAudioRoutes.Port) -> CallAudioRoutes.Device {
         CallAudioRoutes.Device(id: port.id, name: port.name, kind: port.kind)
@@ -83,9 +83,9 @@ final class CallAudioRoutesTests: XCTestCase {
         let headset = CallAudioRoutes.Port(id: "B", name: "Jabra Evolve", kind: .bluetooth)
         let homePod = CallAudioRoutes.Port(id: "AirPlay-1", name: "Kitchen", kind: .other)
         let cases: [(port: CallAudioRoutes.Port, title: String, symbol: String)] = [
-            (airPods, "Franco\u{2019}s AirPods Pro", "airpods"),
+            (airPods, "Leo\u{2019}s AirPods Pro", "airpods"),
             (headset, "Jabra Evolve", "headphones"),
-            (car, "Gia\u{2019}s Highlander", "car.fill"),
+            (car, "Rosa\u{2019}s Highlander", "car.fill"),
             (homePod, "Kitchen", "hifispeaker.fill"),
         ]
         for (port, title, symbol) in cases {

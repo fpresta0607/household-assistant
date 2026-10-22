@@ -1,7 +1,7 @@
 #if canImport(UIKit)
 // The charts and the assistant's pictures, for their before and after page: each chart the
 // steward-cards skill shows the assistants how to write, and a whole day of hours, as
-// Corey's reply in Franco's own thread; a picture Corey made, square and then wide, and the
+// Corey's reply in Leo's own thread; a picture Corey made, square and then wide, and the
 // square one full screen; and the Model page's Image and Video segments, and Video once
 // OpenRouter offers no video model. Every state is drawn light, and dark under its ".dark"
 // id.
@@ -67,7 +67,7 @@ final class ChartsAndPicturesScreenshots: XCTestCase {
         let square = room.keep(DemoMedia.scene(.bloom, width: 1024, height: 1024), kind: .photo, mime: "image/jpeg", width: 1024, height: 1024)
         let wide = room.keep(DemoMedia.scene(.hills, width: 1536, height: 1024), kind: .photo, mime: "image/jpeg", width: 1536, height: 1024)
 
-        room.say("Can you make a picture of a flower for Gia's card?", by: DemoRoom.person, in: .direct)
+        room.say("Can you make a picture of a flower for Rosa's card?", by: DemoRoom.person, in: .direct)
         room.say("Here it is.", by: DemoRoom.assistant, in: .direct, media: [square])
         await gateway.changed()
         try await snap("pictures.assistant-square") { roomScreen(gateway) }
@@ -138,7 +138,7 @@ final class ChartsAndPicturesScreenshots: XCTestCase {
 
     // MARK: - Drawing
 
-    /// Franco's own thread with Corey, as it shows when opened from Chats.
+    /// Leo's own thread with Corey, as it shows when opened from Chats.
     private func roomScreen(_ gateway: FixtureGateway) -> some View {
         NavigationStack {
             RoomView(conversation: .direct)

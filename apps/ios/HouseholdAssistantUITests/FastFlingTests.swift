@@ -125,7 +125,7 @@ final class FastFlingTests: XCTestCase {
         // Arrange
         let app = launch()
         let thread = openThread(in: app)
-        let note = try XCTUnwrap(scrollToVoiceNote(across: thread, in: app), "no voice note of Franco's came on screen")
+        let note = try XCTUnwrap(scrollToVoiceNote(across: thread, in: app), "no voice note of Leo's came on screen")
         let closed = note.frame
 
         // Act
@@ -152,7 +152,7 @@ final class FastFlingTests: XCTestCase {
             thread.swipeDown(velocity: .fast)
         }
         backToNewest(in: app)
-        let back = try XCTUnwrap(scrollToVoiceNote(across: thread, in: app), "no voice note of Franco's came back on screen")
+        let back = try XCTUnwrap(scrollToVoiceNote(across: thread, in: app), "no voice note of Leo's came back on screen")
 
         // Assert
         XCTAssertEqual(back.frame.height, closed.height, accuracy: 1, "the note came back still showing its words or its Transcript")
@@ -161,7 +161,7 @@ final class FastFlingTests: XCTestCase {
     // MARK: - Getting there
 
     /// Drags the thread slowly down from the newest, a little at a time, until one of
-    /// Franco's own voice notes is wholly in sight, and hands it back. Above the newest, the
+    /// Leo's own voice notes is wholly in sight, and hands it back. Above the newest, the
     /// thread keeps its place when a row changes height, rather than its bottom.
     private func scrollToVoiceNote(across thread: XCUIElement, in app: XCUIApplication) -> XCUIElement? {
         let (upper, lower) = dragPoints(across: thread, in: app)
@@ -197,7 +197,7 @@ final class FastFlingTests: XCTestCase {
         [XCTHitchMetric(application: app), XCTOSSignpostMetric.scrollingAndDecelerationMetric]
     }
 
-    /// The demo household with Franco's thread of 300 mixed rows, on Chats.
+    /// The demo household with Leo's thread of 300 mixed rows, on Chats.
     private func launch(also arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-StewardDemo", "YES", "-StewardFlingThread", "YES"] + arguments
@@ -206,7 +206,7 @@ final class FastFlingTests: XCTestCase {
         return app
     }
 
-    /// Opens Franco's own thread at its newest message and lets it settle. Returns the
+    /// Opens Leo's own thread at its newest message and lets it settle. Returns the
     /// thread's list (ThreadCollection).
     private func openThread(in app: XCUIApplication) -> XCUIElement {
         app.buttons["pin.direct"].tap()

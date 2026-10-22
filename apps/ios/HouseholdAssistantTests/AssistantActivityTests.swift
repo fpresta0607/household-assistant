@@ -43,7 +43,7 @@ final class AssistantActivityTests: XCTestCase {
             ("gog gmail search 'from:school'", .mail),
             ("himalaya envelope list", .mail),
             ("python3 ~/.openclaw/workspace/skills/scripture/scripture.py ref \"John 3:16\"", .scripture),
-            ("python3 ~/.openclaw/workspace/skills/coordinate/coordinate.py ask \"Is Gia free?\"", .otherAssistant),
+            ("python3 ~/.openclaw/workspace/skills/coordinate/coordinate.py ask \"Is Rosa free?\"", .otherAssistant),
             ("ls -la", .other),
         ]
         for (command, activity) in cases {

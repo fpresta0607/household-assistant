@@ -22,8 +22,8 @@ final class TranscriptTests: XCTestCase {
     }
 
     private static let participants = [
-        RoomParticipant(id: "franco", name: "Franco", kind: .person, isOwner: true),
-        RoomParticipant(id: "gia", name: "Gia", kind: .person, isOwner: false),
+        RoomParticipant(id: "franco", name: "Leo", kind: .person, isOwner: true),
+        RoomParticipant(id: "gia", name: "Rosa", kind: .person, isOwner: false),
         RoomParticipant(id: "corey", name: "Corey", kind: .assistant, isOwner: false, emoji: "\u{1F989}"),
     ]
 
@@ -87,10 +87,10 @@ final class TranscriptTests: XCTestCase {
 
         \(day(Self.evening))
 
-        \(clock(messages[0].sentAt)), Gia:
+        \(clock(messages[0].sentAt)), Rosa:
         Dinner is ready \u{1F35D}
 
-        \(clock(messages[1].sentAt)), Franco, replying to Gia:
+        \(clock(messages[1].sentAt)), Leo, replying to Rosa:
         Leaving work now.
         Save me some!
 
@@ -126,8 +126,8 @@ final class TranscriptTests: XCTestCase {
         // Assert
         let clock = ConversationTranscript.clock(call.sentAt, calendar: calendar)
         XCTAssertTrue(transcript.text.hasSuffix("""
-        \(clock), Franco, a call with Corey, 4:07:
-        Franco: What's on today?
+        \(clock), Leo, a call with Corey, 4:07:
+        Leo: What's on today?
         Corey: Dentist at 3:30.
         (Only the start of this call was kept.)
 
@@ -176,7 +176,7 @@ final class TranscriptTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertTrue(transcript.text.contains(", Gia:\n[Photo]\n[Voice note, 0:06]\n"), transcript.text)
+        XCTAssertTrue(transcript.text.contains(", Rosa:\n[Photo]\n[Voice note, 0:06]\n"), transcript.text)
         XCTAssertTrue(transcript.text.contains(", Corey:\nHere is the slip.\n[File: Field trip permission slip.pdf]\n[Video, 1:12]\n"), transcript.text)
         for id in [photo.id, voice.id, slip.id, clip.id] {
             XCTAssertFalse(transcript.text.contains(id), "no attachment's hash, let alone its bytes")
@@ -295,6 +295,6 @@ final class TranscriptTests: XCTestCase {
         )
 
         XCTAssertTrue(transcript.text.contains(", Corey:\nDone.\n\n4821\n"), transcript.text)
-        XCTAssertTrue(transcript.text.contains(", Franco:\n```steward-card\n"), "a person's words are theirs as written")
+        XCTAssertTrue(transcript.text.contains(", Leo:\n```steward-card\n"), "a person's words are theirs as written")
     }
 }

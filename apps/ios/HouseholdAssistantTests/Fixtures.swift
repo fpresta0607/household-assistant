@@ -18,8 +18,9 @@ enum Fixtures {
         try String(contentsOf: directory.appendingPathComponent(name + ".json"), encoding: .utf8)
     }
 
-    /// A face a gateway gives a participant: Corey's and Denise's Telegram photos, which
-    /// their gateways start them with.
+    /// A face a gateway gives a participant, in place of the Telegram photos Corey's and
+    /// Denise's gateways start them with: an owl and a blossom, drawn as plain shapes for
+    /// these fixtures, so no photo of the household's is in a picture of the app.
     static func face(_ participant: String) throws -> Data {
         try Data(contentsOf: directory.appendingPathComponent("faces/\(participant).jpg"))
     }

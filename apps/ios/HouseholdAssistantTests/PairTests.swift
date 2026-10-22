@@ -55,7 +55,7 @@ final class PairTests: XCTestCase {
         }
     }
 
-    private static let names = ["corey": "Corey", "denise": "Denise", "franco": "Franco", "gia": "Gia"]
+    private static let names = ["corey": "Corey", "denise": "Denise", "franco": "Leo", "gia": "Rosa"]
 
     private static func ok(_ request: GatewayRequest, _ payload: String) -> String {
         #"{"type":"res","id":"\#(request.id)","ok":true,"payload":\#(payload)}"#
@@ -211,8 +211,8 @@ final class PairTests: XCTestCase {
             "Denise saw it",
             "Denise replied: \u{201C}Two are due Friday, the rest next week.\u{201D}",
             "Denise marked done: \(library)",
-            "Corey took Franco's question",
-            "Denise took over Franco's question",
+            "Corey took Leo's question",
+            "Denise took over Leo's question",
             "Corey removed Chives from Seedlings: \u{201C}6 cm\u{201D}",
         ])
         XCTAssertEqual(entries.map(\.detail), ["Basil 4 cm, Thyme 2 cm, Chives 6 cm", nil, nil, library, library, nil, nil, nil, nil])
@@ -392,7 +392,7 @@ final class PairTests: XCTestCase {
     func testTheRoomsPagesAndThePairEventSayWhenTheLineLastMovedOnlyEverLater() async throws {
         // Arrange
         let gateway = Gateway()
-        let orientation = #""participants":[{"id":"franco","name":"Franco","kind":"person","isOwner":true},{"id":"corey","name":"Corey","kind":"assistant","isOwner":false}],"self":{"person":"franco","assistant":"corey"},"sessionKeys":{"family":"agent:main:household:group:family","direct":"agent:main:household:direct:franco"}"#
+        let orientation = #""participants":[{"id":"franco","name":"Leo","kind":"person","isOwner":true},{"id":"corey","name":"Corey","kind":"assistant","isOwner":false}],"self":{"person":"franco","assistant":"corey"},"sessionKeys":{"family":"agent:main:household:group:family","direct":"agent:main:household:direct:franco"}"#
         gateway.answers["household-app.history"] = { request in
             Self.ok(request, #"{"messages":[],"hasMore":false,"reactions":{},"reads":[],\#(orientation),"pair":{"lastAt":5000}}"#)
         }
@@ -413,6 +413,6 @@ final class PairTests: XCTestCase {
         XCTAssertEqual(fromThePages, 5_000, "the sync page read after does not take it back")
         XCTAssertEqual(afterAnEarlierEvent, 5_000)
         XCTAssertEqual(room.pairLastAt, 9_000)
-        XCTAssertEqual(room.names, ["franco": "Franco", "corey": "Corey"])
+        XCTAssertEqual(room.names, ["franco": "Leo", "corey": "Corey"])
     }
 }

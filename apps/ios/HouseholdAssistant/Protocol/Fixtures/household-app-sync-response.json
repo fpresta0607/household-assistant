@@ -105,13 +105,13 @@
     "participants": [
       {
         "id": "franco",
-        "name": "Franco",
+        "name": "Leo",
         "kind": "person",
         "isOwner": true
       },
       {
         "id": "gia",
-        "name": "Gia",
+        "name": "Rosa",
         "kind": "person",
         "isOwner": false
       },

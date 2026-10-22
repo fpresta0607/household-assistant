@@ -66,7 +66,7 @@ final class PairedPhonesTests: XCTestCase {
         #"{"type":"res","id":"\#(request.id)","ok":false,"error":{"code":"INVALID_REQUEST","message":"\#(message)"}}"#
     }
 
-    private static let ipad = #"{"id":"franco-ipad","name":"Franco's iPad","model":"ipad","lastSeenAtMs":1759913600000,"isThisPhone":false}"#
+    private static let ipad = #"{"id":"franco-ipad","name":"Leo's iPad","model":"ipad","lastSeenAtMs":1759913600000,"isThisPhone":false}"#
     private static let thisIPhone = #"{"id":"this-iphone","name":"Steward AI on iPhone","model":"iphone","lastSeenAtMs":1759999940000,"isThisPhone":true}"#
     private static let oldIPhone = #"{"id":"old-iphone","name":"Steward AI on iPhone","model":null,"lastSeenAtMs":null,"isThisPhone":false}"#
 
@@ -84,7 +84,7 @@ final class PairedPhonesTests: XCTestCase {
         PairedPhones(connection: gateway.connection, sign: { gateway.sign($0) }, now: { [unowned self] in self.clock })
     }
 
-    /// A model that has read Franco's three phones, the iPad listed first.
+    /// A model that has read Leo's three phones, the iPad listed first.
     private func loaded(_ gateway: Gateway) async throws -> PairedPhones {
         gateway.answers["household-app.phones"] = { Self.ok($0, Self.phones(Self.ipad, Self.thisIPhone, Self.oldIPhone)) }
         try await gateway.connect()
@@ -131,7 +131,7 @@ final class PairedPhonesTests: XCTestCase {
         XCTAssertEqual(model.phones.map(\.id), ["this-iphone", "franco-ipad", "old-iphone"])
         XCTAssertEqual(model.phones[1], PairedPhone(
             id: "franco-ipad",
-            name: "Franco's iPad",
+            name: "Leo's iPad",
             model: "ipad",
             lastSeenAtMs: 1_759_913_600_000,
             isThisPhone: false

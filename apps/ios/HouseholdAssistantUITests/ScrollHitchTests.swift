@@ -3,7 +3,7 @@
 // thread opening and closing, and how long it takes to show its first messages.
 //
 // Each launches the demo household the way the motion film does (MotionDemoTests), with
-// the film's scene, so nothing moves on its own until Franco opens his own thread, and
+// the film's scene, so nothing moves on its own until Leo opens his own thread, and
 // then Corey answers once with a card and a picture. Whatever measures inside the thread
 // lets that answer land first, so every iteration meets the same thread. The thread is a
 // long one, 150 older messages, as a thread used for weeks is, and each message sent in it

@@ -1,4 +1,4 @@
-// Franco's list of phones that signed in with Apple and wait for him, and his yes,
+// Leo's list of phones that signed in with Apple and wait for him, and his yes,
 // driven over a scripted gateway.
 
 import XCTest
@@ -64,7 +64,7 @@ final class SignInApprovalsTests: XCTestCase {
     }
 
     private static let waiting =
-        #"{"waiting":[{"id":"franco-req-1","name":"New iPhone","at":1792540800000,"person":"franco"},{"id":"gia-req-1","name":"Gia's iPhone","at":1792540900000,"person":"gia"}]}"#
+        #"{"waiting":[{"id":"franco-req-1","name":"New iPhone","at":1792540800000,"person":"franco"},{"id":"gia-req-1","name":"Rosa's iPhone","at":1792540900000,"person":"gia"}]}"#
 
     private let now = Date(timeIntervalSince1970: 1_792_541_000)
 
@@ -77,7 +77,7 @@ final class SignInApprovalsTests: XCTestCase {
         await approvals.refresh()
 
         XCTAssertEqual(approvals.waiting.map(\.id), ["franco-req-1", "gia-req-1"])
-        XCTAssertEqual(approvals.waiting.last, AppleSignInRequest(id: "gia-req-1", name: "Gia's iPhone", at: 1_792_540_900_000, person: "gia"))
+        XCTAssertEqual(approvals.waiting.last, AppleSignInRequest(id: "gia-req-1", name: "Rosa's iPhone", at: 1_792_540_900_000, person: "gia"))
     }
 
     func testAYesIsSignedByThisPhoneAndTheRequestLeavesTheList() async throws {

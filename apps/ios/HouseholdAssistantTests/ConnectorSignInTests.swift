@@ -2,7 +2,7 @@
 // connector, the PKCE pair, Google's sign-in page and a page the gateway describes, what
 // the phone signs to connect, switch account or disconnect, exactly as
 // deploy/openclaw/plugins/household-app/connect.js checks it, and what the row shows while
-// it goes, once it lands and when it is refused. Driven over a scripted gateway, as Gia's
+// it goes, once it lands and when it is refused. Driven over a scripted gateway, as Rosa's
 // phone with Denise.
 
 import XCTest
@@ -74,7 +74,7 @@ final class ConnectorSignInTests: XCTestCase {
     private static let notionRedirect = "https://www.siqstack.com/steward-ai/notion-callback"
     private static let notionPaste = "fixture-notion-paste-0001"
 
-    /// Denise's settings as PR 183's connect.js shapes them: Gia's own Google account and an
+    /// Denise's settings as PR 183's connect.js shapes them: Rosa's own Google account and an
     /// older one gog holds on the box, whose sign-in has expired, Notion signing in by
     /// `notion`'s kind, linked or not, Outlook, which only Corey has, and the weather.
     private static func linkedSettings(notion: String = "token", isNotionLinked: Bool = false) -> String {
@@ -82,7 +82,7 @@ final class ConnectorSignInTests: XCTestCase {
             ? #"{"provider":"notion","clientId":"notion-client-1","authorizeUrl":"https://api.notion.com/v1/oauth/authorize?owner=user","scopes":[],"redirectUri":"\#(notionRedirect)","usesPkce":false}"#
             : "null"
         let notionAccounts = isNotionLinked
-            ? #"[{"id":"notion:app","name":"Gia's Notion","email":null,"linkedAt":1792018799500,"status":"ok","abilities":["Reads and edits the pages you share with it in Gia's Notion"],"canDisconnect":true}]"#
+            ? #"[{"id":"notion:app","name":"Rosa's Notion","email":null,"linkedAt":1792018799500,"status":"ok","abilities":["Reads and edits the pages you share with it in Rosa's Notion"],"canDisconnect":true}]"#
             : "[]"
         let notionAccountCount = isNotionLinked ? 1 : 0
         let notionState = isNotionLinked ? "connected" : "available"
@@ -94,8 +94,8 @@ final class ConnectorSignInTests: XCTestCase {
         {"id":"gog","name":"Google","category":"calendar-and-mail","icon":"google","summary":"Gmail and Google Calendar","isOn":true,"signIn":"oauth","accounts":2,
         "state":"connected","reason":null,"capabilities":["Reads your Gmail","Reads and adds events in Google Calendar"],"signInKind":"oauth",
         "linkedAccounts":[
-        {"id":"gog:app","name":"Gia Marlowe","email":"gia@example.com","linkedAt":1792018799500,"status":"ok","abilities":["Reads your Gmail","Reads and adds events in Google Calendar"],"canDisconnect":true},
-        {"id":"gog:box:1a2b3c4d","name":"gia.old@example.com","email":"gia.old@example.com","linkedAt":1789426800000,"status":"expired","abilities":["Reads your Gmail"],"canDisconnect":true}],
+        {"id":"gog:app","name":"Rosa Marlowe","email":"rosa@example.com","linkedAt":1792018799500,"status":"ok","abilities":["Reads your Gmail","Reads and adds events in Google Calendar"],"canDisconnect":true},
+        {"id":"gog:box:1a2b3c4d","name":"rosa.old@example.com","email":"rosa.old@example.com","linkedAt":1789426800000,"status":"expired","abilities":["Reads your Gmail"],"canDisconnect":true}],
         "oauth":{"provider":"google","clientId":"\#(clientId)","authorizeUrl":"https://accounts.google.com/o/oauth2/v2/auth","scopes":["openid","email","profile","https://www.googleapis.com/auth/gmail.readonly","https://www.googleapis.com/auth/calendar"],"redirectUri":"\#(redirect)","usesPkce":true}},
         {"id":"notion","name":"Notion","category":"notes","icon":"notion","summary":"Pages and databases in Notion","isOn":true,"signIn":null,"accounts":\#(notionAccountCount),
         "state":"\#(notionState)","reason":null,"capabilities":["Reads the Notion pages you share with it","Adds and edits pages there when you ask"],"signInKind":"\#(notion)",
@@ -298,7 +298,7 @@ final class ConnectorSignInTests: XCTestCase {
         let password = ConnectorChange(
             at: 1_760_000_000_000,
             connector: "himalaya",
-            action: .connect(.password(username: "gia@example.com", secret: SecretText("abcd-efgh-ijkl-mnop")), replacing: nil)
+            action: .connect(.password(username: "rosa@example.com", secret: SecretText("abcd-efgh-ijkl-mnop")), replacing: nil)
         )
         let disconnect = ConnectorChange(at: 1_760_000_000_000, connector: "gog", action: .disconnect(account: nil))
 
@@ -318,7 +318,7 @@ final class ConnectorSignInTests: XCTestCase {
         XCTAssertEqual(password.params(signature: "sig"), .object([
             "at": .number(1_760_000_000_000),
             "connector": .string("himalaya"),
-            "username": .string("gia@example.com"),
+            "username": .string("rosa@example.com"),
             "secret": .string("abcd-efgh-ijkl-mnop"),
             "signature": .string("sig"),
         ]))
@@ -736,7 +736,7 @@ final class ConnectorSignInTests: XCTestCase {
         let icloud = try connector("icloud", in: model)
 
         await model.change(.tone, to: "40")
-        await model.connect(icloud, with: .password(username: "gia@example.com", secret: SecretText("abcd-efgh-ijkl-mnop")))
+        await model.connect(icloud, with: .password(username: "rosa@example.com", secret: SecretText("abcd-efgh-ijkl-mnop")))
         XCTAssertEqual(try connector("icloud", in: model).accounts, 1)
         await model.disconnect(try connector("icloud", in: model))
 
@@ -765,7 +765,7 @@ final class ConnectorSignInTests: XCTestCase {
         let icloud = try connector("icloud", in: model)
 
         let connecting = Task {
-            await model.connect(icloud, with: .password(username: "gia@example.com", secret: SecretText("abcd-efgh-ijkl-mnop")))
+            await model.connect(icloud, with: .password(username: "rosa@example.com", secret: SecretText("abcd-efgh-ijkl-mnop")))
         }
         await eventually("sent") { held != nil }
 
@@ -807,7 +807,7 @@ final class ConnectorSignInTests: XCTestCase {
         let secrets = ["4/0Acode", Self.rfcVerifier, "abcd-efgh-ijkl-mnop", Self.notionPaste]
         let google = ConnectorCredential.oauth(code: SecretText("4/0Acode"), codeVerifier: Self.rfcPKCE.verifier, redirectUri: Self.redirect)
         let notion = ConnectorCredential.oauth(code: SecretText("4/0Acode"), codeVerifier: nil, redirectUri: Self.notionRedirect)
-        let password = ConnectorCredential.password(username: "gia@example.com", secret: SecretText("abcd-efgh-ijkl-mnop"))
+        let password = ConnectorCredential.password(username: "rosa@example.com", secret: SecretText("abcd-efgh-ijkl-mnop"))
         let token = ConnectorCredential.token(SecretText(Self.notionPaste))
         let values: [Any] = [
             SecretText("abcd-efgh-ijkl-mnop"),

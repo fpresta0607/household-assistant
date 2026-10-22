@@ -7,8 +7,8 @@ import XCTest
 
 final class MentionTests: XCTestCase {
     private let room = [
-        RoomParticipant(id: "franco", name: "Franco", kind: .person, isOwner: true),
-        RoomParticipant(id: "gia", name: "Gia", kind: .person, isOwner: false),
+        RoomParticipant(id: "franco", name: "Leo", kind: .person, isOwner: true),
+        RoomParticipant(id: "gia", name: "Rosa", kind: .person, isOwner: false),
         RoomParticipant(id: "corey", name: "Corey", kind: .assistant, isOwner: false, emoji: "\u{1F989}"),
         RoomParticipant(id: "denise", name: "Denise", kind: .assistant, isOwner: false, emoji: "\u{1F338}"),
     ]
@@ -22,7 +22,7 @@ final class MentionTests: XCTestCase {
             ("Thanks\n@De", "De"),
             ("Can @Corey pick up Luca", nil),
             ("Can @Corey ", nil),
-            ("mail franco@example", nil),
+            ("mail leo@example", nil),
             ("Can we", nil),
             ("", nil),
         ]
@@ -34,7 +34,7 @@ final class MentionTests: XCTestCase {
     func testEveryoneIsOfferedThisPhonesAssistantFirstAndItsOwnerLast() {
         let offered = Mention.candidates(matching: "", participants: room, me: me)
         XCTAssertEqual(offered.map(\.participant.id), ["corey", "denise", "gia", "franco"])
-        XCTAssertEqual(offered.map(\.role), ["Your assistant", "Gia's assistant", nil, "You"])
+        XCTAssertEqual(offered.map(\.role), ["Your assistant", "Rosa's assistant", nil, "You"])
     }
 
     func testWhatIsTypedNarrowsTheOfferByTheStartOfTheName() {
@@ -49,9 +49,9 @@ final class MentionTests: XCTestCase {
 
     func testPickingSomeoneKeepsTheAtAndWritesTheirNameAfterIt() {
         XCTAssertEqual(Mention.inserting("Corey", into: "Can @co"), "Can @Corey ")
-        XCTAssertEqual(Mention.inserting("Gia", into: "@"), "@Gia ")
+        XCTAssertEqual(Mention.inserting("Rosa", into: "@"), "@Rosa ")
         XCTAssertEqual(Mention.inserting("Denise", into: "Thanks\n@"), "Thanks\n@Denise ")
-        XCTAssertEqual(Mention.inserting("Gia", into: "No mention here"), "No mention here")
+        XCTAssertEqual(Mention.inserting("Rosa", into: "No mention here"), "No mention here")
     }
 
     func testWhatPickingSomeoneLeavesIsAMentionOfThem() {
@@ -65,7 +65,7 @@ final class MentionTests: XCTestCase {
             ("what time is it on?", "@Corey what time is it on?"),
             ("@corey what time is it on?", "@corey what time is it on?"),
             ("ask @Corey later", "ask @Corey later"),
-            ("mail franco@Corey", "@Corey mail franco@Corey"),
+            ("mail leo@Corey", "@Corey mail leo@Corey"),
         ]
         for shot in drafts {
             XCTAssertEqual(Mention.asking("Corey", in: shot.draft), shot.asked, shot.draft)

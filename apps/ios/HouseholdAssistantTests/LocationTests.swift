@@ -74,7 +74,7 @@ final class LocationTests: XCTestCase {
         return calendar
     }()
 
-    /// Franco on Maple Street, measured a minute ago.
+    /// Leo on Maple Street, measured a minute ago.
     private func fix(
         _ latitude: Double = 39.768403,
         _ longitude: Double = -86.158068,

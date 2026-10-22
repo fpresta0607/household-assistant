@@ -8,8 +8,8 @@ import XCTest
 
 final class MentionMatchingTests: XCTestCase {
     private let room = [
-        RoomParticipant(id: "franco", name: "Franco", kind: .person, isOwner: true),
-        RoomParticipant(id: "gia", name: "Gia", kind: .person, isOwner: false),
+        RoomParticipant(id: "franco", name: "Leo", kind: .person, isOwner: true),
+        RoomParticipant(id: "gia", name: "Rosa", kind: .person, isOwner: false),
         RoomParticipant(id: "corey", name: "Corey", kind: .assistant, isOwner: false, emoji: "\u{1F989}"),
         RoomParticipant(id: "denise", name: "Denise", kind: .assistant, isOwner: false, emoji: "\u{1F338}"),
     ]
@@ -23,10 +23,10 @@ final class MentionMatchingTests: XCTestCase {
             ("(@Denise)", "Denise", true),
             ("Corey can you check?", "Corey", false),
             ("@Coreys list", "Corey", false),
-            ("@Giant pumpkins", "Gia", false),
-            ("mail franco@example.com", "example", false),
-            ("mail franco@Gia", "Gia", false),
-            ("", "Gia", false),
+            ("@Rosary beads", "Rosa", false),
+            ("mail leo@example.com", "example", false),
+            ("mail leo@Rosa", "Rosa", false),
+            ("", "Rosa", false),
         ]
         for shot in cases {
             XCTAssertEqual(Mention.isMentioned(shot.name, in: shot.text), shot.isExpected, "\(shot.text) and \(shot.name)")
@@ -50,17 +50,17 @@ final class MentionMatchingTests: XCTestCase {
     /// Corey wrote Denise's bot in the family room on 19 October. The bubble draws it as the
     /// mention a person's @ writes, over the whole of what was written.
     func testABubbleDrawsAnAssistantsTelegramBotAsItsName() {
-        let text = "That one is Gia's. @Denise_the_woman_bot is she free? @Corey"
+        let text = "That one is Rosa's. @Denise_the_woman_bot is she free? @Corey"
 
         let spans = Mention.spans(in: text, participants: room, me: me)
 
         XCTAssertEqual(spans.map(\.participant.id), ["denise", "corey"])
         XCTAssertEqual(spans.map { String(text[$0.range]) }, ["@Denise_the_woman_bot", "@Corey"])
         XCTAssertEqual(spans.map(\.shown), ["@Denise", "@Corey"])
-        XCTAssertEqual(Mention.spoken(text, spans: spans), "That one is Gia's. mentions Denise is she free? mentions Corey")
+        XCTAssertEqual(Mention.spoken(text, spans: spans), "That one is Rosa's. mentions Denise is she free? mentions Corey")
         XCTAssertEqual(
             Mention.linked(text, spans: spans),
-            "That one is Gia's. [@Denise](steward-mention:denise) is she free? [@Corey](steward-mention:corey)"
+            "That one is Rosa's. [@Denise](steward-mention:denise) is she free? [@Corey](steward-mention:corey)"
         )
     }
 
@@ -70,33 +70,33 @@ final class MentionMatchingTests: XCTestCase {
     }
 
     func testNothingIsMentionedByAnEmptyName() {
-        XCTAssertFalse(Mention.isMentioned("", in: "@Gia"))
+        XCTAssertFalse(Mention.isMentioned("", in: "@Rosa"))
     }
 
     func testEveryoneTheWordsMentionIsFoundInTheOrderTheyAreWritten() {
-        let spans = Mention.spans(in: "@Denise and @Franco, ask @corey", participants: room, me: me)
+        let spans = Mention.spans(in: "@Denise and @Leo, ask @corey", participants: room, me: me)
         XCTAssertEqual(spans.map(\.participant.id), ["denise", "franco", "corey"])
         XCTAssertEqual(Mention.spans(in: "no one here", participants: room, me: me), [])
     }
 
     func testABubbleStylesEachMentionAsWrittenAndLightsThisPhonesOwn() {
-        let text = "@Gia and @franco, ask @Corey or @Denise. Not @Giant, not mail@gia.com, twice @gia"
+        let text = "@Rosa and @leo, ask @Corey or @Denise. Not @Rosary, not mail@rosa.com, twice @rosa"
 
         let spans = Mention.spans(in: text, participants: room, me: me)
 
-        XCTAssertEqual(spans.map { String(text[$0.range]) }, ["@Gia", "@franco", "@Corey", "@Denise", "@gia"])
+        XCTAssertEqual(spans.map { String(text[$0.range]) }, ["@Rosa", "@leo", "@Corey", "@Denise", "@rosa"])
         XCTAssertEqual(spans.map(\.isMine), [false, true, true, false, false])
         XCTAssertEqual(spans.map(\.participant.kind), [.person, .person, .assistant, .assistant, .person])
     }
 
     func testOfTwoNamesAtOneAtTheLongerIsMeant() {
-        let family = room + [RoomParticipant(id: "gia-marie", name: "Gia Marie", kind: .person, isOwner: false)]
-        let text = "@Gia Marie is here, @Gia too"
+        let family = room + [RoomParticipant(id: "rosa-marie", name: "Rosa Marie", kind: .person, isOwner: false)]
+        let text = "@Rosa Marie is here, @Rosa too"
 
         let spans = Mention.spans(in: text, participants: family, me: me)
 
-        XCTAssertEqual(spans.map(\.participant.id), ["gia-marie", "gia"])
-        XCTAssertEqual(spans.map { String(text[$0.range]) }, ["@Gia Marie", "@Gia"])
+        XCTAssertEqual(spans.map(\.participant.id), ["rosa-marie", "gia"])
+        XCTAssertEqual(spans.map { String(text[$0.range]) }, ["@Rosa Marie", "@Rosa"])
     }
 
     func testWithNobodyKnownYetNothingIsAMentionOrLit() {
@@ -113,12 +113,12 @@ final class MentionMatchingTests: XCTestCase {
     }
 
     func testAnAssistantsMarkdownCarriesEachMentionAsALinkToWhoItNames() throws {
-        let markdown = "**Done**, @Gia. I asked @denise_ too"
+        let markdown = "**Done**, @Rosa. I asked @denise_ too"
         let spans = Mention.spans(in: markdown, participants: room, me: me)
 
         let linked = Mention.linked(markdown, spans: spans)
 
-        XCTAssertEqual(linked, "**Done**, [@Gia](steward-mention:gia). I asked [@denise](steward-mention:denise)_ too")
+        XCTAssertEqual(linked, "**Done**, [@Rosa](steward-mention:gia). I asked [@denise](steward-mention:denise)_ too")
         XCTAssertEqual(Mention.linked("no one", spans: []), "no one")
     }
 

@@ -22,7 +22,7 @@ final class TalkSessionTests: XCTestCase {
     }
 
     /// A call saying the first of `reply`'s sentences, with the rest of the reply arrived.
-    private func speaking(_ reply: String = "Gia lands at 4:10. Then the recital at 6.") -> TalkSession {
+    private func speaking(_ reply: String = "Rosa lands at 4:10. Then the recital at 6.") -> TalkSession {
         var session = waiting()
         _ = session.handle(.reply(reply, isFinished: true))
         return session
@@ -100,7 +100,7 @@ final class TalkSessionTests: XCTestCase {
     }
 
     func testThanksWithAnotherRequestDoesNotEndTheCall() {
-        for words in ["Thank you, can you check tomorrow?", "Don't say goodbye yet", "Tell Gia I said goodbye"] {
+        for words in ["Thank you, can you check tomorrow?", "Don't say goodbye yet", "Tell Rosa I said goodbye"] {
             XCTAssertFalse(TalkSession.isFarewell(words))
         }
         var session = waiting(after: "Thanks")
@@ -187,9 +187,9 @@ final class TalkSessionTests: XCTestCase {
         XCTAssertEqual(effect, .interrupt)
         XCTAssertEqual(session.phase, .listening)
         XCTAssertTrue(session.isCut)
-        XCTAssertEqual(session.sentences, ["Gia lands at 4:10.", "Then the recital at 6."], "what was cut stays to be shown")
+        XCTAssertEqual(session.sentences, ["Rosa lands at 4:10.", "Then the recital at 6."], "what was cut stays to be shown")
         XCTAssertEqual(session.utterance.heard, "Wait, which recital?", "the words that cut in are the start of the turn")
-        XCTAssertEqual(session.handle(.reply("Gia lands at 4:10. Then the recital at 6. More.", isFinished: true)), .none)
+        XCTAssertEqual(session.handle(.reply("Rosa lands at 4:10. Then the recital at 6. More.", isFinished: true)), .none)
         XCTAssertEqual(session.handle(.saidSentence), .none)
         XCTAssertEqual(session.handle(.tick(at(6))), .send("Wait, which recital?"))
         XCTAssertFalse(session.isCut)
@@ -211,13 +211,13 @@ final class TalkSessionTests: XCTestCase {
         var session = speaking()
 
         // Act and assert: the recognizer's words grow as it hears more of the same voice.
-        for echo in ["Gia lands at", "Gia lands at 4:10.", ""] {
+        for echo in ["Rosa lands at", "Rosa lands at 4:10.", ""] {
             XCTAssertEqual(session.handle(.heard(echo, at: at(4))), .none, echo)
             XCTAssertEqual(session.phase, .speaking)
         }
-        XCTAssertEqual(session.handle(.heard("Gia lands at 4:10. Wait, which recital?", at: at(5))), .interrupt)
+        XCTAssertEqual(session.handle(.heard("Rosa lands at 4:10. Wait, which recital?", at: at(5))), .interrupt)
         XCTAssertEqual(session.utterance.heard, "Wait, which recital?")
-        _ = session.handle(.heard("Gia lands at 4:10. Wait, which recital is it?", at: at(5.5)))
+        _ = session.handle(.heard("Rosa lands at 4:10. Wait, which recital is it?", at: at(5.5)))
         XCTAssertEqual(session.handle(.tick(at(6.5))), .send("Wait, which recital is it?"))
     }
 
@@ -225,7 +225,7 @@ final class TalkSessionTests: XCTestCase {
     /// same word this turn: echo cancellation takes the voice out, and the person must
     /// always be able to stop it. The voice's own longer phrase is still its echo.
     func testAShortStoppingWordCutsInEvenWhenTheVoiceSaidIt() {
-        let reply = "Wait, no, hold on to that thought. Gia lands at 4:10."
+        let reply = "Wait, no, hold on to that thought. Rosa lands at 4:10."
         for words in ["Wait", "No no", "Hold on", "Stop"] {
             // Arrange
             var session = speaking(reply)
