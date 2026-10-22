@@ -131,6 +131,8 @@ import { openRoomStore } from "./store.js";
 import { ownersFamilySession } from "./turn.js";
 import { createVideoSummaries, videoSource } from "./video-summary.js";
 import { VOICE_NOTE_INSTRUCTION, createHearing, isNameSpoken } from "./voice-notes.js";
+import { WISH_TOOL, createWishTool } from "./wish-tool.js";
+import { createWishes } from "./wishes.js";
 
 export const PLUGIN_ID = "household-app";
 export const CHANNEL = "household";
@@ -153,6 +155,8 @@ const ORDER_MAIL_FIRST_MS = 2 * 60_000;
 const OLD_CALLS_MS = 6 * 3_600_000;
 // How often this assistant's family reminders are checked for one that came due.
 const REMINDERS_MS = 30_000;
+// How often the wishlist is checked for gift ideas due to be handed over.
+const WISHES_MS = 60 * 60_000;
 const execFileAsync = promisify(execFile);
 // One mail binary's run: no shell, a minute at most, the bytes as they came, and stopped
 // with the channel.
@@ -764,7 +768,7 @@ function startRoom(ctx) {
     emit,
     // One write at a time, so an older snapshot can never land after a newer one.
     writeOutbox: (outbox) => {
-      const text = JSON.stringify({ persona: assistant.id, ...outbox, ...appleSignIn.outbox(), ...cart.outbox(), ...notes.outbox() });
+      const text = JSON.stringify({ persona: assistant.id, ...outbox, ...appleSignIn.outbox(), ...cart.outbox(), ...notes.outbox(), ...wishes.outbox() });
       writing = writing
         .then(() => writeAtomically(path.join(directory, "outbox.json"), text))
         .catch((error) => log.warn(`${PLUGIN_ID}: the outbox could not be written: ${error?.message ?? error}`));
@@ -819,6 +823,17 @@ function startRoom(ctx) {
     },
   });
 
+  // Gift and wishlist memory (wishes.js): the wishes this gateway hands to its own person, and
+  // the relay's private steps for the other side's, never on any phone until they are handed.
+  const wishes = createWishes({
+    file: path.join(directory, "wishes.sqlite"),
+    assistant,
+    peerAssistant,
+    owner,
+    peerPerson,
+    changed: () => room.publishOutbox(),
+  });
+
   // The other gateway's half of the family room, as relay-in.mjs leaves it.
   const inbox = path.join(directory, "inbox");
   let draining = Promise.resolve();
@@ -845,6 +860,8 @@ function startRoom(ctx) {
           const noted = notes.acceptPeer(batch);
           if (noted.refused) log.warn(`${PLUGIN_ID}: refused ${noted.refused} household note steps from the other gateway`);
           considerHandoffs(noted.handed);
+          const wished = wishes.acceptPeer(batch);
+          if (wished.refused) log.warn(`${PLUGIN_ID}: refused ${wished.refused} wishlist steps from the other gateway`);
         } catch (error) {
           log.warn(`${PLUGIN_ID}: an inbox file was refused: ${error?.message ?? error}`);
         } finally {
@@ -928,7 +945,7 @@ function startRoom(ctx) {
 
   return {
     room, media, store, inbox, drain, owner, peerPerson, pairing, nonces, appleSignIn, tick, location, approvals, cart, cartOrdered,
-    notes, videos, images, stopBounds, sends,
+    notes, videos, images, stopBounds, sends, wishes,
     canEmail: Boolean(config.orderMail?.account),
     orderMail,
     log,
@@ -1117,6 +1134,21 @@ export const householdChannel = createChatChannelPlugin({
         }
         const remindersTimer = setInterval(remind, REMINDERS_MS);
         remindersTimer.unref();
+        // The wishes due to be handed to this gateway's person, three weeks before a birthday or
+        // Christmas, posted in their own thread, each once a year (wishes.js).
+        const handWishes = () => {
+          try {
+            for (const text of started.wishes.due()) {
+              void started.room.reply({ conversation: "direct", text })
+                .catch((error) => ctx.log?.warn?.(`${PLUGIN_ID}: gift ideas were not posted: ${error?.message ?? error}`));
+            }
+          } catch (error) {
+            ctx.log?.warn?.(`${PLUGIN_ID}: the wishlist was not checked: ${error?.message ?? error}`);
+          }
+        };
+        handWishes();
+        const wishesTimer = setInterval(handWishes, WISHES_MS);
+        wishesTimer.unref();
         void started.drain();
         try {
           ctx.setStatus(channelReadyPatch({ accountId: ctx.accountId }));
@@ -1128,6 +1160,7 @@ export const householdChannel = createChatChannelPlugin({
           clearInterval(mailTimer);
           clearInterval(callsTimer);
           clearInterval(remindersTimer);
+          clearInterval(wishesTimer);
           started.stopBounds();
           await reading;
           await started.drain();
@@ -1138,6 +1171,7 @@ export const householdChannel = createChatChannelPlugin({
           started.store.close();
           started.cart.close();
           started.notes.close();
+          started.wishes.close();
           ctx.setStatus(channelStoppedPatch({ accountId: ctx.accountId }));
         }
       },
@@ -1496,6 +1530,18 @@ function registerFull(api) {
   // Old family destinations resolve to the app once, with no Telegram copy.
   const familyPosts = createFamilyPosts({ config: () => runtime.config.current() });
   api.on("before_tool_call", (event, context) => familyPosts.beforeToolCall(event, context), { matcher: FAMILY_POST_TOOLS });
+  // Gift and wishlist memory, in the owner's own turns only (wish-tool.js).
+  api.registerTool(
+    (context) => live && createWishTool({
+      context,
+      owner: live.owner.id,
+      ownerName: live.owner.name,
+      peerName: live.peerPerson.name,
+      people: [live.owner.id, live.peerPerson.id],
+      wishes: live.wishes,
+    }),
+    { names: [WISH_TOOL], optional: true },
+  );
   // A draft the owner sends with one tap, in the owner's own turns only, and the yes it
   // waits for, which freezes the draft (send-tool.js). Without a running channel there is
   // no card to tap, so it is refused. A command's own Gmail send is refused everywhere.
