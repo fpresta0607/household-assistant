@@ -163,12 +163,13 @@ test("a scheduled post to The Fam lands in the app's family room", async () => {
   assert.deepEqual(setup.sent.map((send) => send.to), ["household:family"]);
 });
 
-test("nothing is copied unless Telegram took it, it carried words, and it went to a mapped chat", async () => {
+test("nothing is copied unless the run succeeded, chose to speak, carried words, and went to a mapped chat", async () => {
   const setup = gateway();
   await setup.reconcile();
 
   for (const event of [
-    finished("briefing", { delivered: false, deliveryStatus: "not-delivered" }),
+    finished("briefing", { delivered: false, deliveryStatus: "not-delivered", deliverySuppressionReason: "silent" }),
+    finished("briefing", { delivered: false, deliveryStatus: "not-requested" }),
     finished("briefing", { status: "error" }),
     { ...finished("briefing"), action: "started" },
     finished("other-chat"),
@@ -446,13 +447,27 @@ for (const [field, value] of [
   });
 }
 
-test("a failed delivery cannot become a copy when its complete output arrives late", async () => {
+// Issue #6: with Telegram off, every Telegram delivery fails, and the app is where the words go.
+test("a run Telegram did not take is still copied to the app, once, even when its output arrives late", async () => {
   const setup = gateway();
   await setup.reconcile();
-  const event = finished("briefing", { delivered: false, deliveryStatus: "not-delivered" });
+  const event = finished("briefing", { delivered: false, deliveryStatus: "not-delivered", deliveryError: "telegram channel is not running" });
 
   await setup.changed(event);
   await setup.output(...output(event));
+  await setup.changed(event);
+
+  assert.equal(setup.sent.length, 1);
+  assert.equal(setup.sent[0].text, "Complete scheduled answer.");
+});
+
+test("a run that chose silence is never copied, whatever its delivery says", async () => {
+  const setup = gateway();
+  await setup.reconcile();
+  const event = finished("briefing", { delivered: false, deliveryStatus: "not-delivered", deliverySuppressionReason: "silent" });
+
+  await setup.changed(event);
+  await setup.output(...output(event, ["NO_REPLY"]));
 
   assert.equal(setup.sent.length, 0);
 });

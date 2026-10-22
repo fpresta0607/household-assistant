@@ -34,6 +34,7 @@ def node_or_skip() -> str:
         "household_app_amazon_mail.test.mjs",
         "household_app_apple.test.mjs",
         "household_app_approvals.test.mjs",
+        "household_app_automations.test.mjs",
         "household_app_brief.test.mjs",
         "household_app_call_setup.test.mjs",
         "household_app_call_turn.test.mjs",
