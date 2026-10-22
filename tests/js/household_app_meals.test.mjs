@@ -154,7 +154,8 @@ test("through the plugin, an accepted plan fills the cart with each item once, a
     const proposed = await run(meals, { action: "propose", dinners: WEEK });
     const accepted = await run(meals, { action: "accept", plan: proposed.plan });
     const again = await run(meals, { action: "accept", plan: proposed.plan });
-    await until("the cart in the outbox", async () => (await readFile(outbox, "utf8").catch(() => "")).includes("ground beef"), { attempts: 2000 });
+    // Seven adds are seven atomic rewrites of the outbox, one after another, slow on a busy disk.
+    await until("the cart in the outbox", async () => (await readFile(outbox, "utf8").catch(() => "")).includes("ground beef"), { attempts: 6000 });
     const crossing = JSON.parse(await readFile(outbox, "utf8")).cart.filter((step) => step.kind === "add");
 
     // Assert
