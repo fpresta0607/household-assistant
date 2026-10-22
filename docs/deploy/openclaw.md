@@ -2395,6 +2395,24 @@ Corey asked for passports, insurance policies, car registrations, warranties, su
   A document kept, or renewed, with less than 30 days left is said in that turn's reply instead (the answer's `tell`), and nothing is posted on the day itself.
 - `update` takes a renewed document's new day or a new photo and corrects its note line (adding it back if someone removed it); `remove` takes a document and its note line out; `view` lists what is kept, soonest first, with how many pictures each has and never their ids.
 
+### A meal plan that builds the cart
+
+Corey asked for the week's dinners proposed from what is in the kitchen and what is on sale, turned into the shopping list automatically.
+
+- `household_meals` (`meals-tool.js`) is offered where the cart is: the owner's own thread and the family room.
+- What is in the kitchen is the household note's: every open line of any topic about the kitchen, the pantry, the fridge or the freezer, such as "In the kitchen", one line per thing (its `item`, or its words). The tool tells the assistant to keep it there as people say what they have or used up.
+- What is on sale is what the assistant finds for the family's usual store this week before it proposes, said beside each ingredient (`sale`).
+- `propose` takes up to seven dinners with their ingredients and answers, from `meals.js`:
+  - `have`: what the kitchen already has, by name;
+  - `inCart`: what the cart already has;
+  - `buy`: everything else, each item once with its quantities added across dinners;
+  - `card`: a table card of the dinners, with what is on sale, for the reply.
+- Two names are one item when their words match once each word is singular and any count or measure in front is dropped: "Tomatoes" and "tomato", "2 lb ground beef" and "Ground beef". Never a part of one: "rice" in the kitchen is no "rice vinegar".
+- `accept` with the plan's id, only once someone says yes, puts the `buy` items in the household cart as they stand at that moment, down for whoever asked, and answers the cart card.
+  A plan is accepted once, and a plan the cart has no room for (40 items) is refused whole and stays open.
+- Proposed plans are kept in `household-app/meals.sqlite` for two weeks; only the cart's own steps cross to the other gateway.
+- Placing the order stays the one-tap send (`household_send`'s order card), and nothing here orders anything.
+
 ### The house
 
 - `household_home` is the assistant's tool for the thermostat, the music and the living room TV, in the owner's own thread and the family room, by the same turn proof as `household_location` (`turn.js`).

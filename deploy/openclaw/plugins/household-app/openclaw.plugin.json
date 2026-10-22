@@ -8,7 +8,7 @@
   },
   "channels": ["household"],
   "contracts": {
-    "tools": ["household_location", "household_cart", "household_brief", "household_today", "household_home", "household_react", "household_note", "household_send", "household_digest", "household_wish", "household_vault"]
+    "tools": ["household_location", "household_cart", "household_brief", "household_today", "household_home", "household_react", "household_note", "household_send", "household_digest", "household_wish", "household_vault", "household_meals"]
   },
   "toolMetadata": {
     "household_location": {
@@ -62,6 +62,11 @@
       "sideEffecting": true
     },
     "household_vault": {
+      "optional": true,
+      "replaySafe": false,
+      "sideEffecting": true
+    },
+    "household_meals": {
       "optional": true,
       "replaySafe": false,
       "sideEffecting": true

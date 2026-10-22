@@ -164,6 +164,7 @@ def test_the_patch_names_the_plugin_and_the_room_and_keeps_every_list(app: Modul
             "household_digest",
             "household_wish",
             "household_vault",
+            "household_meals",
         ]
     }
 
@@ -271,6 +272,7 @@ def test_the_location_tool_goes_before_the_finance_tools_so_the_guard_finds_noth
         "household_digest",
         "household_wish",
         "household_vault",
+        "household_meals",
         *FINANCE,
     ]
     assert installer.configured(result, "corey", "7100000001") == result
@@ -297,6 +299,7 @@ def test_a_gateway_without_the_apps_tools_is_told_so(app: ModuleType) -> None:
         "the assistant is not handed household_digest",
         "the assistant is not handed household_wish",
         "the assistant is not handed household_vault",
+        "the assistant is not handed household_meals",
     ]
 
 
@@ -321,6 +324,7 @@ def test_a_gateway_that_has_the_location_tool_gets_the_cart_and_the_brief_beside
         "household_digest",
         "household_wish",
         "household_vault",
+        "household_meals",
     ]
 
 

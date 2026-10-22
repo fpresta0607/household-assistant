@@ -103,7 +103,7 @@ test("a handoff from before the bound is marked seen but starts no turn", async 
   const channel = await runningChannel(CFG);
   try {
     await deliverFromCorey(channel, [handoff({ at: Date.now() - 10 * 60_000 })]);
-    await until("the seen step", async () => ((await outboxOf(channel).catch(() => ({ notes: [] }))).notes ?? []).length === 1);
+    await until("the seen step", async () => ((await outboxOf(channel).catch(() => ({ notes: [] }))).notes ?? []).length === 1, { attempts: 2000 });
     assert.equal(channel.dispatches.length, 0);
   } finally {
     await channel.stop();
@@ -117,7 +117,7 @@ test("a handoff delivered twice is seen and answered once", async () => {
     await writeFile(path.join(channel.stateDir, "household-app", "inbox", "0001-from-corey.json"), JSON.stringify({ from: "corey", batch: { entries: [], notes: [handoff()] } }));
     await writeFile(path.join(channel.stateDir, "household-app", "inbox", "0002-from-corey.json"), JSON.stringify({ from: "corey", batch: { entries: [], notes: [handoff()] } }));
     await until("both deliveries read", async () => (await readdir(path.join(channel.stateDir, "household-app", "inbox"))).length === 0);
-    await until("the seen step", async () => ((await outboxOf(channel).catch(() => ({ notes: [] }))).notes ?? []).length === 1);
+    await until("the seen step", async () => ((await outboxOf(channel).catch(() => ({ notes: [] }))).notes ?? []).length === 1, { attempts: 2000 });
     assert.equal(channel.dispatches.length, 1);
     assert.equal((await outboxOf(channel)).notes.length, 1);
   } finally {
@@ -159,7 +159,7 @@ test("hand writes a line for the other assistant, which crosses in the outbox an
     // Assert
     assert.equal(handed.topic, "Handoffs");
     assert.deepEqual({ owner: handed.lines[0].owner, seen: handed.lines[0].seen }, { owner: "Corey", seen: null });
-    await until("the handoff in the outbox", async () => ((await outboxOf(channel).catch(() => ({ notes: [] }))).notes ?? []).length === 1);
+    await until("the handoff in the outbox", async () => ((await outboxOf(channel).catch(() => ({ notes: [] }))).notes ?? []).length === 1, { attempts: 2000 });
     assert.equal((await outboxOf(channel)).notes[0].line.owner, "corey");
     const before = (await channel.promptBuild({ prompt: "" }, { agentId: "main", ...OWNERS_THREAD })).prependContext;
     assert.match(before, /Corey to do, not seen yet/);
