@@ -54,6 +54,17 @@ struct TodayGlance: Equatable, Sendable {
         self.verse = verse
     }
 
+    /// The card's day as the snapshot draws it (AgendaDayView): the calendar mark of the day
+    /// the next thing is on, or of today when nothing is, and a row for each thing shown, its
+    /// time as the card says it, nil all day.
+    func agendaDay(at now: Date, calendar: Calendar) -> AgendaCard.Day {
+        let shown = [next].compactMap { $0 } + more
+        return AgendaCard.Day(
+            mark: CalendarMark(date: next?.start ?? now, calendar: calendar),
+            events: shown.map { AgendaCard.Event(title: $0.title, time: $0.time) }
+        )
+    }
+
     /// Everything in `card` as the card says it, the soonest first, what has gone by marked.
     static func lines(of card: TodayCard, at now: Date, calendar: Calendar) -> [Line] {
         card.items.compactMap { item -> Line? in

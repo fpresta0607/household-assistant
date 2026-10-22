@@ -12,7 +12,8 @@ declaration key so adding it again brings the one job to this shape rather than 
   meet end to end, so every event is in exactly one day's run, about 48 hours before it.
   Nothing is written to the household note: an appointment can be one person's own.
 - The Sunday digest. Sunday evening the run reads the coming week's calendar and calls
-  household_digest with the week and the decisions it needs; the plugin adds what is
+  household_digest with the week's events and the decisions it needs; the plugin draws the
+  events as the week at a glance (an agenda card) and adds what is
   slipping, the litter's weight trend, the cart and the open promises from the household
   note and posts the whole digest in its person's own thread (digest.js), so the run delivers
   nothing itself.
@@ -88,8 +89,10 @@ SUNDAY_DIGEST = Job(
     prompt=(
         f'It is Sunday evening. Read the family\'s shared calendar, "{SHARED_CALENDAR}" in '
         "iCloud, and your person's own calendars for the coming week, Monday to Sunday. Then call "
-        "household_digest once: week, at most four short lines, the week's main events your "
-        "person goes to, each with its day and time; and decide, the two or three things that "
+        "household_digest once: events, the week's main events your person goes to, at most "
+        "twelve, each with its title and its start as the calendar gives it, with its offset, or "
+        "its day when it is all day (only when you cannot, week instead, at most four short "
+        "lines, each with its day and time); and decide, the two or three things that "
         "need your person's decision this week, such as a clash, something to book or a reply "
         f"owed, each one short line, or none. {OTHERS}Send nothing to any chat or person and "
         "change nothing. Once it is posted, reply NO_REPLY."

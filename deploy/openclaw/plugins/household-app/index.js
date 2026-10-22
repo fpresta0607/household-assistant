@@ -361,12 +361,14 @@ function withPlace(message) {
   return [message.text.trim(), place].filter(Boolean).join("\n");
 }
 
+const replyMediaUrls = (payload) => [...new Set([payload.mediaUrl, ...(payload.mediaUrls ?? [])].filter((url) => typeof url === "string" && url))];
+
 // A reply's media, read the way OpenClaw reads it for any channel: local files only
-// under the agent's own media roots, remote ones through its guarded fetch.
-async function loadReplyFiles(cfg, payload) {
-  const urls = [payload.mediaUrl, ...(payload.mediaUrls ?? [])].filter((url) => typeof url === "string" && url);
+// under the agent's own media roots, remote ones through its guarded fetch. `posted` holds
+// what this turn already posted, which is never posted again.
+async function loadReplyFiles(cfg, payload, posted = new Set()) {
   const files = [];
-  for (const url of [...new Set(urls)]) {
+  for (const url of replyMediaUrls(payload).filter((each) => !posted.has(each))) {
     const loaded = await loadOutboundMediaFromUrl(url, {
       maxBytes: MAX_MEDIA_BYTES,
       mediaLocalRoots: getAgentScopedMediaLocalRoots(cfg, AGENT),
@@ -378,6 +380,7 @@ async function loadReplyFiles(cfg, payload) {
       kind: payload.audioAsVoice && mime.startsWith("audio/") ? "voice" : undefined,
       name: loaded.fileName,
     });
+    posted.add(url);
   }
   return files;
 }
@@ -533,6 +536,8 @@ function startRoom(ctx) {
     room.assistantRead({ conversation, messageId: message.id });
     room.setTyping({ conversation, active: true });
     const changes = did.turn();
+    // The files this turn's replies posted, so one is never posted twice (deliver below).
+    const postedMedia = new Set();
     try {
       // The other assistant's spoken reply carries its own words.
       const words = author.isAssistant ? "" : await hearing.words(message);
@@ -615,11 +620,18 @@ function startRoom(ctx) {
             keepaliveIntervalMs: TYPING_KEEPALIVE_MS,
           },
         },
+        // OpenClaw hands over a reply that carries a file as soon as the assistant writes it,
+        // as a block even with block streaming off, or as a tool's result, and leaves that
+        // reply out of the final it sends after. On 22 October a reply with a chart was so
+        // handed over as a block, which this channel dropped, and its final came empty: the
+        // owner got nothing. So a block is a reply like the final, a tool's result is one only
+        // when it carries a file, and a file this turn already posted is not posted again.
         delivery: {
           deliver: async (payload, info) => {
-            if (info.kind !== "final") return;
+            const isReply = info.kind === "final" || info.kind === "block" || (info.kind === "tool" && replyMediaUrls(payload).length > 0);
+            if (!isReply) return;
             if (payload.isReasoning || payload.isCommentary || payload.isStatusNotice || payload.isCompactionNotice) return;
-            const files = await loadReplyFiles(cfg(), payload);
+            const files = await loadReplyFiles(cfg(), payload, postedMedia);
             const entry = await room.reply({ conversation, text: payload.text ?? "", files, handedOver, did: changes.take() });
             return entry
               ? {
@@ -1683,9 +1695,10 @@ function registerFull(api) {
             context,
             owner: account.config.owner.id,
             owners: cfg?.commands?.ownerAllowFrom,
-            post: async (week, decide) => {
+            post: async (week, decide, events) => {
               const lines = composeDigest({
                 week,
+                events,
                 decide,
                 due: running.notes.due(),
                 log: running.notes.rowsOf(WEIGHTS),

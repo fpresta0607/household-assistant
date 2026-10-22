@@ -1806,6 +1806,9 @@ An assistant's post to the family lands in the app's family room first, and Tele
 - `deploy/openclaw/plugins/household-app` registers the channel.
   A phone talks to it through the plugin's `household-app.*` gateway methods over the connection it already pairs with, and hears about changes through the `plugin.household-app.changed` and `plugin.household-app.typing` events.
 - Everything said in the app is kept in `household-app/room.sqlite` under the gateway's state, with attachments under `household-app/media/`, each named by its SHA-256.
+- A reply that carries a file, such as a chart or a PDF the assistant made, is handed to the channel as soon as the assistant writes it: OpenClaw sends it as a block even with block streaming off, or as a tool's result, and leaves it out of the final that follows.
+  The channel keeps a block as a reply like the final, a tool's result only when it carries a file, and never posts the same file twice in one turn.
+  Until 22 October it kept finals only, so such a reply was lost whole, words and file, with nothing in any log: OpenClaw reports a delivery that answers nothing only at verbose level.
 - A turn in the app is a channel turn like a Telegram one: it carries who sent it, the family room's last twenty messages as group history, and the tools the same turn has on Telegram, as [What a family-room turn may use](#what-a-family-room-turn-may-use) says.
   In the family room an assistant answers only when a message names it, by name or emoji, or replies to one of its messages, and a voice note is heard first to find out, as [Voice notes in the app](#voice-notes-in-the-app) says.
 - One assistant hands a request to the other by @mentioning it in the family room, `@Corey` or `@Denise`, the way PR 92 does in The Fam.
@@ -1833,6 +1836,7 @@ An assistant's post to the family lands in the app's family room first, and Tele
   The phone opens the card on the first visit from 5 AM; an overnight visit cannot mark that morning read, and a verse arriving after a calendar-only card reopens it once.
   The plugin keeps only the newest card, which the phone reads with `household-app.today` and hears of through `plugin.household-app.today`, and keeps on the phone to show offline, picking what is still ahead by its own clock.
   Each card also writes the day's brief line, which the app builds from before the card still show.
+  Since 22 October the card draws its day clean rather than wordy, as the Overlord asked: the calendar mark of the day, the month in three letters over the day's number, beside the next thing and two more, each in bold with its time (`AgendaDayView`); each thing's helping line is in the whole day the card opens, and in what VoiceOver reads.
 - An assistant's answer carries a `did` list, one item for each change its run made, which the app shows as chips under the answer: an event added, moved, changed or deleted, a reminder set, moved, changed or deleted, the household cart changed, or an email drafted, with its title and when it is.
   The plugin reads each from the run's own tool calls as OpenClaw's `after_tool_call` hook reports them, a calendar or reminder the way `approval-asks.js` reads it to ask, and keeps only a call that worked; a read adds nothing (`did.js`).
   The turn names each run OpenClaw starts for it, as a handed-over turn does, so the list goes on that turn's reply, and the relay carries a family-room reply's list to the other gateway, which keeps only the items it can read.
@@ -2338,7 +2342,9 @@ Corey's second list ranked it second: one message on Sunday night, about ten lin
 It goes to each parent from that parent's own assistant.
 
 - `scripts/openclaw-scheduled-jobs.py apply` also gives each gateway `household-app:sunday-digest`, "Sunday digest": an isolated run of the main agent at 19:00 on Sundays, which delivers nothing itself (`--no-deliver`).
-- The run reads the family's shared calendar and its person's own for the coming week, and calls `household_digest` once with `week`, at most four one-line events with their day and time, and `decide`, at most three things that need a decision (`digest.js`).
+- The run reads the family's shared calendar and its person's own for the coming week, and calls `household_digest` once with `events`, at most twelve, each its title and its start with the calendar's offset, or its day when all day, and `decide`, at most three things that need a decision (`digest.js`).
+  The plugin draws the events as an agenda card (`agenda` in the steward-cards skill): each day a calendar mark, the month in three letters over the day's number, beside one row for each thing in bold with its time, as the Overlord asked for the day snapshot on 22 October.
+  A run that cannot give starts gives `week` instead, at most four one-line events with their day and time, which the digest shows as lines, as before.
 - A run has every tool, so it never reads words someone else wrote into the household note.
   The plugin itself adds those lines and posts the digest in its person's own thread: what is slipping (overdue lines and overdue promises, two named and a count), the trend of the most recently changed log whose topic says "weigh" (the latest weigh-in's count and average, and the change since the one before), how many items the cart holds, and the open promises, the first named.
   The tool answers the run with the number of lines alone.

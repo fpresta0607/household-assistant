@@ -55,6 +55,8 @@ struct StewardCard: Decodable, Equatable, Sendable {
             content = .pocketPiggies(try PocketPiggiesCard(from: decoder))
         case "sources":
             content = .sources(try SourcesCard(from: decoder))
+        case "agenda":
+            content = .agenda(try AgendaCard(from: decoder))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "not a card type this app draws")
         }

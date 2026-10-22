@@ -8,13 +8,26 @@
 // gives household_digest what only it can find, the week's calendar and the decisions, and
 // this composes the rest from the note and the cart itself and posts the whole message. The
 // tool answers the run with counts alone.
+//
+// The week is drawn the way the Overlord asked for the day snapshot on 22 October, clean
+// rather than wordy: when the run gives the week's `events`, the message carries them as an
+// agenda card, each day a calendar mark beside one row for each thing, in bold with its time
+// (the app's AgendaCardView). A run that gives only `week` lines gets those lines, as before.
 
+import { CLOSING, OPENING } from "./card-blocks.js";
 import { isOwnTurn } from "./brief.js";
 
 export const DIGEST_TOOL = "household_digest";
 const MAX_WEEK = 4;
 const MAX_DECIDE = 3;
 const MAX_LINE = 120;
+// What an agenda card draws at most (the app's AgendaCard): seven days, twelve things a day.
+const MAX_EVENTS = 12;
+const MAX_DAYS = 7;
+const MAX_TITLE = 60;
+// A start as the calendar gives it, with its offset, and an all-day thing's day.
+const START = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})$/;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_SLIPPING_SHOWN = 2;
 // A log whose trend the digest gives: the litter's weigh-ins, or any other weight.
 export const WEIGHTS = /weigh/i;
@@ -60,14 +73,36 @@ function weekOf(now, timeZone) {
 
 const quoted = (line) => `"${line.text}"${line.topic ? ` (${line.topic})` : ""}`;
 
+// "9:00 AM", on the clock the calendar gave the start in.
+function clock(start) {
+  const [, , hour, minute] = START.exec(start);
+  return `${Number(hour) % 12 || 12}:${minute} ${Number(hour) < 12 ? "AM" : "PM"}`;
+}
+
+// The week's events as an agenda card's lines: each day once, the soonest first, something all
+// day before the timed things of its day, at most seven days.
+export function agendaLines(events) {
+  const sorted = events
+    .map((event) => (event.start
+      ? { day: START.exec(event.start)[1], sort: event.start.slice(11, 16), row: { title: event.title, time: clock(event.start) } }
+      : { day: event.day, sort: "", row: { title: event.title } }))
+    .sort((left, right) => left.day.localeCompare(right.day) || left.sort.localeCompare(right.sort));
+  const days = [];
+  for (const { day, row } of sorted) {
+    if (days.at(-1)?.date !== day) days.push({ date: day, events: [] });
+    days.at(-1).events.push(row);
+  }
+  return [OPENING, JSON.stringify({ type: "agenda", title: "The week ahead", skill: "calendar", days: days.slice(0, MAX_DAYS) }), CLOSING];
+}
+
 // The digest as its lines, from what the run found and what the note and the cart hold.
-export function composeDigest({ week, decide, due, log, cartItems, now, timeZone }) {
+export function composeDigest({ week, events = [], decide, due, log, cartItems, now, timeZone }) {
   const slipping = [...due.overdue, ...due.promises.filter((line) => line.standing === "overdue")];
   const open = due.promises.length;
   const trend = trendOf(log);
   return [
     `Sunday digest, the week of ${weekOf(now, timeZone)}`,
-    ...(week.length > 0 ? week.map((line) => `- ${line}`) : ["- Nothing on the calendar."]),
+    ...(events.length > 0 ? agendaLines(events) : week.length > 0 ? week.map((line) => `- ${line}`) : ["- Nothing on the calendar."]),
     slipping.length === 0
       ? "Slipping: nothing."
       : `Slipping: ${slipping.slice(0, MAX_SLIPPING_SHOWN).map(quoted).join(", ")}${slipping.length > MAX_SLIPPING_SHOWN ? ` and ${slipping.length - MAX_SLIPPING_SHOWN} more` : ""}.`,
@@ -82,34 +117,63 @@ function result(payload, isError = false) {
   return { content: [{ type: "text", text: JSON.stringify(payload) }], ...(isError ? { isError } : {}) };
 }
 
-// The tool, in the owner's own turns and a scheduled run, or null. `post(week, decide)`
-// composes and posts the digest, and answers how many lines it posted.
+// The tool, in the owner's own turns and a scheduled run, or null. `post(week, decide,
+// events)` composes and posts the digest, and answers how many lines it posted.
 export function createDigestTool({ context, owner, owners, post }) {
   if (!isOwnTurn({ context, owner, owners })) return null;
   const lines = (value, most) => Array.isArray(value) && value.length <= most &&
     value.every((line) => typeof line === "string" && line.trim() && line.length <= MAX_LINE && !NOT_ONE_LINE.test(line));
+  const isEvent = (event) => Boolean(event) && typeof event === "object" && !Array.isArray(event) &&
+    Object.keys(event).every((key) => ["title", "start", "day"].includes(key)) &&
+    typeof event.title === "string" && event.title.trim() !== "" && event.title.length <= MAX_TITLE && !NOT_ONE_LINE.test(event.title) &&
+    (event.start === undefined) !== (event.day === undefined) &&
+    (event.start === undefined || (typeof event.start === "string" && START.test(event.start))) &&
+    (event.day === undefined || (typeof event.day === "string" && DAY.test(event.day)));
+  const isEvents = (value) => value === undefined || (Array.isArray(value) && value.length <= MAX_EVENTS && value.every(isEvent));
   return {
     name: DIGEST_TOOL,
     label: "Sunday digest",
     description:
-      "Posts the Sunday night digest in your person's own chat in the Steward app: about ten lines, read once. Give `week`, at most four short lines, " +
-      "the coming week's main events from the family's shared calendar and your person's own, each with its day and time, and `decide`, the two or three " +
+      "Posts the Sunday night digest in your person's own chat in the Steward app: about ten lines, read once. Give `events`, the coming week's main events " +
+      `from the family's shared calendar and your person's own, at most ${MAX_EVENTS}, each its \`title\` and its \`start\` as the calendar gives it, with its offset, ` +
+      "or its `day` when it is all day: the app draws them as the week at a glance. Without `events`, `week` gives at most four short lines, each with its day and time. " +
+      "Give `decide`, the two or three " +
       "things that need your person's decision this week, each one short line, or none. The digest adds what is slipping, the litter's weight trend, " +
       "the cart and the open promises from the household note itself. Call it once.",
     parameters: {
       type: "object",
       additionalProperties: false,
-      required: ["week", "decide"],
+      required: ["decide"],
       properties: {
+        events: {
+          type: "array",
+          maxItems: MAX_EVENTS,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["title"],
+            properties: {
+              title: { type: "string", minLength: 1, maxLength: MAX_TITLE },
+              start: { type: "string", description: "When it starts, as the calendar gives it, such as 2026-10-26T09:00:00-05:00." },
+              day: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "Its day, YYYY-MM-DD, only when it is all day." },
+            },
+          },
+        },
         week: { type: "array", maxItems: MAX_WEEK, items: { type: "string", minLength: 1, maxLength: MAX_LINE } },
         decide: { type: "array", maxItems: MAX_DECIDE, items: { type: "string", minLength: 1, maxLength: MAX_LINE } },
       },
     },
     async execute(_id, args) {
-      if (!lines(args?.week, MAX_WEEK) || !lines(args?.decide, MAX_DECIDE)) {
-        return result({ code: "invalid_arguments", message: `Give week, at most ${MAX_WEEK} lines, and decide, at most ${MAX_DECIDE}, each one line of at most ${MAX_LINE} characters.` }, true);
+      const week = args?.week ?? (args?.events === undefined ? null : []);
+      if (!lines(week, MAX_WEEK) || !lines(args?.decide, MAX_DECIDE) || !isEvents(args?.events)) {
+        return result({
+          code: "invalid_arguments",
+          message: `Give events, at most ${MAX_EVENTS}, each a title and a start with its offset or an all-day day, or week, at most ${MAX_WEEK} lines; ` +
+            `and decide, at most ${MAX_DECIDE}, each one line of at most ${MAX_LINE} characters.`,
+        }, true);
       }
-      const posted = await post(args.week.map((line) => line.trim()), args.decide.map((line) => line.trim()));
+      const events = (args.events ?? []).map((event) => ({ ...event, title: event.title.trim() }));
+      const posted = await post(week.map((line) => line.trim()), args.decide.map((line) => line.trim()), events);
       return result({ posted: true, lines: posted });
     },
   };

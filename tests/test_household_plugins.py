@@ -71,6 +71,7 @@ def node_or_skip() -> str:
         "household_app_photos.test.mjs",
         "household_app_push.test.mjs",
         "household_app_relay_in.test.mjs",
+        "household_app_reply_media.test.mjs",
         "household_app_room.test.mjs",
         "household_app_send.test.mjs",
         "household_app_settings.test.mjs",
