@@ -2374,6 +2374,21 @@ A gift for one parent must never reach that parent, and both parents read the ho
 - The host relay carries the `wishes` log beside the cart's and the note's (`STEP_LOGS` in `household-app-relay.py`), only the source assistant's own steps, and no phone is shown any of it.
 - A wish of a person's own waits in that gateway's outbox until the other side has it, so a relay that is down keeps it there longer; nothing in that gateway's turns, pages or line shows it.
 
+### Document and deadline vault
+
+Corey asked for passports, insurance policies, car registrations, warranties, subscriptions and licenses to be photographed once, with the assistant watching their dates and saying so thirty days out.
+
+- `household_vault` (`vault-tool.js`) is offered in the owner's own thread alone, never in the family room, not even the owner's own session of it.
+  The owner sends a photo, or a scan (the app sends it as a PDF), in their thread; the assistant reads the day the document expires or renews and calls `keep` with that message's id, what it is, its kind and the day.
+  It asks rather than guess a day it cannot read.
+- The picture never moves.
+  The owner's thread is shared with nobody and the media store keeps its files on this gateway alone (`media.js`); the vault keeps only which of those files a document is, what it is and its day, in `household-app/vault.sqlite` (`vault.js`), and nothing of it is in the outbox.
+  No log line names a document.
+- The day goes into the household note as a line of the `Renewals` topic due on that day, such as "Franco's passport expires Sat, Mar 6, 2027", naming only the document and its day; with `isPrivate`, when the owner asks to keep it to themselves, there is no note line.
+- Every hour, and as the channel starts, the gateway posts its owner, in their own thread and with no model, each document whose day is 30 days away or less, once for that day: "Your passport expires in 30 days, Mon, Dec 21, 2026. It is in your vault in Steward."
+  A document kept, or renewed, with less than 30 days left is said in that turn's reply instead (the answer's `tell`), and nothing is posted on the day itself.
+- `update` takes a renewed document's new day or a new photo and corrects its note line (adding it back if someone removed it); `remove` takes a document and its note line out; `view` lists what is kept, soonest first, with how many pictures each has and never their ids.
+
 ### The house
 
 - `household_home` is the assistant's tool for the thermostat, the music and the living room TV, in the owner's own thread and the family room, by the same turn proof as `household_location` (`turn.js`).

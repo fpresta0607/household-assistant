@@ -107,8 +107,8 @@ FAMILY_GROUP = IDENTIFIERS.family_group
 # The plugin's tools: where the owner is while they share it, the household's shared
 # cart, the assistant's Today card and its line for the day, the house's thermostat and
 # music, a tapback on a person's message, the household note, a draft the owner sends
-# with one tap, the Sunday digest, and the wishlist. They are optional, so under a tool
-# profile only `tools.alsoAllow` hands them to the model.
+# with one tap, the Sunday digest, the wishlist, and the document vault. They are optional,
+# so under a tool profile only `tools.alsoAllow` hands them to the model.
 APP_TOOLS = [
     "household_location",
     "household_cart",
@@ -120,6 +120,7 @@ APP_TOOLS = [
     "household_send",
     "household_digest",
     "household_wish",
+    "household_vault",
 ]
 # The PocketPiggies guard rewrites `tools.alsoAllow` as everything else in its order,
 # then these three. Putting the new tool before them leaves the guard nothing to do.
