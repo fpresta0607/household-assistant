@@ -24,9 +24,12 @@ struct RoomSyncPage: Decodable, Equatable, Sendable {
     /// The family room's look, changed on either phone. Nil while nobody has changed it,
     /// and from a gateway that does not keep one.
     let familyLook: FamilyLook?
+    /// When the two assistants' direct line last moved. Nil before its first step, and from
+    /// a gateway that has no line.
+    let pair: RoomPair?
 
     private enum CodingKeys: String, CodingKey {
-        case entries, rev, hasMore, participants, sessionKeys, ownersFamilySession, peerAssistant, familyAvatar, familyLook
+        case entries, rev, hasMore, participants, sessionKeys, ownersFamilySession, peerAssistant, familyAvatar, familyLook, pair
         case me = "self"
     }
 }

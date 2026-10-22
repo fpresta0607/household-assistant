@@ -1,8 +1,10 @@
 // Chats, where the app opens: the family room and this phone's own thread with its
 // assistant as two big pinned faces, the way Messages pins a conversation, and what was
-// shared in either in one strip underneath, all of it or one conversation's. Sharing where
-// this iPhone is runs in the background with nothing here: Location in Settings, and the
-// chat it was shared in, say whether it is on.
+// shared in either in one strip underneath, all of it or one conversation's. Between them,
+// once the two assistants have passed each other anything, a row opens the Corey & Denise
+// group both parents watch (PairView). Sharing where this iPhone is runs in the background
+// with nothing here: Location in Settings, and the chat it was shared in, say whether it
+// is on.
 //
 // Under it floats the glass tab bar, Chats and Settings, both always there. Your own face
 // at the top left opens Settings too, and the phone at the top right calls your assistant.
@@ -11,8 +13,8 @@
 // all of it.
 //
 // As the app opens, the page settles in and the tab bar rises, the pins rise one after
-// another, and the Today card and what was shared arrive last, all within about a third of a
-// second. A conversation slides in and out, as in Telegram: zoomed out of its pinned face,
+// another, and the Today card, the assistants' row and what was shared arrive last, all
+// within about a third of a second. A conversation slides in and out, as in Telegram: zoomed out of its pinned face,
 // the open chat's own page showed as a white card over the face as it closed back into it.
 // A picture zooms out of its tile. With Reduce Motion everything only fades.
 
@@ -30,6 +32,8 @@ struct InboxView: View {
     @State private var zoomedMedia: String?
     /// Whether Chats has made its entrance, once, as the app opens.
     @State private var hasEntered = false
+    /// Whether the Corey & Denise group is open over Chats, from its row.
+    @State private var isPairOpen = false
     @Namespace private var zoom
 
     var body: some View {
@@ -41,7 +45,7 @@ struct InboxView: View {
                     // hands the tab bar a choice made inside the stack, the open chat's or
                     // Chats' own, so a chat showed the bar under its composer. The bar rises
                     // in as the page settles and is gone while a chat is open.
-                    .toolbar(hasEntered && model.path.isEmpty ? .visible : .hidden, for: .tabBar)
+                    .toolbar(hasEntered && model.path.isEmpty && !isPairOpen ? .visible : .hidden, for: .tabBar)
             }
             Tab("Settings", systemImage: "gearshape.fill", value: AppTab.settings) {
                 SettingsView()
@@ -53,6 +57,8 @@ struct InboxView: View {
         .onChange(of: model.path) { old, new in
             if old.isEmpty, !new.isEmpty {
                 ChatTiming.opened()
+                // A conversation opened from anywhere shows alone, as it does over Chats.
+                isPairOpen = false
             }
             #if DEBUG
             DemoBackTransitionObservation.shared.pathChanged(from: old, to: new)
@@ -107,6 +113,11 @@ struct InboxView: View {
                             .frame(maxWidth: .infinity)
                             // Room for the bubble that sits over a face.
                             .padding(.top, 44)
+                            if model.room.pairLastAt != nil || !model.pairLine.entries.isEmpty {
+                                PairRow { isPairOpen = true }
+                                    .padding(.horizontal, 16)
+                                    .modifier(Entering(order: RoomConversation.allCases.count, hasEntered: hasEntered))
+                            }
                             SharedStrip(onOpen: { open($0) }, onSearch: { isSearchingShared = true })
                                 .modifier(Entering(order: RoomConversation.allCases.count, hasEntered: hasEntered))
                         }
@@ -136,6 +147,9 @@ struct InboxView: View {
             }
             .navigationDestination(for: RoomConversation.self) { conversation in
                 RoomView(conversation: conversation)
+            }
+            .navigationDestination(isPresented: $isPairOpen) {
+                PairView()
             }
             .fullScreenCover(item: $viewing) { media in
                 MediaViewer(media: media) { shown in

@@ -38,6 +38,9 @@ final class RoomModel {
     private(set) var familyAvatar: RoomMedia?
     /// The family room's look, the same on both phones. Nil until anyone changes it.
     private(set) var familyLook: FamilyLook?
+    /// When the two assistants' direct line last moved, in milliseconds, from the pages and
+    /// the plugin's `pair` event, for the family room's quiet marker. Nil before its first step.
+    private(set) var pairLastAt: Int?
     /// The newest revision this phone has followed.
     private(set) var rev = 0
     /// False when the gateway this phone pairs with has no household-app channel,
@@ -175,6 +178,11 @@ final class RoomModel {
         participants.first { $0.id == id }
     }
 
+    /// Everyone in the room's name by their id, for words that name them.
+    var names: [String: String] {
+        Dictionary(participants.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+    }
+
     /// What this phone's assistant's run is busy with in a conversation while a tool
     /// runs. Nil while it thinks, and once the run is over.
     func activity(in conversation: RoomConversation) -> AssistantActivity? {
@@ -222,7 +230,7 @@ final class RoomModel {
         if !hasReadPage {
             // Who is in the room, from a kept page that says, before the threads are drawn.
             if let page = read.map(\.page).first(where: { !$0.participants.isEmpty }) {
-                orient(participants: page.participants, me: page.me, sessionKeys: page.sessionKeys, ownersFamilySession: page.ownersFamilySession, familyAvatar: page.familyAvatar, familyLook: page.familyLook)
+                orient(participants: page.participants, me: page.me, sessionKeys: page.sessionKeys, ownersFamilySession: page.ownersFamilySession, familyAvatar: page.familyAvatar, familyLook: page.familyLook, pair: page.pair)
             }
             for found in read {
                 kept[found.conversation] = found.kept
@@ -282,7 +290,7 @@ final class RoomModel {
                 hasReadPage = true
                 update(conversation) { $0.load(page) }
                 keep(RoomArchive.Kept(page: answer.json), for: conversation)
-                orient(participants: page.participants, me: page.me, sessionKeys: page.sessionKeys, ownersFamilySession: page.ownersFamilySession, familyAvatar: page.familyAvatar, familyLook: page.familyLook)
+                orient(participants: page.participants, me: page.me, sessionKeys: page.sessionKeys, ownersFamilySession: page.ownersFamilySession, familyAvatar: page.familyAvatar, familyLook: page.familyLook, pair: page.pair)
                 let newest = max(rev, page.messages.map(\.rev).max() ?? 0)
                 if newest != rev {
                     rev = newest
@@ -348,7 +356,7 @@ final class RoomModel {
                 let answer = try await connection.roomSyncKept(since: rev)
                 let page = answer.model
                 keep(changes: answer.json["entries"]?.arrayValue ?? [])
-                orient(participants: page.participants, me: page.me, sessionKeys: page.sessionKeys, ownersFamilySession: page.ownersFamilySession, familyAvatar: page.familyAvatar, familyLook: page.familyLook)
+                orient(participants: page.participants, me: page.me, sessionKeys: page.sessionKeys, ownersFamilySession: page.ownersFamilySession, familyAvatar: page.familyAvatar, familyLook: page.familyLook, pair: page.pair)
                 let arriving = page.entries.filter { $0.kind == .message }.map { RoomMessage($0) }
                 if !arriving.isEmpty {
                     await prepare?(arriving)
@@ -905,6 +913,12 @@ final class RoomModel {
             follow(tool)
             return
         }
+        if event.event == PairPage.eventName {
+            if let lastAt = event.payload?["lastAt"]?.intValue {
+                pairMoved(at: lastAt)
+            }
+            return
+        }
         guard
             case .chat(let chat) = event.body,
             let conversation = followedConversation(chat.sessionKey),
@@ -1060,6 +1074,7 @@ final class RoomModel {
         peerAssistant = nil
         familyAvatar = nil
         familyLook = nil
+        pairLastAt = nil
         rev = 0
         isAvailable = nil
         errorText = nil
@@ -1230,9 +1245,13 @@ final class RoomModel {
         sessionKeys: [RoomConversation: String],
         ownersFamilySession: String?,
         familyAvatar: RoomMedia?,
-        familyLook: FamilyLook?
+        familyLook: FamilyLook?,
+        pair: RoomPair?
     ) {
         let hasChanged = participants != self.participants || me != self.me
+        if let pair {
+            pairMoved(at: pair.lastAt)
+        }
         if familyAvatar != self.familyAvatar {
             self.familyAvatar = familyAvatar
         }
@@ -1253,6 +1272,13 @@ final class RoomModel {
         self.ownersFamilySession = ownersFamilySession
         if hasChanged {
             onParticipantsChanged?()
+        }
+    }
+
+    /// Only ever later: a page read before the line's latest event must not take it back.
+    private func pairMoved(at lastAt: Int) {
+        if lastAt > (pairLastAt ?? 0) {
+            pairLastAt = lastAt
         }
     }
 

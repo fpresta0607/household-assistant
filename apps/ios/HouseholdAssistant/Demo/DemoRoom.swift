@@ -113,6 +113,8 @@ final class DemoRoom {
     /// that shows them. Everyone shows their emoji or initial until then.
     var faces: [String: RoomMedia] = [:]
     private let now: () -> Date
+    /// Corey and Denise on their direct line, which every page says the last move of.
+    private let pair: DemoPair
 
     /// What Gia says in her voice note, which the demo and the screenshots show under it
     /// in place of a recognizer's hearing.
@@ -133,6 +135,9 @@ final class DemoRoom {
     /// many older messages in Franco's own thread first, for the hitch tests.
     init(now: @escaping () -> Date = Date.init, isFinished: Bool = true, longThread: Int = 0) {
         self.now = now
+        // On the phone's own clock, so the family room's marker shows however the demo's
+        // clock is set.
+        pair = DemoPair(at: Date())
         let photoData = DemoMedia.photo()
         let voiceData = DemoMedia.voiceNote(seconds: 6)
         let slipData = DemoMedia.permissionSlip()
@@ -379,6 +384,8 @@ final class DemoRoom {
             return history(conversation, before: params["before"]?.intValue, limit: params["limit"]?.intValue ?? 100)
         case "household-app.sync":
             return sync(since: params["since"]?.intValue ?? 0, limit: params["limit"]?.intValue ?? 500)
+        case DemoPair.method:
+            return pair.answer(params)
         case "household-app.media":
             return chunk(params["id"]?.stringValue ?? "", offset: params["offset"]?.intValue ?? 0, length: params["length"]?.intValue ?? 0)
         case "household-app.send":
@@ -608,6 +615,7 @@ final class DemoRoom {
             "sessionKeys": Self.sessionKeysJSON,
             "looks": .array(looks(among: page, in: conversation, before: before, hasMore: older.count > page.count)),
             "familyLook": familyLook ?? .null,
+            "pair": pair.mark,
         ])
     }
 
@@ -672,6 +680,7 @@ final class DemoRoom {
             "sessionKeys": Self.sessionKeysJSON,
             "peerAssistant": Self.peerAssistant,
             "familyLook": familyLook ?? .null,
+            "pair": pair.mark,
         ])
     }
 
