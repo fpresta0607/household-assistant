@@ -2,10 +2,12 @@
 // identity, so only a row whose content changed draws again and every row keeps the height
 // it drew at (ThreadLayout). Rows coming or going above what the person reads leave the
 // message they read where it is. At the newest, a row arriving at the bottom takes its place
-// just above the composer in the same pass and fades in, and what this phone sends rises
-// out of its own corner, as in Messages, never from under the composer. A message from
-// someone else too tall to show whole there glides up from where the list stood until its
-// top is at the top instead, so it is read from the start. What this phone sends brings the
+// just above the composer and fades in, and what this phone sends rises out of its own
+// corner, as in Messages, never from under the composer. Someone else's message, an
+// assistant's reply taking the place of its typing dots above all, does not jump there: the
+// list glides up to it, and its words type in from the top, line by line, at reading pace.
+// A message from someone else too tall to show whole there glides up from where the list
+// stood until its top is at the top instead, so it is read from the start. What this phone sends brings the
 // list to it from wherever the person was. The page before is read once its row comes on
 // screen.
 //
@@ -39,6 +41,11 @@ final class ThreadCollectionCoordinator: NSObject, UICollectionViewDelegate {
     /// and lets go of the farthest once twice as many are built.
     private static let keptRows = 80
     private static let restBeforeBuildingAhead: TimeInterval = 0.5
+    /// How fast a reply types in, by its height, and how long that takes at the least and
+    /// the most: a one-liner still visibly types, a long answer is never kept waiting.
+    private static let typeInPointsPerSecond = 700.0
+    private static let typeInShortest = 0.3
+    private static let typeInLongest = 0.9
 
     let layout = ThreadLayout()
     private var list: ThreadCollection
@@ -340,6 +347,11 @@ final class ThreadCollectionCoordinator: NSObject, UICollectionViewDelegate {
         }
         if wasPinned, let top = topOfTallArrival(among: arrived, in: view) {
             view.show(fromTop: top, startingAt: offsetBefore, isAnimated: !(look?.reducesMotion ?? false))
+        } else if wasPinned, !(look?.reducesMotion ?? false), offsetApplied - offsetBefore > 1, arrived.contains(where: isReply) {
+            // The pin moved the list up by the reply's height in this one pass; it glides there
+            // from where it stood instead, so nothing above jumps.
+            view.contentOffset.y = offsetBefore
+            view.goToNewest(isAnimated: true)
         }
         ThreadLog.note(
             "apply rows \(countBefore)->\(newOrder.count) arriving \(arriving.count) changed \(changed.count) \(changed.prefix(3)) "
@@ -559,6 +571,41 @@ final class ThreadCollectionCoordinator: NSObject, UICollectionViewDelegate {
         return nil
     }
 
+    /// Whether a row is a message someone else sent, an assistant's reply most of all, rather
+    /// than one this phone is sending or anything that is not a message.
+    private func isReply(_ id: ThreadRow.ID) -> Bool {
+        guard let row = rows[id], case .message = row.content else {
+            return false
+        }
+        return !Self.isSending(row)
+    }
+
+    /// Shows a message's rows from the top down behind a soft edge, at about reading pace, so
+    /// it reads as typing in rather than appearing whole. It is laid out at its full height
+    /// from the start, so nothing moves while it types in.
+    private func typeIn(_ cell: UICollectionViewCell) {
+        let height = cell.bounds.height
+        let edge: CGFloat = 36
+        let mask = CAGradientLayer()
+        mask.colors = [UIColor.black.cgColor, UIColor.black.cgColor, UIColor.clear.cgColor]
+        mask.locations = [0, NSNumber(value: Double(height / (height + edge))), 1]
+        mask.frame = CGRect(x: 0, y: 0, width: cell.bounds.width, height: height + edge)
+        cell.layer.mask = mask
+        let reveal = CABasicAnimation(keyPath: "position.y")
+        reveal.fromValue = -(height + edge) / 2
+        reveal.toValue = (height + edge) / 2
+        reveal.duration = min(Self.typeInLongest, max(Self.typeInShortest, Double(height) / Self.typeInPointsPerSecond))
+        reveal.timingFunction = CAMediaTimingFunction(name: .linear)
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak cell, weak mask] in
+            if let cell, cell.layer.mask === mask {
+                cell.layer.mask = nil
+            }
+        }
+        mask.add(reveal, forKey: "typeIn")
+        CATransaction.commit()
+    }
+
     private func restore(_ anchor: (row: ThreadRow.ID, top: CGFloat), in view: ThreadCollectionView) {
         guard let index = order.firstIndex(of: anchor.row), let frame = layout.frame(at: index) else {
             return
@@ -579,6 +626,7 @@ final class ThreadCollectionCoordinator: NSObject, UICollectionViewDelegate {
         ChatTiming.appeared(row, isNewest: indexPath.item == order.count - 1)
         cell.alpha = 1
         cell.transform = .identity
+        cell.layer.mask = nil
         if arriving.remove(row.id) != nil, !(look?.reducesMotion ?? false) {
             if Self.isSending(row) {
                 // Grows out of its bottom trailing corner, so its bottom edge never moves.
@@ -591,6 +639,8 @@ final class ThreadCollectionCoordinator: NSObject, UICollectionViewDelegate {
                     cell.transform = .identity
                     cell.alpha = 1
                 }
+            } else if isReply(row.id) {
+                typeIn(cell)
             } else {
                 cell.alpha = 0
                 UIView.animate(withDuration: 0.25) {

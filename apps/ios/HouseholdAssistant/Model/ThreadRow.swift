@@ -5,8 +5,10 @@
 // from another app on its way, or a change to the family room's look, among the messages
 // at its time. No line of the assistant's steps shows before or around a reply.
 //
-// A reply shows whole once it is complete, never typed out word by word: while it streams
-// in, and while its words are made ready to draw, its author's typing row stands in for it.
+// A reply is laid out whole once it is complete, never word by word: while it streams in,
+// and while its words are made ready to draw, its author's typing row stands in for it.
+// Then it takes the typing row's place without a jump and types in from the top, line by
+// line (ThreadCollectionCoordinator).
 // The room for "Delivered" under this phone's newest message is kept from the moment it is
 // sent, so the receipt arriving never moves it.
 //
