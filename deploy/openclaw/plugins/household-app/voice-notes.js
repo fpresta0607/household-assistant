@@ -32,6 +32,18 @@ export function isNameSpoken(words, name) {
   return (String(words).match(/\p{L}+/gu) ?? []).some((word) => key(word) === wanted);
 }
 
+// A turn started by a person's voice note. The family lives in voice notes, so a weigh-in or a
+// grocery list said aloud is logged as it is, rows in the household note or items in the
+// cart, and answered with one line: no re-reading, no transcription chore. Speech-to-text
+// mishears a number or a name now and then, so the one unclear value is asked about, never
+// guessed. It is an instruction only: no model call is added for it.
+export const VOICE_NOTE_INSTRUCTION = [
+  "This message is a voice note, and you have its words as speech-to-text wrote them.",
+  "When it gives something the family keeps track of, such as a weigh-in, a reading, a dose or a list, log it at once, in one call: household_note add with rows, one row per item, or household_cart add with list for things to buy.",
+  "If one value is unclear in the words, such as a number misheard or a name that is no one's, never guess it: give that row with unsure saying what you heard, log the rest, and ask about that one value alone in a short question.",
+  "Then answer in one line that says what you logged, such as \"logged 7 kittens, Day 17\", plus that one question when there is one, and nothing else.",
+].join(" ");
+
 export function createHearing({ store, transcribe, assistantId, heard, log, now = Date.now }) {
   const hearing = new Map();
 

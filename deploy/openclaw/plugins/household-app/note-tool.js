@@ -32,6 +32,27 @@ const ROW = {
   owner: { type: "string", minLength: 1, maxLength: 40, description: "Who will do it, by name: you, the other assistant, or one of the people. It makes the line a promise." },
 };
 
+// A row whose value was unclear, such as a weight speech-to-text misheard in a voice note: it
+// is not logged, and the answer says to ask about it rather than guess.
+const UNSURE = {
+  type: "string",
+  minLength: 1,
+  maxLength: 120,
+  description: "Only when this row's value was unclear, such as a number misheard in a voice note: what you heard. The row is not logged; ask about it.",
+};
+
+// What an add logged, in a few words for a one-line answer, and the rows to ask about.
+function logged(view, rows, unsure) {
+  const kept = view.lines.slice(-rows);
+  const days = [...new Set(kept.map((line) => line.day))];
+  return {
+    logged: `${rows} ${rows === 1 ? "row" : "rows"} under ${JSON.stringify(view.topic)}${days.length === 1 ? `, ${days[0]}` : ""}`,
+    ...(unsure.length > 0
+      ? { ask: unsure.map((row) => ({ ...(row.item === undefined ? {} : { item: row.item }), heard: row.unsure })), askHow: "Ask about only these, in one short question; never guess them." }
+      : {}),
+  };
+}
+
 function result(payload, isError = false) {
   return { content: [{ type: "text", text: JSON.stringify(payload) }], ...(isError ? { isError } : {}) };
 }
@@ -50,6 +71,8 @@ export function createNoteTool({ context, owner, people, notes, peerAssistantNam
       "never keep family data in a file or tracker of your own, and when you find one, move what it holds here. " +
       "A log is one topic, such as \"Kitten weights\", with one row per item: `add` with `rows` takes a whole weigh-in at once, " +
       "each row's `item` (the kitten) and `text` (\"212 g\"), with `day` when it was not today. " +
+      "A row whose value was unclear, such as a weight misheard in a voice note, goes in with `unsure` saying what you heard: it is not logged, and you ask about it instead of guessing. " +
+      "The answer's `logged` says what was logged, for a one-line reply. " +
       "Something due, such as a deworming dose, first shots, a vet visit or a deadline, is a line with `due`; `done` marks it done, and `due` lists what is overdue and due within a week. " +
       `Facts both of you must know, such as dates, church times or a code the family shares on purpose, are lines too. Anything you are asked to tell ${peerAssistantName} goes here, so it is never only a message. ` +
       `\`hand\` is your direct line to ${peerAssistantName}: it hands them a question or a piece of work without a word in the family room, their side marks it seen at once and answers it in a turn of their own, ` +
@@ -74,7 +97,7 @@ export function createNoteTool({ context, owner, people, notes, peerAssistantNam
           minItems: 1,
           maxItems: MAX_ROWS,
           description: "Several rows under one topic at once, such as each kitten's weight from one weigh-in.",
-          items: { type: "object", additionalProperties: false, required: ["text"], properties: ROW },
+          items: { type: "object", additionalProperties: false, required: ["text"], properties: { ...ROW, unsure: UNSURE } },
         },
         line: { type: "string", description: "A line's id, such as hn-1a2b3c4d, from the note." },
         time: { type: "string", pattern: "^([01]\\d|2[0-3]):[0-5]\\d$", description: "When a reminder goes off, HH:MM on a 24-hour clock, in the family's time." },
@@ -96,8 +119,12 @@ export function createNoteTool({ context, owner, people, notes, peerAssistantNam
           if (args.rows !== undefined && ROW_FIELDS.some((field) => args[field] !== undefined)) {
             return failure("invalid_arguments", "Give either one line's fields or rows, not both.");
           }
-          const rows = args.rows?.map((each) => ({ ...each, owner: ownerOf(each.owner) }));
-          return result(notes.add({ topic: args.topic, ...(rows === undefined ? row : { rows }), forWho: turn.sender }));
+          if (args.rows === undefined) return result(notes.add({ topic: args.topic, ...row, forWho: turn.sender }));
+          const unsure = args.rows.filter((each) => each.unsure !== undefined);
+          const rows = args.rows.filter((each) => each.unsure === undefined).map((each) => ({ ...each, owner: ownerOf(each.owner) }));
+          if (rows.length === 0) return result({ ...logged({ topic: args.topic, lines: [] }, 0, unsure), logged: "nothing yet" });
+          const view = notes.add({ topic: args.topic, rows, forWho: turn.sender });
+          return result({ ...logged(view, rows.length, unsure), ...view });
         }
         if (args.action === "promise") {
           return result(notes.add({ topic: args.topic ?? PROMISES, ...row, owner: row.owner ?? notes.self, forWho: turn.sender }));

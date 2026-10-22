@@ -967,3 +967,17 @@ for (const [why, args, code] of [
     assert.equal(answer.code, code);
   });
 }
+
+test("an add whose every row was unclear logs nothing and says what to ask", async () => {
+  // Arrange
+  const { notes, found } = tool(DIRECT);
+
+  // Act
+  const answer = await run(found, { action: "add", topic: "Kitten weights", rows: [{ item: "Mochi", text: "2 g", unsure: "two-something grams" }] });
+
+  // Assert
+  assert.equal(answer.isError, false);
+  assert.equal(answer.logged, "nothing yet");
+  assert.deepEqual(answer.ask, [{ item: "Mochi", heard: "two-something grams" }]);
+  assert.deepEqual(notes.view(), { topics: [] });
+});
