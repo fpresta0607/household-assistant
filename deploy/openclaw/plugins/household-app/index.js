@@ -75,7 +75,7 @@ import { createFixedWindowRateLimiter, readJsonWebhookBodyOrReject } from "openc
 
 import { APPLE_PATH, createAppleKeys, createAppleSignIn, createNonces } from "./apple-signin.js";
 import { ASKING_TOOLS, askBeforeChange } from "./approval-asks.js";
-import { familyAutomations } from "./automations.js";
+import { createReminderPushes, familyAutomations } from "./automations.js";
 import { approvalNativeRuntime, createApprovals, ownerApprovalCapability } from "./approvals.js";
 import { BRIEF_TOOL, createBrief, createBriefTool } from "./brief.js";
 import { TODAY_TOOL, createToday, createTodayTool } from "./today.js";
@@ -208,6 +208,8 @@ let logger = null;
 // family automations into the household note running at a time (automations.js).
 let scheduler = null;
 let mirroring = Promise.resolve();
+// Which of the scheduler's reminders announce to the app, and which are running now.
+const reminderPushes = createReminderPushes();
 
 function mirrorAutomations() {
   mirroring = mirroring.then(async () => {
@@ -215,6 +217,7 @@ function mirrorAutomations() {
     const current = scheduler;
     if (!running || !current || current.signal?.aborted) return;
     const jobs = await current.cron.list({ includeDisabled: true });
+    reminderPushes.know(jobs);
     const counts = running.notes.mirror(familyAutomations(jobs, { config: runtime.config.current() }), { forWho: running.owner.id });
     if (counts.added + counts.corrected + counts.removed > 0) logger?.info?.(`${PLUGIN_ID}: family automations mirrored: ${JSON.stringify(counts)}`);
   }).catch(() => logger?.warn?.(`${PLUGIN_ID}: the family automations could not be mirrored`));
@@ -975,14 +978,15 @@ function targetConversation(to) {
 
 // What the assistant posts on its own, a tool's post included, marked when a tool of a
 // handed-over turn posts it. A reminder the job mirror copies here comes marked time
-// sensitive (household-job-mirror), so its push gets through a Focus.
+// sensitive (household-job-mirror), and so does what a reminder announcing straight to the
+// app sends while it runs (automations.js), so its push gets through a Focus.
 async function sendText({ to, text, isTimeSensitive }) {
   const conversation = targetConversation(to);
   const entry = await live.room.reply({
     conversation,
     text,
     handedOver: handovers.marks(conversation),
-    isTimeSensitive: isTimeSensitive === true,
+    isTimeSensitive: isTimeSensitive === true || reminderPushes.isTimeSensitive(normalizeTarget(to)),
   });
   if (!entry) throw new Error("nothing to send");
   return {
@@ -1474,7 +1478,10 @@ function registerFull(api) {
     scheduler = cron ? { cron, signal: context.abortSignal } : null;
     return mirrorAutomations();
   });
-  api.on("cron_changed", () => mirrorAutomations());
+  api.on("cron_changed", (event) => {
+    reminderPushes.observe(event);
+    return mirrorAutomations();
+  });
   // Which run each tool call is, so a tool's post during a handed-over turn is marked, and
   // what each call changed once it ended, for its turn's reply. They only watch: neither
   // ever blocks or changes a call.

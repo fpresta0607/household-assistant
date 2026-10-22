@@ -8,8 +8,11 @@
 // app's conversation for the same people: the owner's own thread, or the family room.
 // The app's channel keeps it and notifies the phone, as for any assistant message.
 //
-// `llm_output` carries the complete ordered words. The matching `cron_changed` event
-// confirms delivery, but its summary is truncated and cannot supply message text.
+// `llm_output` carries the complete ordered words. The matching `cron_changed` event says
+// the run succeeded, but its summary is truncated and cannot supply message text. Whether
+// Telegram took it does not matter: once Telegram is off (issue #6) every such delivery fails,
+// and the app is where the words belong. Only a run that chose to stay silent, such as one
+// that answered NO_REPLY, which OpenClaw records as a suppression reason, is not copied.
 // Both hooks identify the run's session. The scheduler supplies each job's delivery,
 // and a removed one-time reminder's routing is kept until its finished event arrives.
 //
@@ -185,7 +188,7 @@ export function createMirror(api, { targets }) {
       await readJobs();
       return;
     }
-    if (event.status !== "ok" || event.delivered !== true) return;
+    if (event.status !== "ok" || event.deliverySuppressionReason || event.deliveryStatus === "not-requested") return;
     const job = jobs.get(event.jobId);
     const delivery = job?.delivery;
     if (delivery?.mode !== "announce" || delivery.channel !== "telegram") return;

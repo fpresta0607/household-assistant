@@ -1906,7 +1906,7 @@ The hook catches the call on its way in rather than the message on its way out, 
 What still reaches Telegram alone, or the app only after Telegram:
 
 - An assistant's own reply to a message someone sent in The Fam on Telegram, since the question was only ever on Telegram.
-- A scheduled run's announcement, which [Scheduled messages in the app](#scheduled-messages-in-the-app) copies into the app after Telegram takes it.
+- A scheduled run's announcement to Telegram, which [Scheduled messages in the app](#scheduled-messages-in-the-app) copies into the app whatever Telegram did with it; since 22 October every job announces to the app itself ([Telegram off](#telegram-off)).
 - A post with no session, which is how the coordination relay posts a crossing and the planner posts a proposal, so the planner's web-derived venue prose stays out of the app room and the other assistant's prompt, as [the coordination design](../plan/coordination-between-assistants.md#each-sees-what-the-other-said-in-the-group) requires.
 - A picture or file the `message` tool sends, with or without words beside it: the words come to the app, the attachment does not.
 - `sessions_send` to The Fam's session, whose reply goes out as that session's own.
@@ -1918,8 +1918,8 @@ The plugin goes to the box like any household-app update: `bash scripts/househol
 
 - **Who reads it.** Everyone who reads the family on Telegram has to read it in the app, with notifications allowed.
   For Gia that is her phone paired with Denise and registered for pushes; `/app` is sent on Telegram, and Sign in with Apple with the approver's yes is the way in without it.
-- **Scheduled messages.** Every automation that announces to The Fam or to a person's own Telegram chat moves its delivery to the app (`--channel household --to household:family` or `household:<person>`).
-  Then household-job-mirror, its config and `openclaw-job-mirror.py` come out, since they copy into the app only what Telegram took.
+- **Scheduled messages.** Done 22 October: every automation that announced to The Fam or to a person's own Telegram chat announces to the app (`scripts/openclaw-app-deliveries.py`, [Telegram off](#telegram-off)).
+  household-job-mirror stays, and copies into the app any run still aimed at Telegram, whether or not Telegram took it.
 - **Tool posts.** The assistants post to the family with `message` on the household channel, target `family`, rather than to The Fam, which each assistant's `AGENTS.md` has to say.
   Then `family-posts.js` has nothing left to catch and comes out.
 - **The coordination relay, the planner and the handover.** The relay's crossings and the planner's proposals post to The Fam through the CLI (`post_to_group` in `household/openclaw.py`), and `DockerPeerHandover` starts the other assistant's turn in The Fam's session.
@@ -1929,6 +1929,18 @@ The plugin goes to the box like any household-app update: `bash scripts/househol
   `family_history` then reads the family room alone.
 - **What reads The Fam's id.** household-pictures, household-speech and `family-posts.js` take it from household-family-room's config, household-memory has its own `groupChatId`, and the app room's `familyTools` is copied from The Fam's `tools.allow` by `openclaw-household-app.py apply`.
   Each needs a source that does not name a Telegram group.
+
+### Telegram off
+
+On 22 October the Overlord decided (issue #6) to move the family's scheduled messages to the app and then turn Telegram off on both gateways.
+
+- `scripts/openclaw-app-deliveries.py apply --gateway <persona>` moves each job that announces to Telegram to the same people in the app, changing only its delivery (`automations edit <id> --announce --channel household --to household:<target> --account default`): The Fam to `household:family`, the gateway's own person's private chat to `household:<person>`.
+  A job to any other chat, such as the other parent's private chat, has no clear home, so apply refuses the whole gateway and says how many; `check` counts each gateway's jobs to Telegram and to the app.
+  Its prompt, schedule, session and name stay as they were, and nothing is read from them, so a job's words reach the same people as before and Denise's privacy rule holds.
+- Each moved job's own delivery preview (`automations show <id>`) names `household:<target>` as its route, with no run; jobs that already announced to the app had delivered there.
+- A reminder someone made that now announces straight to the app is still pushed Time Sensitive while it runs (`createReminderPushes` in `automations.js`), as the job mirror's copies of it were.
+- Only then `openclaw-household-app.py apply` writes `channels.telegram.enabled: false` on each gateway, under the rollout lock, and `openclaw-verify.sh` reads 24 of 24.
+- The coordination tick still runs every 15 seconds and posts only what a gateway queues for The Fam; nothing was queued in the 14 days before, and the planner's timer is not enabled.
 
 ### What a family-room turn may use
 
@@ -2292,7 +2304,7 @@ A turn in the room's shared session, which anyone's question starts, has no auto
   The wall-clock time holds across a change of the clocks.
 - **What the other sees.** Every turn of both assistants lists the family reminders set, with when each next goes off and who posts it, and both phones' view of the line shows each one set and moved.
 - **The receiving gateway checks** a reminder's time, repeat and due date on every step from the other side, and only the owner's gateway ever posts it.
-- Corey's existing Telegram automations for the family stay as they are, and a reminder for one person alone stays an automation in that person's own chat.
+- A reminder for one person alone stays an automation in that person's own chat, which since 22 October is their own thread in the app.
 - **Existing family automations, mirrored read-only** (`automations.js`).
   Each gateway lists its own scheduler's jobs as OpenClaw reconciles it, whenever a job changes, and as the channel starts, and keeps one line under "Family automations" for each enabled job of the main agent that posts in the family room: delivered to The Fam (the family group of `household-family-room`'s config) or to the app's family room.
   A line holds the job's name and when it runs, never its prompt; it is corrected when either changes and removed with the job, and a restart with nothing changed takes no step.
@@ -2481,8 +2493,8 @@ An automation has one delivery target, so until 15 October none of them reached 
 
 `deploy/openclaw/plugins/household-job-mirror` copies each one into the app, word for word, from the same run:
 
-- OpenClaw's `cron_changed` event for a finished run carries the words it announced and whether Telegram took them.
-  Only a run that succeeded, was delivered and carried words is copied, once.
+- OpenClaw's `cron_changed` event for a finished run says whether it succeeded and whether it chose to stay silent (`deliverySuppressionReason`, such as a `NO_REPLY`), and `llm_output` carries its words.
+  A run that succeeded, chose to speak and carried words is copied, once, whether or not Telegram took it: with Telegram off every Telegram delivery fails, and the app is where the words belong (issue #6).
 - The event does not say where the job delivers, so the plugin reads every job's delivery from the scheduler that `cron_reconciled` hands it, again whenever a job changes, and keeps what it read, since a one-time reminder is deleted once it has run.
 - The owner's private chat goes to the owner's app thread, and The Fam to the app's family room, as `targets` in the plugin's config says.
   The app's channel keeps the copy as the assistant's message and notifies the phone, and the relay carries a family-room copy to the other gateway.
@@ -2494,7 +2506,7 @@ An automation has one delivery target, so until 15 October none of them reached 
 - A job that already announces to the app, or to any other chat, is left alone.
 
 `python3 scripts/openclaw-job-mirror.py check` reports both gateways, and `apply --gateway <persona>` sets one up, keeping the config it replaces as `openclaw.json.pre-job-mirror-<UTC stamp>`.
-When Telegram is turned off, each job's delivery should be moved to the app itself (`--channel household --to household:<person>` or `household:family`), since a copy follows only a delivery Telegram took.
+On 22 October each job's delivery moved to the app itself ([Telegram off](#telegram-off)), so the mirror copies only a job still aimed at Telegram, such as one made later on a Telegram chat.
 
 #### Bringing it to the box, one gateway at a time
 

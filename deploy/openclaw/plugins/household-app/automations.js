@@ -36,3 +36,41 @@ export function familyAutomations(jobs, { config, timeZone }) {
     .map((job) => ({ job: job.id, name: typeof job.name === "string" ? job.name : "", schedule: scheduleWords(job.schedule, timeZone) }))
     .filter((job) => typeof job.job === "string" && job.schedule !== undefined);
 }
+
+// How long a run of a reminder may take before its Time Sensitive window closes anyway.
+const REMINDER_RUN_MS = 10 * 60_000;
+
+// A reminder someone made, announced straight to the app since Telegram went off (issue #6),
+// is pushed Time Sensitive, as household-job-mirror's copies of it were, so it gets through a
+// Focus. A channel's send is not told which run it comes from, so this keeps which jobs are
+// reminders, a job with no declaration key that announces to the app, and while one runs its
+// sends to that conversation are marked. `target` is the app conversation: family, or a person.
+export function createReminderPushes({ now = Date.now } = {}) {
+  let reminders = new Map();
+  const running = new Map();
+  const appTarget = (delivery) => {
+    if (delivery?.mode !== "announce" || delivery.channel !== "household" || typeof delivery.to !== "string") return undefined;
+    return delivery.to.trim().replace(/^household:/i, "").toLowerCase() || undefined;
+  };
+  return {
+    // The scheduler's jobs, as listed.
+    know(jobs) {
+      reminders = new Map(jobs
+        .filter((job) => typeof job?.id === "string" && !(typeof job.declarationKey === "string" && job.declarationKey.trim()))
+        .map((job) => [job.id, appTarget(job.delivery)])
+        .filter(([, target]) => target !== undefined));
+    },
+    // A `cron_changed` event: a reminder's run starting opens its window, and its end closes it.
+    observe(event) {
+      if (event?.action === "started" && reminders.has(event.jobId)) running.set(event.jobId, { target: reminders.get(event.jobId), until: now() + REMINDER_RUN_MS });
+      else if (event?.action === "finished" || event?.action === "removed") running.delete(event.jobId);
+    },
+    isTimeSensitive(target) {
+      for (const [jobId, run] of running) {
+        if (run.until <= now()) running.delete(jobId);
+        else if (run.target === target) return true;
+      }
+      return false;
+    },
+  };
+}
