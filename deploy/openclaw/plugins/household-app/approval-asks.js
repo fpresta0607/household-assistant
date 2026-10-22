@@ -107,7 +107,7 @@ function momentOf(value, { timeZone, isAllDay = false, isNaiveUtc }) {
   return Number.isNaN(moment.getTime()) ? {} : { at: moment.toISOString() };
 }
 
-function spokenSchedule(schedule, timeZone) {
+export function spokenSchedule(schedule, timeZone) {
   if (!isRecord(schedule)) return undefined;
   if (schedule.kind === "at" && text(schedule.at)) return spokenTime(schedule.at, { timeZone, isNaiveUtc: true });
   if (schedule.kind === "cron" && text(schedule.expr)) return `on the schedule ${text(schedule.expr)}`;

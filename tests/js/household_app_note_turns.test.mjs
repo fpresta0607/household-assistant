@@ -155,6 +155,77 @@ test("a weigh-in Denise keeps as rows reaches Corey's family-room turn through t
   }
 });
 
+// Corey's weekly family posts were automations of his alone, delivered to The Fam, so Denise
+// never knew they existed.
+test("Corey's automations that post in the family room reach Denise's family-room turns by name and schedule, never their prompt, and go when deleted", async () => {
+  // Arrange
+  const cfg = { ...CFG, plugins: { entries: { "household-family-room": { config: { groupChatId: "-5100000001" } } } } };
+  const job = (id, name, delivery, extra = {}) => ({
+    id, name, agentId: "main", enabled: true, delivery,
+    schedule: { kind: "cron", expr: "40 16 * * 6", tz: "America/Chicago" },
+    payload: { kind: "agentTurn", message: "PRIVATE PROMPT WORDS" },
+    ...extra,
+  });
+  const jobs = [
+    job("job-fam", "Saturday supplies reminder", { mode: "announce", channel: "telegram", to: "-5100000001" }),
+    job("job-room", "Sunday plan for the week", { mode: "announce", channel: "household", to: "household:family" }),
+    job("job-own", "Franco's morning brief", { mode: "announce", channel: "telegram", to: "7100000001" }),
+    job("job-off", "Paused family post", { mode: "announce", channel: "telegram", to: "-5100000001" }, { enabled: false }),
+    job("job-other", "Another agent's post", { mode: "announce", channel: "telegram", to: "-5100000001" }, { agentId: "money" }),
+  ];
+  const scheduler = { list: async () => structuredClone(jobs) };
+  const abort = new AbortController();
+  const corey = await runningChannel(cfg);
+  const outbox = path.join(corey.stateDir, "household-app", "outbox.json");
+  let mirrored;
+  try {
+    // Act: OpenClaw reconciles the scheduler as the gateway starts, and a job is later deleted.
+    await corey.hook("cron_reconciled", { reason: "startup", enabled: true }, { getCron: () => scheduler, abortSignal: abort.signal });
+    await until("the automations in the outbox", async () => JSON.parse(await readFile(outbox, "utf8").catch(() => "{}")).notes?.length === 2);
+    mirrored = JSON.parse(await readFile(outbox, "utf8")).notes;
+    jobs.splice(1, 1);
+    await corey.hook("cron_changed", { action: "removed", jobId: "job-room" });
+    await until("the deleted automation removed", async () => JSON.parse(await readFile(outbox, "utf8")).notes.length === 3);
+
+    // Assert
+    assert.deepEqual(mirrored.map((step) => [step.kind, step.line.text, step.line.automation]), [
+      ["add", "Saturday supplies reminder", { job: "job-fam", schedule: "on the schedule 40 16 * * 6 (America/Chicago)" }],
+      ["add", "Sunday plan for the week", { job: "job-room", schedule: "on the schedule 40 16 * * 6 (America/Chicago)" }],
+    ]);
+    assert.equal(JSON.parse(await readFile(outbox, "utf8")).notes[2].kind, "remove");
+    assert.doesNotMatch(await readFile(outbox, "utf8"), /PRIVATE PROMPT WORDS|morning brief|Paused|Another agent/);
+  } finally {
+    abort.abort();
+    await corey.stop();
+  }
+
+  const denise = await runningChannel({
+    channels: {
+      household: {
+        owner: { id: "gia", name: "Gia" },
+        assistant: { id: "denise", name: "Denise" },
+        peer: { person: { id: "franco", name: "Franco" }, assistant: { id: "corey", name: "Corey" } },
+      },
+    },
+  });
+  try {
+    // Act: the relay carries Corey's steps to Denise's gateway.
+    await writeFile(
+      path.join(denise.stateDir, "household-app", "inbox", "0001-from-corey.json"),
+      JSON.stringify({ from: "corey", batch: { entries: [], notes: JSON.parse(await readFile(outbox, "utf8")).notes } }),
+    );
+    await until("Corey's automation in Denise's note", async () =>
+      (await denise.promptBuild({ prompt: "" }, { agentId: "main", ...FAMILY_ROOM })).prependContext?.includes("Saturday supplies reminder") === true);
+    const room = (await denise.promptBuild({ prompt: "What posts on its own?" }, { agentId: "main", ...FAMILY_ROOM })).prependContext;
+
+    // Assert
+    assert.match(room, /\nFamily automations, which post on their own:\n- hn-[0-9a-f]{8}, "Family automations", "Saturday supplies reminder", runs on the schedule 40 16 \* \* 6 \(America\/Chicago\), an automation of Corey's that posts in the family room\n/);
+    assert.doesNotMatch(room, /Sunday plan for the week/);
+  } finally {
+    await denise.stop();
+  }
+});
+
 test("a promise made in the owner's thread survives a restart and starts the family room's next turn until it is done", async () => {
   // Arrange: Franco asks Corey in passing, in his own thread, and the gateway restarts.
   const first = await runningChannel(CFG);

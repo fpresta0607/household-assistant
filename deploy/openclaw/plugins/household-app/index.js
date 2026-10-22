@@ -75,6 +75,7 @@ import { createFixedWindowRateLimiter, readJsonWebhookBodyOrReject } from "openc
 
 import { APPLE_PATH, createAppleKeys, createAppleSignIn, createNonces } from "./apple-signin.js";
 import { ASKING_TOOLS, askBeforeChange } from "./approval-asks.js";
+import { familyAutomations } from "./automations.js";
 import { approvalNativeRuntime, createApprovals, ownerApprovalCapability } from "./approvals.js";
 import { BRIEF_TOOL, createBrief, createBriefTool } from "./brief.js";
 import { TODAY_TOOL, createToday, createTodayTool } from "./today.js";
@@ -196,6 +197,22 @@ const appleLimiter = createFixedWindowRateLimiter({ windowMs: 60_000, maxRequest
 // for the assistant's next turn.
 let workflow = null;
 let logger = null;
+// The scheduler, once OpenClaw has reconciled it, and the one mirror of this assistant's
+// family automations into the household note running at a time (automations.js).
+let scheduler = null;
+let mirroring = Promise.resolve();
+
+function mirrorAutomations() {
+  mirroring = mirroring.then(async () => {
+    const running = live;
+    const current = scheduler;
+    if (!running || !current || current.signal?.aborted) return;
+    const jobs = await current.cron.list({ includeDisabled: true });
+    const counts = running.notes.mirror(familyAutomations(jobs, { config: runtime.config.current() }), { forWho: running.owner.id });
+    if (counts.added + counts.corrected + counts.removed > 0) logger?.info?.(`${PLUGIN_ID}: family automations mirrored: ${JSON.stringify(counts)}`);
+  }).catch(() => logger?.warn?.(`${PLUGIN_ID}: the family automations could not be mirrored`));
+  return mirroring;
+}
 // OpenRouter's public model lists, read at most once an hour.
 const catalog = createModelCatalog();
 // The runs of turns the other assistant's @mention started, and their tool calls.
@@ -997,6 +1014,7 @@ export const householdChannel = createChatChannelPlugin({
         await mkdir(started.inbox, { recursive: true, mode: 0o700 });
         live = started;
         sharePage();
+        void mirrorAutomations();
         // OpenClaw starts this channel's native approvals once it finds them here, and
         // forgets them when the channel stops.
         registerChannelRuntimeContext({
@@ -1354,6 +1372,15 @@ function registerFull(api) {
     const note = isAppTurn ? live.notes.prompt(event?.prompt, isOwnersOwn ? { fullFor: live.owner.id } : {}) : "";
     return { appendSystemContext: [ownSettings().settings.guidance(cfg), householdRoutingGuidance(cfg)].filter(Boolean).join("\n\n"), ...(note ? { prependContext: note } : {}) };
   });
+  // This assistant's family automations, mirrored into the household note as OpenClaw
+  // reconciles the scheduler and whenever a job changes, a run's finish included, since a
+  // one-time job is gone once it ran.
+  api.on("cron_reconciled", (event, context) => {
+    const cron = event?.enabled === false ? undefined : context?.getCron?.();
+    scheduler = cron ? { cron, signal: context.abortSignal } : null;
+    return mirrorAutomations();
+  });
+  api.on("cron_changed", () => mirrorAutomations());
   // Which run each tool call is, so a tool's post during a handed-over turn is marked, and
   // what each call changed once it ended, for its turn's reply. They only watch: neither
   // ever blocks or changes a call.

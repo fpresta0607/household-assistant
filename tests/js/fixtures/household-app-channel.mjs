@@ -138,6 +138,11 @@ export async function runningChannel(cfg, {
       }
       return joined;
     },
+    // Every handler the plugin registered for a hook with no matcher, such as cron_changed, in
+    // the order it registered them, each awaited.
+    async hook(name, event, context) {
+      for (const hook of hooks) if (hook.name === name) await hook.handler(event, context);
+    },
     async stop() {
       abort.abort();
       await stopped;
