@@ -44,18 +44,19 @@ const SDK = {
 // The assistant's messages in Franco's thread after his one message, with OpenClaw's run
 // standing in as `run`: it hands the channel's deliver what OpenClaw would.
 async function threadAfter(run) {
+  let isRunDone = false;
   const channel = await runningChannel(COREY, {
     sdk: SDK,
     dispatch: async (params) => {
       await run(params.delivery.deliver);
+      isRunDone = true;
       return { admission: { kind: "dispatch" } };
     },
   });
   try {
     const message = { conversation: "direct", id: "r-00000001", at: Date.now(), replyTo: null, text: "Can you make me a chart?", media: [] };
     await channel.send(signedBy(FRANCO, message));
-    await until("the turn", () => channel.dispatches.length === 1);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await until("the run's replies", () => isRunDone, { attempts: 2000 });
     const thread = (await channel.call("household-app.history", { conversation: "direct" })).payload.messages;
     return thread.filter((each) => each.author === "corey");
   } finally {
