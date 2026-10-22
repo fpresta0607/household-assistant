@@ -1,5 +1,6 @@
-// Saving a photo or a video from a conversation to the phone's library. Steward AI asks
-// only to add to Photos, never to see what is there.
+// Saving a photo or a video from a conversation to the phone's library. Saving asks only to
+// add to Photos; reading the library is the photo keeper's, asked for on its own page
+// (PhotoKeeperPage).
 
 import Photos
 
