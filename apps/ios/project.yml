@@ -185,6 +185,9 @@ targets:
         # on, and never at install. One plain line, as iOS shows it.
         NSContactsUsageDescription: Steward AI looks in your contacts on this iPhone to find who your assistant drafts a text for, and reads a contact only when you choose to send it in a chat.
         NSPhotoLibraryAddUsageDescription: Steward AI adds a photo or a video from a chat to your library when you tap Save.
+        # Settings, Photos (PhotoKeeperPage): asked only when the person opens it and taps to let
+        # Steward AI read. Read on the phone alone; deleting takes their tap and iOS's own question.
+        NSPhotoLibraryUsageDescription: Steward AI reads your photos on this iPhone to make your monthly recap and to find near-duplicates, blurry shots and old screenshots you may want to clear. No photo leaves your iPhone.
         # Add to Calendar on an event card. Write-only: the app adds events and never reads the calendar.
         NSCalendarsWriteOnlyAccessUsageDescription: Steward AI adds the events your assistant sends to your calendar when you tap Add to Calendar. It never reads your calendar.
         # `steward://family`, `steward://direct`, `.../write` and `steward://talk` from the

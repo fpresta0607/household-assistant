@@ -1,7 +1,7 @@
 // Settings, the glass tab bar's second tab, which your own face on Chats also opens: you,
 // which opens your account, then your own assistant, then what it costs, what it can reach
-// and the model it answers with, then where this iPhone is, notifications, privacy,
-// appearance and accessibility, each a page of its own. Everything is changed from here,
+// and the model it answers with, then where this iPhone is, its photo keeper, notifications,
+// privacy, appearance and accessibility, each a page of its own. Everything is changed from here,
 // never the box.
 //
 // Each person controls only their own assistant: a change goes to this phone's own
@@ -76,6 +76,16 @@ struct SettingsView: View {
                             SymbolTile("location", color: Color(red: 0x14 / 255, green: 0xA3 / 255, blue: 0xB8 / 255))
                         } trailing: {
                             RowValue(text: model.locationState.label)
+                        }
+                    }
+                    .buttonStyle(.settingsRow)
+                    NavigationLink {
+                        PhotoKeeperPage()
+                    } label: {
+                        SettingsRow("Photos") {
+                            SymbolTile("photo.on.rectangle.angled", color: Color(red: 0xF5 / 255, green: 0x9E / 255, blue: 0x0B / 255))
+                        } trailing: {
+                            RowValue()
                         }
                     }
                     .buttonStyle(.settingsRow)
