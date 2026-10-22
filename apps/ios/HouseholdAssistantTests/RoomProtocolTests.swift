@@ -184,6 +184,45 @@ final class RoomProtocolTests: XCTestCase {
         XCTAssertTrue(command.isCommand)
     }
 
+    /// Shaped as approvals.js keeps a draft's card (send-tool.js): where it goes, what it is,
+    /// and every word of it, or every item and the total.
+    func testADraftsCardSaysWhereItGoesOrWhatItCostsAndHasEveryWord() throws {
+        let body = String(repeating: "Could we move Thursday's cleaning to Friday morning? ", count: 12)
+        let email = try JSONValue.object([
+            "id": .string("plugin:7a1b"), "kind": .string("plugin"), "title": .string("Send: Moving Thursday's cleaning"),
+            "detail": .string("To: dentist@example.com\nSubject: Moving Thursday's cleaning\n\n\(body)"),
+            "send": .object(["kind": .string("email"), "to": .string("dentist@example.com"), "subject": .string("Moving Thursday's cleaning")]),
+            "decisions": .array([.string("allow-once"), .string("deny")]),
+        ]).decoded(as: RoomApproval.self)
+        let order = try JSONValue.object([
+            "id": .string("plugin:7a1c"), "kind": .string("plugin"), "title": .string("Order 2 items, $28.97"),
+            "detail": .string("2 × Milk, $3.49 each\n1 × Paper towels, $21.99 each\nTotal: $28.97"),
+            "send": .object([
+                "kind": .string("order"), "total": .string("$28.97"),
+                "items": .array([
+                    .object(["name": .string("Milk"), "quantity": .number(2), "price": .string("$3.49")]),
+                    .object(["name": .string("Paper towels"), "quantity": .number(1), "price": .string("$21.99")]),
+                ]),
+            ]),
+            "decisions": .array([.string("allow-once"), .string("deny")]),
+        ]).decoded(as: RoomApproval.self)
+        let later = try JSONValue.object([
+            "id": .string("plugin:7a1d"), "kind": .string("plugin"), "title": .string("Post it"),
+            "send": .object(["kind": .string("fax")]), "decisions": .array([.string("allow-once"), .string("deny")]),
+        ]).decoded(as: RoomApproval.self)
+
+        XCTAssertEqual(email.send?.kind, .email)
+        XCTAssertEqual(email.send?.to, "dentist@example.com")
+        XCTAssertTrue(email.detail?.hasSuffix(body) == true, "every word, past OpenClaw's few lines")
+        XCTAssertNil(email.send?.total)
+        XCTAssertEqual(order.send?.kind, .order)
+        XCTAssertEqual(order.send?.total, "$28.97")
+        XCTAssertEqual(order.send?.items?.map(\.quantity), [2, 1])
+        XCTAssertNil(order.send?.to)
+        XCTAssertNil(later.send, "a kind a later gateway adds is an ordinary card")
+        XCTAssertEqual(later.decisions, [.approve, .deny])
+    }
+
     func testAnApprovalTheGatewayDescribesBadlyIsAnOrdinaryMessage() throws {
         let entry = try JSONValue.object([
             "id": .string("ap-1"), "rev": .number(12), "kind": .string("message"), "conversation": .string("direct"),
