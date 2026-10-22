@@ -1,9 +1,10 @@
 // A step of the assistant's run that waits for this phone's person to say yes: what it
 // would do, with Deny and Approve, and once answered, a confirmation in their place.
-// A draft to send shows where it goes, or an order's total, and every word of it, and its
-// Approve says what the tap does: Send, Book or Order.
+// A draft to send looks like the app's other cards: what it is, an email, a booking request or
+// an order, with where it goes or its total, and every word of it, and its Approve says what
+// the tap does: Send, Book or Order.
 // The answer is signed by this phone and shows at once; one the gateway refuses comes
-// back with why. A gold edge along its top says the assistant is the one asking.
+// back with why. A gold edge along its top says the assistant is asking for any other step.
 
 import SwiftUI
 
@@ -21,12 +22,14 @@ struct ApprovalCardView: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: CardStyle.cornerRadius, style: .continuous)
         VStack(alignment: .leading, spacing: 8) {
-            CardHeader(symbol: "hand.raised.fill", tint: CardStyle.goldInk, kind: "Needs your OK", title: approval.title)
             if let send = approval.send {
+                CardHeader(symbol: send.kind.symbol, tint: CardStyle.accent, kind: send.kind.words, title: send.subject ?? approval.title)
                 sendTarget(send)
+            } else {
+                CardHeader(symbol: "hand.raised.fill", tint: CardStyle.goldInk, kind: "Needs your OK", title: approval.title)
             }
             if let detail = approval.detail {
-                Text(detail)
+                Text(approval.send == nil ? detail : Self.draftWords(detail))
                     .font(approval.isCommand ? .system(.footnote, design: .monospaced) : .subheadline)
                     .foregroundStyle(CardStyle.ink.opacity(0.78))
                     // A draft shows every word the tap sends; anything else, a few lines.
@@ -46,11 +49,13 @@ struct ApprovalCardView: View {
         .cardPanel()
         .overlay {
             // Only the top of a gold rim, so it reads as an edge that follows the corners.
-            shape.strokeBorder(CardStyle.gold, lineWidth: 4)
-                .mask(alignment: .top) {
-                    Rectangle().frame(height: 9)
-                }
-                .allowsHitTesting(false)
+            if approval.send == nil {
+                shape.strokeBorder(CardStyle.gold, lineWidth: 4)
+                    .mask(alignment: .top) {
+                        Rectangle().frame(height: 9)
+                    }
+                    .allowsHitTesting(false)
+            }
         }
         .animation(Motion.press(reduced: reduceMotion), value: outcome)
         .haptic(.success, trigger: outcome) { _, now in
@@ -114,6 +119,13 @@ struct ApprovalCardView: View {
         }
     }
 
+    /// A draft's words below its header: an email's message without the To and Subject lines
+    /// the gateway puts first (approvals.js), which the header and the To line already show.
+    static func draftWords(_ detail: String) -> String {
+        guard detail.hasPrefix("To: "), let blank = detail.range(of: "\n\n") else { return detail }
+        return String(detail[blank.upperBound...])
+    }
+
     private var approveWords: String {
         switch approval.send?.kind {
         case .email: return "Send"
@@ -126,6 +138,24 @@ struct ApprovalCardView: View {
     private func answer(_ decision: RoomApproval.Decision) {
         Task {
             await model.room.answer(message, with: decision)
+        }
+    }
+}
+
+private extension RoomApproval.Send.Kind {
+    var words: String {
+        switch self {
+        case .email: return "Email"
+        case .booking: return "Booking request"
+        case .order: return "Order"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .email: return "envelope.fill"
+        case .booking: return "calendar.badge.plus"
+        case .order: return "cart.fill"
         }
     }
 }
