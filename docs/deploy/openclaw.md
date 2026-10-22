@@ -2287,6 +2287,10 @@ A turn in the room's shared session, which anyone's question starts, has no auto
 - **What the other sees.** Every turn of both assistants lists the family reminders set, with when each next goes off and who posts it, and both phones' view of the line shows each one set and moved.
 - **The receiving gateway checks** a reminder's time, repeat and due date on every step from the other side, and only the owner's gateway ever posts it.
 - Corey's existing Telegram automations for the family stay as they are, and a reminder for one person alone stays an automation in that person's own chat.
+- **Existing family automations, mirrored read-only** (`automations.js`).
+  Each gateway lists its own scheduler's jobs as OpenClaw reconciles it, whenever a job changes, and as the channel starts, and keeps one line under "Family automations" for each enabled job of the main agent that posts in the family room: delivered to The Fam (the family group of `household-family-room`'s config) or to the app's family room.
+  A line holds the job's name and when it runs, never its prompt; it is corrected when either changes and removed with the job, and a restart with nothing changed takes no step.
+  Every turn of both assistants lists them under "Family automations, which post on their own", with whose they are, and neither assistant's `household_note` can correct, finish or remove one (`automation_line`): it changes only with the job itself.
 
 Each workspace's `AGENTS.md` gets one line for it under "Write It Down", after the household note's:
 

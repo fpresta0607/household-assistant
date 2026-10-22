@@ -43,6 +43,12 @@
 // repeats. "Remind us Saturdays at 4:40" so fires from whichever assistant took it, and the
 // other sees it in every turn. Nothing the room's other turns say can schedule a run with
 // every tool this way: the post is the reminder's own words, and nothing else runs.
+//
+// An automation of an assistant's that posts in the family room, such as a weekly job made
+// before these reminders existed, is mirrored here by its own gateway as a read-only line
+// (`automation`): its name and when it runs, never what it tells the model, kept while the
+// job is and removed with it (automations.js). The other assistant so knows it exists, and
+// neither assistant's tool changes it; it changes only with the job.
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
@@ -86,6 +92,10 @@ const MESSAGE_ID = /^[A-Za-z0-9][A-Za-z0-9-]{7,79}$/;
 // claims it as its turn starts, and the other takes it over only when no sign of the claim
 // came within its bound (room.js).
 const CLAIM_KINDS = new Set(["claim", "took"]);
+// A mirrored automation: the scheduler's job id, and when it runs, in words.
+const JOB_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
+export const MAX_SCHEDULE = 120;
+export const AUTOMATIONS = "Family automations";
 const STEP_ID = /^ns-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 const SCHEMA = `
@@ -220,6 +230,7 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
           due: step.due,
           owner: step.owner,
           remind: step.remind,
+          automation: step.automation,
           changedAt: step.at,
           correctedBy: step.author,
           wrote: {
@@ -244,6 +255,15 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
   function openLine(id) {
     const line = typeof id === "string" ? lines().find((candidate) => candidate.id === id) : undefined;
     if (!line) throw new NoteError("unknown_line", "That line is not in the household note. View it for its lines' ids.");
+    return line;
+  }
+
+  // An open line a person may change through either assistant: not a mirrored automation.
+  function editableLine(id) {
+    const line = openLine(id);
+    if (line.automation) {
+      throw new NoteError("automation_line", `That line mirrors an automation of ${names.get(line.by)}'s and changes only with the automation itself.`);
+    }
     return line;
   }
 
@@ -286,7 +306,15 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
     };
   }
 
-  // When a reminder goes off: a time of day, HH:MM, and how often it repeats, on a line
+  // A mirrored automation, exactly as kept.
+function isAutomation(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (Object.keys(value).some((key) => key !== "job" && key !== "schedule")) return false;
+  return typeof value.job === "string" && JOB_ID.test(value.job) && typeof value.schedule === "string" &&
+    value.schedule.length > 0 && value.schedule.length <= MAX_SCHEDULE && cleanWords(value.schedule) === value.schedule;
+}
+
+// When a reminder goes off: a time of day, HH:MM, and how often it repeats, on a line
   // whose due date is its next day.
   function cleanRemind(value, due) {
     if (!isRemind(value)) throw new NoteError("invalid_line", `A reminder has a time, HH:MM, and repeats every ${REPEATS.join(", ")} or never.`);
@@ -379,6 +407,9 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
     const reminder = line.remind === undefined
       ? ""
       : `, goes off ${dateWords(line.due)} at ${clock(line.remind.at)}${line.remind.every ? `, every ${line.remind.every}` : ""}, posted by ${names.get(line.owner)}`;
+    if (line.automation) {
+      return `- ${line.id}, ${topic}${JSON.stringify(line.text)}, runs ${line.automation.schedule}, an automation of ${names.get(line.by)}'s that posts in the family room`;
+    }
     return `- ${line.id}, ${topic}${line.day === undefined ? day(line.at) : dateWords(line.day)}: ${words}${line.remind === undefined ? `${dueWords(line, on)}${owner}` : reminder}${handoff} (${asked}${corrected})`;
   }
 
@@ -391,6 +422,7 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
       ...(line.due === undefined ? {} : { due: dateWords(line.due), standing: standing(line) }),
       ...(line.owner === undefined ? {} : { owner: names.get(line.owner) }),
       ...(line.remind === undefined ? {} : { remind: { at: clock(line.remind.at), ...(line.remind.every ? { every: line.remind.every } : {}) } }),
+      ...(line.automation === undefined ? {} : { automation: { runs: line.automation.schedule, of: names.get(line.by) } }),
       ...(line.done ? { done: day(line.done.at), doneBy: names.get(line.done.by) ?? line.done.by } : {}),
       ...(isHandoff(line) ? { seen: line.seen ? `${day(line.seen.at)} ${time(line.seen.at)}` : null } : {}),
       ...(line.reply ? { reply: line.reply.text, replied: `${day(line.reply.at)} ${time(line.reply.at)}` } : {}),
@@ -417,12 +449,14 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
     const on = today();
     const byDue = (left, right) => (left.due ?? "9999").localeCompare(right.due ?? "9999");
     const reminders = open.filter((line) => line.remind !== undefined && !line.done).sort(byDue);
+    const automations = open.filter((line) => line.automation !== undefined);
     const promises = open
       .filter((line) => line.owner !== undefined && line.remind === undefined && !line.done)
       .sort((left, right) => Number(right.owner === assistant.id) - Number(left.owner === assistant.id) || byDue(left, right));
     const dated = open.filter((line) => line.owner === undefined && line.due !== undefined && !line.done).sort(byDue);
     return {
       reminders,
+      automations,
       promises,
       overdue: dated.filter((line) => standing(line, on) === "overdue"),
       soon: dated.filter((line) => standing(line, on) === "soon"),
@@ -469,6 +503,7 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
       if ((source.day !== undefined && !isDay(source.day)) || (source.due !== undefined && !isDay(source.due))) return null;
       if (source.owner !== undefined && !names.has(source.owner)) return null;
       if (source.remind !== undefined && (!isRemind(source.remind) || source.due === undefined)) return null;
+      if (source.automation !== undefined && !isAutomation(source.automation)) return null;
       return {
         topic: source.topic,
         text: source.text,
@@ -477,6 +512,7 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
         ...(source.due === undefined ? {} : { due: source.due }),
         ...(source.owner === undefined ? {} : { owner: source.owner }),
         ...(source.remind === undefined ? {} : { remind: { at: source.remind.at, ...(source.remind.every === undefined ? {} : { every: source.remind.every }) } }),
+        ...(source.automation === undefined ? {} : { automation: { job: source.automation.job, schedule: source.automation.schedule } }),
       };
     };
     if (raw.kind === "add") {
@@ -641,7 +677,7 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
     // A line as it should read now, for whoever asked: any of its topic, words, item, day,
     // due date and owner, the rest as they were.
     correct(id, { topic, text, item, day: happened, due, owner, forWho }) {
-      const line = openLine(id);
+      const line = editableLine(id);
       const row = cleanRow({
         text: text ?? line.text,
         item: item ?? line.item,
@@ -659,7 +695,7 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
     // A line's thing done, such as a dose given or a visit made, for whoever said so. It
     // stays in the note, done, until someone removes it.
     done(id, { forWho }) {
-      const line = openLine(id);
+      const line = editableLine(id);
       if (line.done) throw new NoteError("already_done", `That line was marked done ${day(line.done.at)}.`);
       if (!names.has(forWho)) throw new NoteError("invalid_line", "A line is marked done for someone in the household.");
       take({ kind: "done", line: line.id, for: forWho });
@@ -675,9 +711,41 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
     },
 
     remove(id) {
-      const line = openLine(id);
+      const line = editableLine(id);
       take({ kind: "remove", line: line.id });
       return topicView(line.topic);
+    },
+
+    // This assistant's family automations as the scheduler lists them now, each `{ job, name,
+    // schedule }`, mirrored for `forWho`: a line added for each new one, corrected when its
+    // name or schedule changed, and removed when it is gone. Nothing is taken when nothing
+    // changed, so a restart adds no step. Says how many lines it added, corrected and removed.
+    mirror(jobs, { forWho }) {
+      const wanted = new Map(jobs
+        .map((job) => [job.job, {
+          text: cleanWords(job.name).slice(0, MAX_TEXT) || "Unnamed automation",
+          automation: { job: job.job, schedule: cleanWords(job.schedule).slice(0, MAX_SCHEDULE) },
+        }])
+        .filter(([job, { automation }]) => typeof job === "string" && JOB_ID.test(job) && automation.schedule));
+      const mirrored = lines().filter((line) => line.automation !== undefined && line.by === assistant.id);
+      const counts = { added: 0, corrected: 0, removed: 0 };
+      for (const line of mirrored) {
+        const current = wanted.get(line.automation.job);
+        if (!current) {
+          take({ kind: "remove", line: line.id });
+          counts.removed += 1;
+        } else if (current.text !== line.text || current.automation.schedule !== line.automation.schedule) {
+          take({ kind: "correct", line: line.id, topic: line.topic, ...current, for: forWho });
+          counts.corrected += 1;
+        }
+        wanted.delete(line.automation.job);
+      }
+      const room = Math.max(0, MAX_OPEN_LINES - lines().length);
+      for (const row of [...wanted.values()].slice(0, room)) {
+        take({ kind: "add", line: { id: `hn-${randomBytes(4).toString("hex")}`, topic: AUTOMATIONS, ...row, for: forWho } });
+        counts.added += 1;
+      }
+      return counts;
     },
 
     // One topic, or every topic, newest first, at most MAX_VIEWED_LINES lines in all.
@@ -722,14 +790,14 @@ export function createNotes({ file, assistant, peerAssistant, people, now = Date
       const handedHere = open.filter((line) => !isShown(line) && line.owner === assistant.id && isHandoff(line) && !line.done).length;
       if (open.length === 0) return "";
       const on = today();
-      const { reminders, promises, overdue, soon } = dueOf(visible);
+      const { reminders, automations, promises, overdue, soon } = dueOf(visible);
       const shown = [];
       const unshown = [];
       let room = MAX_SHOWN_CHARACTERS;
       let firstRoom = MAX_SHOWN_CHARACTERS / 2;
       // Lines listed first are not shown again under their topics.
       const listedIds = new Set();
-      for (const [title, list] of [["Promises still open:", promises], ["Due now or within a week:", [...overdue, ...soon]], ["Family reminders set:", reminders]]) {
+      for (const [title, list] of [["Promises still open:", promises], ["Due now or within a week:", [...overdue, ...soon]], ["Family reminders set:", reminders], ["Family automations, which post on their own:", automations]]) {
         const listed = [];
         for (const each of list) {
           const line = shownLine(each, on, { isTopicNamed: true, isReplyShown: fullFor === undefined });

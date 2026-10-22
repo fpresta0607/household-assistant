@@ -764,6 +764,85 @@ test("the other gateway's malformed reminder is refused, and a reminder goes off
   assert.throws(() => corey.fired(id), (error) => error.code === "not_a_reminder");
 });
 
+// MARK: - Family automations, mirrored read-only
+
+const WEEKLY = { job: "job-weekly-0001", name: "Saturday supplies reminder", schedule: "on the schedule 40 16 * * 6 (America/Chicago)" };
+const SUNDAY = { job: "job-weekly-0002", name: "Sunday plan for the week", schedule: "on the schedule 0 18 * * 0 (America/Chicago)" };
+
+test("Corey's family automations reach Denise's turns as lines with their name and schedule, and a restart takes no step", () => {
+  // Arrange
+  const { corey, denise, relay } = gateways();
+
+  // Act
+  const first = corey.mirror([WEEKLY, SUNDAY], { forWho: "franco" });
+  const again = corey.mirror([WEEKLY, SUNDAY], { forWho: "franco" });
+  relay(corey, denise);
+
+  // Assert
+  assert.deepEqual(first, { added: 2, corrected: 0, removed: 0 });
+  assert.deepEqual(again, { added: 0, corrected: 0, removed: 0 });
+  assert.equal(corey.outbox().notes.length, 2, "an unchanged automation takes no step");
+  assert.match(denise.prompt(""), /\nFamily automations, which post on their own:\n- hn-[0-9a-f]{8}, "Family automations", "Saturday supplies reminder", runs on the schedule 40 16 \* \* 6 \(America\/Chicago\), an automation of Corey's that posts in the family room\n/);
+  assert.deepEqual(denise.view("Family automations").lines.map((line) => line.automation), [
+    { runs: WEEKLY.schedule, of: "Corey" },
+    { runs: SUNDAY.schedule, of: "Corey" },
+  ]);
+  assert.doesNotMatch(denise.prompt(""), /Promises still open|Due now/, "an automation is neither a promise nor due");
+});
+
+test("a renamed or rescheduled automation is corrected, and a deleted one is removed, on both gateways", () => {
+  // Arrange
+  const { corey, denise, relay } = gateways();
+  corey.mirror([WEEKLY, SUNDAY], { forWho: "franco" });
+  relay(corey, denise);
+
+  // Act
+  const counts = corey.mirror([{ ...WEEKLY, schedule: "on the schedule 30 16 * * 6 (America/Chicago)" }], { forWho: "franco" });
+  relay(corey, denise);
+
+  // Assert
+  assert.deepEqual(counts, { added: 0, corrected: 1, removed: 1 });
+  assert.deepEqual(denise.view("Family automations").lines.map((line) => [line.text, line.automation.runs]), [
+    ["Saturday supplies reminder", "on the schedule 30 16 * * 6 (America/Chicago)"],
+  ]);
+});
+
+test("neither assistant's tool changes a mirrored automation, and each says why", () => {
+  // Arrange
+  const { corey, denise, relay } = gateways();
+  corey.mirror([WEEKLY], { forWho: "franco" });
+  relay(corey, denise);
+  const id = denise.view("Family automations").lines[0].id;
+
+  // Act and Assert
+  for (const notes of [corey, denise]) {
+    for (const change of [
+      () => notes.correct(id, { text: "Something else", forWho: "gia" }),
+      () => notes.done(id, { forWho: "gia" }),
+      () => notes.remove(id),
+    ]) {
+      assert.throws(change, (error) => error.code === "automation_line" && /an automation of Corey's/.test(error.message));
+    }
+  }
+});
+
+test("Denise's gateway mirrors none of Corey's automations away, and refuses a malformed one", () => {
+  // Arrange
+  const { corey, denise, relay } = gateways();
+  corey.mirror([WEEKLY], { forWho: "franco" });
+  relay(corey, denise);
+  const [step] = corey.outbox().notes;
+
+  // Act
+  const counts = denise.mirror([], { forWho: "gia" });
+  const refused = denise.acceptPeer({ notes: [{ ...step, id: "ns-00000000-0000-4000-8000-0000000000ff", line: { ...step.line, id: "hn-0f0f0f0f", automation: { ...step.line.automation, prompt: "anything" } } }] });
+
+  // Assert
+  assert.deepEqual(counts, { added: 0, corrected: 0, removed: 0 });
+  assert.equal(denise.view("Family automations").lines.length, 1);
+  assert.deepEqual(refused, { accepted: 0, refused: 1 });
+});
+
 // MARK: - The tool, and the turns it answers in
 
 const DIRECT = {
