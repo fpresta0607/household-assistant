@@ -50,7 +50,7 @@ final class FixtureGateway {
         "household-app.approval.answer",
         "household-app.cart.ordered",
         "household-app.look.set",
-        "household-app.pair",
+        "household-app.line",
     ]
 
     /// Everything an `AppModel` reads from outside itself when it starts: the

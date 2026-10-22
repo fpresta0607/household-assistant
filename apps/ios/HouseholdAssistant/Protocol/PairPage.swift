@@ -1,4 +1,4 @@
-// What `household-app.pair` answers: a page of the two assistants' direct line, oldest
+// What `household-app.line` answers: a page of the two assistants' direct line, oldest
 // first, the newest page unless it was asked for the steps before one, and whether any are
 // older. The plugin's `pair` event says the line moved, with when, and every sync and
 // history page says when it last did (RoomPair).

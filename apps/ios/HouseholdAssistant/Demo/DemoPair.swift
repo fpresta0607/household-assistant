@@ -1,6 +1,6 @@
 #if DEBUG
 // The made-up household's two assistants on their direct line, in the shape the
-// household-app plugin answers `household-app.pair` with (notes.js timeline): Corey logs
+// household-app plugin answers `household-app.line` with (notes.js timeline): Corey logs
 // three seedlings at once and corrects one, hands Denise a question that she sees, answers
 // and marks done, takes a question Franco asked them both, and Denise hands him one of
 // Gia's, which he has just seen. Its last step is four minutes before the moment it is made,
@@ -9,7 +9,7 @@
 import Foundation
 
 struct DemoPair {
-    static let method = "household-app.pair"
+    static let method = "household-app.line"
 
     /// Every step, oldest first.
     private let events: [JSONValue]

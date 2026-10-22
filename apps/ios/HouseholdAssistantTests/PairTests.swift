@@ -1,4 +1,4 @@
-// The Corey & Denise group from the phone's side: `household-app.pair`'s page, the plugin's
+// The Corey & Denise group from the phone's side: `household-app.line`'s page, the plugin's
 // `pair` event and the `pair` mark on the room's pages in the shapes the plugin gives them,
 // the rule that folds a burst of rows into one line, what each line says, how long the
 // family room's marker shows, and the model reading the line a page at a time over a
@@ -285,7 +285,7 @@ final class PairTests: XCTestCase {
     func testTheNewestPageShowsWithABurstAsOneLine() async throws {
         // Arrange
         let gateway = Gateway()
-        gateway.answers["household-app.pair"] = { Self.ok($0, Self.fixturePayload("household-app-pair-response")) }
+        gateway.answers["household-app.line"] = { Self.ok($0, Self.fixturePayload("household-app-pair-response")) }
         try await gateway.connect()
         let pair = PairModel(connection: gateway.connection)
 
@@ -296,7 +296,7 @@ final class PairTests: XCTestCase {
         XCTAssertEqual(pair.events.count, 11)
         XCTAssertEqual(pair.entries.count, 9)
         XCTAssertFalse(pair.hasOlder)
-        let asked = try XCTUnwrap(gateway.requests("household-app.pair").first)
+        let asked = try XCTUnwrap(gateway.requests("household-app.line").first)
         XCTAssertNil(asked.params["before"], "the newest page")
         XCTAssertEqual(asked.params["limit"]?.intValue, 100)
     }
@@ -304,7 +304,7 @@ final class PairTests: XCTestCase {
     func testScrollingUpReadsThePageBeforeTheOldestStepUntilNoneAreOlder() async throws {
         // Arrange
         let gateway = Gateway()
-        gateway.answers["household-app.pair"] = { request in
+        gateway.answers["household-app.line"] = { request in
             request.params["before"]?.intValue == 3_000
                 ? Self.ok(request, Self.page([Self.step(1, at: 1_000, kind: "corrected"), Self.step(2, at: 2_000, kind: "removed")], more: false))
                 : Self.ok(request, Self.page([Self.step(3, at: 3_000, kind: "corrected"), Self.step(4, at: 4_000, kind: "corrected")], more: true))
@@ -321,13 +321,13 @@ final class PairTests: XCTestCase {
         // Assert
         XCTAssertEqual(pair.events.map(\.id), ["ns-1", "ns-2", "ns-3", "ns-4"])
         XCTAssertFalse(pair.hasOlder)
-        XCTAssertEqual(gateway.requests("household-app.pair").map { $0.params["before"]?.intValue }, [nil, 3_000], "nothing older is asked for")
+        XCTAssertEqual(gateway.requests("household-app.line").map { $0.params["before"]?.intValue }, [nil, 3_000], "nothing older is asked for")
     }
 
     func testThePairEventReadsTheNewestPageAgainKeepingTheOlderOnes() async throws {
         // Arrange: the newest page, then the one before it as the person scrolled up.
         let gateway = Gateway()
-        gateway.answers["household-app.pair"] = { request in
+        gateway.answers["household-app.line"] = { request in
             request.params["before"] == nil
                 ? Self.ok(request, Self.page([Self.step(3, at: 3_000, kind: "corrected")], more: true))
                 : Self.ok(request, Self.page([Self.step(1, at: 1_000, kind: "corrected")], more: false))
@@ -336,7 +336,7 @@ final class PairTests: XCTestCase {
         let pair = PairModel(connection: gateway.connection)
         await pair.refresh()
         await pair.loadOlder()
-        gateway.answers["household-app.pair"] = { request in
+        gateway.answers["household-app.line"] = { request in
             Self.ok(request, Self.page([Self.step(3, at: 3_000, kind: "corrected"), Self.step(4, at: 4_000, kind: "handed")], more: true))
         }
 
@@ -352,11 +352,11 @@ final class PairTests: XCTestCase {
     func testANewestPageThatLeavesAGapReplacesWhatIsHere() async throws {
         // Arrange
         let gateway = Gateway()
-        gateway.answers["household-app.pair"] = { Self.ok($0, Self.page([Self.step(1, at: 1_000, kind: "corrected"), Self.step(2, at: 2_000, kind: "corrected")], more: false)) }
+        gateway.answers["household-app.line"] = { Self.ok($0, Self.page([Self.step(1, at: 1_000, kind: "corrected"), Self.step(2, at: 2_000, kind: "corrected")], more: false)) }
         try await gateway.connect()
         let pair = PairModel(connection: gateway.connection)
         await pair.refresh()
-        gateway.answers["household-app.pair"] = { Self.ok($0, Self.page([Self.step(5, at: 5_000, kind: "corrected"), Self.step(6, at: 6_000, kind: "corrected")], more: true)) }
+        gateway.answers["household-app.line"] = { Self.ok($0, Self.page([Self.step(5, at: 5_000, kind: "corrected"), Self.step(6, at: 6_000, kind: "corrected")], more: true)) }
 
         // Act
         await pair.refresh()
@@ -369,14 +369,14 @@ final class PairTests: XCTestCase {
     func testAGatewayWithNoLineLeavesTheGroupEmptyAndPairingAgainForgetsIt() async throws {
         // Arrange
         let gateway = Gateway()
-        gateway.answers["household-app.pair"] = { Self.refused($0, "unknown method: household-app.pair") }
+        gateway.answers["household-app.line"] = { Self.refused($0, "unknown method: household-app.line") }
         try await gateway.connect()
         let pair = PairModel(connection: gateway.connection)
 
         // Act
         await pair.refresh()
         let fromAnOlderGateway = pair.entries
-        gateway.answers["household-app.pair"] = { Self.ok($0, Self.fixturePayload("household-app-pair-response")) }
+        gateway.answers["household-app.line"] = { Self.ok($0, Self.fixturePayload("household-app-pair-response")) }
         await pair.refresh()
         pair.reset()
 

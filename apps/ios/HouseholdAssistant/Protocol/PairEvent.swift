@@ -1,5 +1,5 @@
 // One step either assistant took on the two assistants' direct line, as
-// `household-app.pair` pages them (notes.js timeline): a row of the household note logged,
+// `household-app.line` pages them (notes.js timeline): a row of the household note logged,
 // corrected, done or removed, a handoff one handed the other, seen and answered, and a
 // family-room question both were asked that one took, or took over from the other.
 //

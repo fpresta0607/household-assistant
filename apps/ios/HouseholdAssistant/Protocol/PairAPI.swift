@@ -11,6 +11,6 @@ extension GatewayConnection {
         if let before {
             params["before"] = .number(Double(before))
         }
-        return try await request("household-app.pair", .object(params), as: PairPage.self)
+        return try await request("household-app.line", .object(params), as: PairPage.self)
     }
 }
