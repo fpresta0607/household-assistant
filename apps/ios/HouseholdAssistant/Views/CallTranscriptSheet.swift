@@ -2,6 +2,7 @@
 // Only the words were kept, never the sound; a long call keeps only its start, and says so.
 
 import SwiftUI
+import UIKit
 
 struct CallTranscriptSheet: View {
     let call: RoomCall
@@ -9,6 +10,8 @@ struct CallTranscriptSheet: View {
 
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+
+    @State private var copied = false
 
     var body: some View {
         NavigationStack {
@@ -43,6 +46,15 @@ struct CallTranscriptSheet: View {
             .navigationTitle("Call with \(name(of: call.assistant))")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if !call.transcript.isEmpty {
+                        Button(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc") {
+                            UIPasteboard.general.string = call.transcript.map { "\(name(of: $0.author)): \($0.text)" }.joined(separator: "\n\n")
+                            copied = true
+                        }
+                        .accessibilityLabel("Copy call transcript")
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()

@@ -29,14 +29,11 @@ final class VoiceNoteRecorder {
     /// The note stopped and kept to listen back to.
     private(set) var kept: URL?
 
-    @ObservationIgnored private var ready: AVAudioRecorder?
+    /// A single warm-up shared with a press that arrives before it finishes.
+    @ObservationIgnored private var warming: Task<Made, Never>?
+    @ObservationIgnored private var wantsWarmth = false
     @ObservationIgnored private var recorder: AVAudioRecorder?
     @ObservationIgnored private var metering: Task<Void, Never>?
-    /// Whether a readying is under way on the sound's queue.
-    @ObservationIgnored private var isWarming = false
-    /// Counts each readying and each letting go, so a readying that finishes after the
-    /// conversation closed, or after a touch readied on the spot, is let go, not kept.
-    @ObservationIgnored private var warmth = 0
     /// Whether a note is recording, for the sound's queue, which never gives the sound back
     /// from under one that a touch started before the queue came to it.
     @ObservationIgnored private let isRecordingNow = OSAllocatedUnfairLock(initialState: false)
@@ -84,34 +81,19 @@ final class VoiceNoteRecorder {
     /// Readies the next note without touching the microphone, on the sound's queue. Asks
     /// nothing; until the microphone is allowed it does nothing.
     func warm() {
-        guard recorder == nil, starting == nil, !isWarming, AVAudioApplication.shared.recordPermission == .granted else {
+        wantsWarmth = true
+        guard recorder == nil, starting == nil, warming == nil,
+              AVAudioApplication.shared.recordPermission == .granted else {
             return
         }
-        if ready != nil, AudioFocus.isHeld(.playAndRecord, mode: .default) {
-            return
-        }
-        isWarming = true
-        warmth += 1
-        let mine = warmth
         let options = Self.readyOptions
-        AudioFocus.soon {
-            let made = Made(Self.made(options: options))
-            Task { @MainActor in
-                self.adopt(made, warmth: mine)
+        warming = Task {
+            await withCheckedContinuation { continuation in
+                AudioFocus.soon {
+                    continuation.resume(returning: Made(Self.made(options: options)))
+                }
             }
         }
-    }
-
-    private func adopt(_ made: Made, warmth: Int) {
-        isWarming = false
-        guard warmth == self.warmth, recorder == nil, let next = made.recorder else {
-            if let unused = made.recorder {
-                try? FileManager.default.removeItem(at: unused.url)
-            }
-            return
-        }
-        discardReady()
-        ready = next
     }
 
     /// Starts recording right behind the touch, which has already drawn the note: the
@@ -122,15 +104,15 @@ final class VoiceNoteRecorder {
         VoiceNotePlayer.shared.stop()
         attempt += 1
         let mine = attempt
-        // A readying still under way is let go: this start makes its own if it must.
-        warmth += 1
-        isWarming = false
-        let readied = Made(ready)
-        ready = nil
+        // Consume the same warm-up even when it is still on the sound queue. Previously
+        // a press threw it away and could try to record with no recorder at all.
+        let prepared = warming
+        warming = nil
         isRecordingNow.withLock { $0 = true }
         levels = []
         let options = (ready: Self.readyOptions, recording: Self.recordingOptions)
         let start = Task {
+            let readied = await prepared?.value ?? Made(nil)
             let started = await Self.start(readied, readyOptions: options.ready, recordingOptions: options.recording)
             return self.adopt(started: started, attempt: mine)
         }
@@ -181,7 +163,7 @@ final class VoiceNoteRecorder {
             AudioFocus.soon {
                 let isOtherAudioPlaying = AudioFocus.isOtherAudioPlaying
                 var next = readied.recorder
-                if isOtherAudioPlaying || !AudioFocus.isHeld(.playAndRecord, mode: .default) {
+                if next == nil || isOtherAudioPlaying || !AudioFocus.isHeld(.playAndRecord, mode: .default) {
                     if let unused = next {
                         try? FileManager.default.removeItem(at: unused.url)
                     }
@@ -243,8 +225,7 @@ final class VoiceNoteRecorder {
     /// Lets go of the sound kept ready, when the conversation closes or the app leaves the
     /// screen. A note kept to listen back to stays until it is sent or thrown away.
     func rest() {
-        warmth += 1
-        isWarming = false
+        wantsWarmth = false
         discardReady()
         guard recorder == nil else {
             return
@@ -305,14 +286,16 @@ final class VoiceNoteRecorder {
                 AudioFocus.giveBack()
             }
         }
-        warm()
+        if wantsWarmth { warm() }
     }
 
     private func discardReady() {
-        if let ready {
-            try? FileManager.default.removeItem(at: ready.url)
+        guard let unused = warming else { return }
+        warming = nil
+        Task {
+            if let ready = await unused.value.recorder {
+                try? FileManager.default.removeItem(at: ready.url)
+            }
         }
-        ready = nil
     }
 }
-

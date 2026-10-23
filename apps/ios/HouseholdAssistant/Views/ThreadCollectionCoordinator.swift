@@ -109,11 +109,6 @@ final class ThreadCollectionCoordinator: NSObject, UICollectionViewDelegate {
             collectionView.dequeueConfiguredReusableCell(using: registration, for: indexPath, item: row)
         }
         view.delegate = self
-        list.state.rowAt = { [weak self, weak view] point in
-            guard let self, let view, let path = view.indexPathForItem(at: view.convert(point, from: nil)),
-                  let id = self.dataSource?.itemIdentifier(for: path), case .message? = self.rows[id]?.content else { return nil }
-            return id
-        }
         jump.safeAreaRegions = []
         jump.view.backgroundColor = .clear
         view.jumpControl = jump.view
@@ -393,7 +388,7 @@ final class ThreadCollectionCoordinator: NSObject, UICollectionViewDelegate {
             host.show(
                 row,
                 look: lookCount,
-                as: ThreadCell(row: row, conversation: list.conversation, actions: list.actions, state: list.state)
+                as: ThreadCell(row: row, conversation: list.conversation, actions: list.actions)
                     .environment(\.self, environment)
             )
             #if DEBUG
@@ -738,19 +733,14 @@ final class ThreadCollectionCoordinator: NSObject, UICollectionViewDelegate {
     }
 }
 
-/// One row as its cell hosts it. Only the row the person is swiping reads how far its
-/// timestamp is out, so the other cells are not redrawn while the finger moves.
+/// One row as its cell hosts it; redraw only when its contents change.
 private struct ThreadCell: View {
     let row: ThreadRow
     let conversation: RoomConversation
     let actions: ThreadActions
-    let state: ThreadListState
 
     var body: some View {
-        let isSwiped = state.revealedRow == row.id
-        ThreadRowView(row: row, conversation: conversation, actions: actions,
-                      timestampReveal: isSwiped ? state.timestampReveal : 0,
-                      showsTimestamps: isSwiped && state.showsTimestamps)
+        ThreadRowView(row: row, conversation: conversation, actions: actions)
             .equatable()
     }
 }

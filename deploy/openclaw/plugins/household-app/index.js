@@ -475,10 +475,12 @@ function startRoom(ctx) {
         const heard = store.transcript(earlier.id);
         return {
           sender: earlier.author === assistant.id ? `${names[earlier.author]} (you)` : names[earlier.author] ?? earlier.author,
-          body: withPlace(earlier).trim() ||
-            earlier.media.map((item) => (item.kind === "voice" && heard !== null
-              ? `(voice note) ${heard}`
-              : `<media:${KIND_OF_FACT[item.kind] ?? "document"}>`)).join(" "),
+          body: [withPlace(earlier).trim(), ...earlier.media.map((item) => {
+            if (item.kind === "voice" && heard !== null) return formatAudioTranscriptForAgent(heard);
+            // A spoken assistant reply already has its words in the message.
+            if (item.kind === "voice" && withPlace(earlier).trim() && ![owner.id, peerPerson.id].includes(earlier.author)) return "";
+            return item.kind === "voice" ? "[Voice note: saved transcript unavailable]" : `<media:${KIND_OF_FACT[item.kind] ?? "document"}>`;
+          })].filter(Boolean).join("\n"),
           timestamp: earlier.at,
           messageId: earlier.id,
         };

@@ -21,6 +21,7 @@ struct TableCardView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     grid
                 }
+                .accessibilityIdentifier("card.table-scroll")
             }
             .cardPanel()
         }

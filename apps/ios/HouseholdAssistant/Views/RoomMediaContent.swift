@@ -5,6 +5,7 @@
 
 import AVFoundation
 import SwiftUI
+import UIKit
 
 struct RoomMediaContent: View {
     let media: [RoomMedia]
@@ -74,6 +75,7 @@ private struct VoiceNoteBubble: View {
     @State private var player = VoiceNotePlayer.shared
     @State private var url: URL?
     @State private var hasFailed = false
+    @State private var copiedTranscript = false
     /// The length read from the file, for a note the gateway kept without one.
     @State private var measuredMs: Int?
 
@@ -211,13 +213,37 @@ private struct VoiceNoteBubble: View {
             .buttonStyle(.plain)
             .accessibilityLabel(isOpen ? "Hide the transcript" : "Show the transcript")
             if isOpen {
-                Text(words)
-                    .font(.footnote)
-                    .foregroundStyle(foreground.opacity(0.85))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(foreground.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Spacer(minLength: 0)
+                        Button {
+                            UIPasteboard.general.string = words
+                            copiedTranscript = true
+                        } label: {
+                            Label(copiedTranscript ? "Copied" : "Copy", systemImage: copiedTranscript ? "checkmark" : "doc.on.doc")
+                                .font(.caption.weight(.semibold))
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(copiedTranscript ? "Transcript copied" : "Copy transcript")
+                        .accessibilityIdentifier("voice-note.copy-transcript")
+                    }
+                    Text(words)
+                        .font(.footnote)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .foregroundStyle(foreground.opacity(0.85))
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(foreground.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .onDisappear { copiedTranscript = false }
+                .task(id: copiedTranscript) {
+                    guard copiedTranscript else { return }
+                    do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                    copiedTranscript = false
+                }
             }
         }
         .padding(.horizontal, 12)

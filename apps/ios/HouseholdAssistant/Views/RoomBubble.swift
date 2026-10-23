@@ -161,7 +161,10 @@ struct RoomBubble: View {
     /// A voice note's words: a voice reply's own, or what the gateway heard a person say,
     /// which is what their assistant answered to.
     private var voiceNoteWords: String? {
-        message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? message.heard : message.text
+        if !isAssistant, let heard = message.heard, !heard.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return heard
+        }
+        return message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? message.heard : message.text
     }
 
     /// A picture, a file or a map fills the bubble almost to its edge.
@@ -230,7 +233,7 @@ struct RoomBubble: View {
         }
         // An approval card keeps its two buttons apart, so each can be found and pressed, and
         // so does a card with buttons or links of its own, a checklist's ticks among them.
-        .accessibilityElement(children: message.approval == nil && !hasCardControls ? .combine : .contain)
+        .accessibilityElement(children: message.approval == nil && !hasCardControls && !message.media.contains(where: { $0.kind == .voice }) ? .combine : .contain)
         .accessibilityLabel { label in
             if let name = participant?.name, !isOwn {
                 Text(name)
