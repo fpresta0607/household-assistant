@@ -226,14 +226,21 @@ final class VoiceNoteRecorder {
     /// screen. A note kept to listen back to stays until it is sent or thrown away.
     func rest() {
         wantsWarmth = false
+        let preparation = warming
         discardReady()
         guard recorder == nil else {
             return
         }
         let isRecordingNow = isRecordingNow
-        AudioFocus.soon {
-            if !isRecordingNow.withLock({ $0 }), AudioFocus.isHeld(.playAndRecord, mode: .default) {
-                AudioFocus.giveBack()
+        Task {
+            // A warm-up whose task has not reached the sound queue yet must finish
+            // before giving the session back, or it could reactivate after we leave.
+            _ = await preparation?.value
+            guard !wantsWarmth else { return }
+            AudioFocus.soon {
+                if !isRecordingNow.withLock({ $0 }), AudioFocus.isHeld(.playAndRecord, mode: .default) {
+                    AudioFocus.giveBack()
+                }
             }
         }
     }

@@ -791,11 +791,13 @@ test("Steward history bounds saved transcripts and paginates past malformed mess
   }
   store.close();
   const db = new DatabaseSync(file);
-  db.prepare("UPDATE entries SET body = ? WHERE id = ?").run("not json", "voice-0");
+  for (const [index, body] of ["not json", "null", '{"media":[null]}'].entries()) {
+    db.prepare("UPDATE entries SET body = ? WHERE id = ?").run(body, `voice-${index}`);
+  }
   db.close();
   const tool = setup.discover(APP_FAMILY_TURN);
   const first = await page(tool, { limit: 50 });
-  assert.equal(first.skippedMalformedEvents, 1);
+  assert.equal(first.skippedMalformedEvents, 3);
   assert.equal(first.truncated, true);
   assert.equal(first.hasMore, true);
   assert.ok(first.entries.every((entry) => entry.text.length <= 2000));

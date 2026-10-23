@@ -243,13 +243,16 @@ function appRows(directory, offset) {
 
 function appMessage(row, people) {
   const message = JSON.parse(row.body);
-  const transcript = row.transcript ? JSON.parse(row.transcript).words : null;
-  const parts = [typeof message.text === "string" ? message.text : ""];
+  if (!message || typeof message !== "object" || Array.isArray(message)) throw new SyntaxError("invalid app message");
+  const transcript = row.transcript ? JSON.parse(row.transcript)?.words : null;
+  const caption = typeof message.text === "string" ? message.text : "";
+  const parts = [caption];
   for (const media of Array.isArray(message.media) ? message.media : []) {
+    if (!media || typeof media !== "object") throw new SyntaxError("invalid app attachment");
     if (media.kind === "voice") {
       if (typeof transcript === "string" && transcript.trim()) {
         parts.push(`[Voice note transcript (machine-generated)]: ${transcript}`);
-      } else if (people.includes(row.author) || !message.text?.trim()) {
+      } else if (people.includes(row.author) || !caption.trim()) {
         parts.push("[Voice note: saved transcript unavailable]");
       }
     } else {
