@@ -321,7 +321,7 @@ struct RoomComposer: View {
         // recorder itself at the next touch, a little slower.
         .onChange(of: player.current) { _, current in
             if current == nil {
-                recorder.warm()
+                recorder.warm(afterPlayback: true)
             }
         }
         .onChange(of: scenePhase) { _, phase in

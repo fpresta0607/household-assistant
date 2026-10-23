@@ -80,12 +80,16 @@ final class VoiceNoteRecorder {
 
     /// Readies the next note without touching the microphone, on the sound's queue. Asks
     /// nothing; until the microphone is allowed it does nothing.
-    func warm() {
+    func warm(afterPlayback: Bool = false) {
         wantsWarmth = true
-        guard recorder == nil, starting == nil, warming == nil,
+        guard recorder == nil, starting == nil,
               AVAudioApplication.shared.recordPermission == .granted else {
             return
         }
+        // Playback took the audio session. Replace any preparation from before it,
+        // so the next press does not have to switch the session back itself.
+        if afterPlayback { discardReady() }
+        guard warming == nil else { return }
         let options = Self.readyOptions
         warming = Task {
             await withCheckedContinuation { continuation in
