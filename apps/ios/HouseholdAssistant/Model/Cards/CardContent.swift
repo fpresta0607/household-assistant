@@ -41,13 +41,13 @@ enum CardContent: Equatable, Sendable {
         }
     }
 
-    /// Whether a card of this type has buttons or links of its own, which VoiceOver must
+    /// Whether a card has buttons, links or horizontal scrolling, which VoiceOver must
     /// reach one by one, so the bubble keeps them apart instead of reading it as one.
     var hasControls: Bool {
         switch self {
-        case .checklist, .event, .placeReminder, .email, .copy, .product, .message, .cart, .scripture, .sermon, .sources:
+        case .table, .checklist, .event, .placeReminder, .email, .copy, .product, .message, .cart, .scripture, .sermon, .sources:
             return true
-        case .table, .chart, .reminder, .map, .order, .pocketPiggies, .agenda:
+        case .chart, .reminder, .map, .order, .pocketPiggies, .agenda:
             return false
         }
     }

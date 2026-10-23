@@ -8,7 +8,7 @@ final class MessageActionsTests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testTimestampSwipeRepeatsAndKeepsVerticalScrolling() {
+    func testHorizontalSwipesLeaveMessagesStillAndTimesAreInTheMenu() {
         let app = XCUIApplication()
         let control = "steward-timestamp-fix-" + UUID().uuidString
         app.launchArguments = ["-StewardDemo", "YES", "-StewardMessageActionsDemo", "YES",
@@ -27,13 +27,13 @@ final class MessageActionsTests: XCTestCase {
             let newest = messages.matching(NSPredicate(format: "label CONTAINS %@", "Everything is ready for the walk.")).firstMatch
             XCTAssertTrue(newest.waitForExistence(timeout: 10))
             for _ in 0..<2 {
-                verifyHeldTimestamps(in: app, thread: thread, field: field,
+                verifyMessageTimes(in: app, thread: thread, field: field,
                                      rows: [question, reply, newest], control: control)
             }
             if conversation == "direct" {
                 field.tap()
                 XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-                verifyHeldTimestamps(in: app, thread: thread, field: field, rows: [reply, newest], control: control)
+                verifyMessageTimes(in: app, thread: thread, field: field, rows: [reply, newest], control: control)
                 XCTAssertTrue(app.keyboards.firstMatch.exists)
             }
             let y = newest.frame.minY
@@ -47,6 +47,60 @@ final class MessageActionsTests: XCTestCase {
             XCTAssertFalse(app.buttons["Share the chat"].exists)
             app.navigationBars.buttons.element(boundBy: 0).tap()
         }
+    }
+
+    func testTableScrollsHorizontallyWithoutMovingItsMessage() {
+        let app = openMediaDemo()
+        let table = app.scrollViews["card.table-scroll"]
+        XCTAssertTrue(table.waitForExistence(timeout: 10))
+        let title = app.staticTexts["Pocket Piggies spending"]
+        let frame = title.frame
+        let firstColumn = app.staticTexts["Garden Market"]
+        let firstColumnX = firstColumn.frame.minX
+        let start = table.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -200, dy: 0)),
+                    withVelocity: .slow, thenHoldForDuration: 0.1)
+        XCTAssertEqual(title.frame.minX, frame.minX, accuracy: 1)
+        XCTAssertEqual(title.frame.minY, frame.minY, accuracy: 1)
+        XCTAssertLessThan(firstColumn.frame.minX, firstColumnX - 30, "the cells must scroll inside the bubble")
+        let finalColumn = app.staticTexts["$257.82"]
+        for _ in 0..<3 where !finalColumn.isHittable { table.swipeLeft() }
+        XCTAssertTrue(finalColumn.isHittable, "the table must reveal its last column")
+        XCTAssertFalse(timestampLabels(in: app).firstMatch.exists)
+        XCTAssertFalse(app.buttons["Reply"].exists)
+    }
+
+    func testExpandedTranscriptCopiesIntoTheComposer() {
+        let app = openMediaDemo()
+        let note = app.descendants(matching: .any).matching(identifier: "room.message")
+            .matching(NSPredicate(format: "label CONTAINS %@", "Voice note")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 10))
+        note.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.5)).tap()
+        let disclosure = app.buttons["Show the transcript"]
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+        disclosure.tap()
+        let copy = app.buttons["voice-note.copy-transcript"]
+        XCTAssertTrue(copy.waitForExistence(timeout: 5))
+        copy.tap()
+        let field = app.descendants(matching: .any).matching(identifier: "composer.field").firstMatch
+        field.tap()
+        field.press(forDuration: 0.8)
+        let paste = app.menuItems["Paste"]
+        XCTAssertTrue(paste.waitForExistence(timeout: 5))
+        paste.tap()
+        let pasted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "Come home soon, the pasta is getting cold."), object: field)
+        XCTAssertEqual(XCTWaiter.wait(for: [pasted], timeout: 5), .completed)
+    }
+
+    private func openMediaDemo() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-StewardDemo", "YES", "-StewardMessageActionsDemo", "YES", "-StewardMessageMediaDemo", "YES"]
+        app.launch()
+        let pin = app.buttons["pin.family"]
+        XCTAssertTrue(pin.waitForExistence(timeout: 30))
+        pin.tap()
+        XCTAssertTrue(app.collectionViews["room.thread"].waitForExistence(timeout: 10))
+        return app
     }
 
     func testSelectTextCopiesOnlyThePassageAndWholeMessageCopyStillWorks() {
@@ -130,7 +184,7 @@ final class MessageActionsTests: XCTestCase {
         add(screenshot)
     }
 
-    func testLongMessagesActionsAndHeldTimestamps() throws {
+    func testLongMessagesActionsAndMenuTimestamps() throws {
         for isHuman in [false, true] {
             let app = XCUIApplication()
             let control = "steward-message-actions-" + UUID().uuidString
@@ -184,7 +238,7 @@ final class MessageActionsTests: XCTestCase {
                     XCTAssertFalse(app.keyboards.firstMatch.exists)
                 }
 
-                verifyHeldTimestamps(in: app, thread: thread, field: field, rows: [question, reply, newest], control: control)
+                verifyMessageTimes(in: app, thread: thread, field: field, rows: [question, reply, newest], control: control)
 
                 let beforeScroll = question.frame
                 let start = thread.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
@@ -286,7 +340,7 @@ final class MessageActionsTests: XCTestCase {
                     }) { break }
                     thread.swipeUp(velocity: .fast)
                 }
-                verifyHeldTimestamps(in: app, thread: thread, field: field, rows: [reply, newest], control: control)
+                verifyMessageTimes(in: app, thread: thread, field: field, rows: [reply, newest], control: control)
                 XCTAssertTrue(app.keyboards.firstMatch.exists)
                 let dismissStart = reply.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                 let dismissEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98))
@@ -305,7 +359,7 @@ final class MessageActionsTests: XCTestCase {
         }
     }
 
-    private func verifyHeldTimestamps(
+    private func verifyMessageTimes(
         in app: XCUIApplication, thread: XCUIElement, field: XCUIElement,
         rows: [XCUIElement], control: String
     ) {
@@ -318,23 +372,24 @@ final class MessageActionsTests: XCTestCase {
             XCTAssertLessThanOrEqual(row.frame.maxY, bottom, "the composer must not cover the selected row or timestamp")
             return row.frame
         }
-        // The app acknowledges exactly one rendered timestamp label, the swiped message's,
-        // inside the unobscured safe area after half a second with the real recognizer holding.
-        let held = XCTDarwinNotificationExpectation(notificationName: control + ".timestamps-held")
         let start = rows[rows.count - 1].coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -125, dy: 0)),
-                    withVelocity: .slow, thenHoldForDuration: 2)
-        XCTAssertEqual(XCTWaiter.wait(for: [held], timeout: 2), .completed,
-                       "the swiped message's timestamp was never the one label rendered while the drag was held")
+                    withVelocity: .slow, thenHoldForDuration: 0.1)
         for (row, frame) in zip(rows, frames) {
             XCTAssertEqual(row.frame.minX, frame.minX, accuracy: 1,
                            app.descendants(matching: .any)["debug.threadLog"].label)
             XCTAssertEqual(row.frame.minY, frame.minY, accuracy: 1,
                            app.descendants(matching: .any)["debug.threadLog"].label)
         }
-        XCTAssertTrue(timestampLabels(in: app).firstMatch.waitForNonExistence(timeout: 3),
-                      "timestamp labels must leave the hierarchy after the bubbles return")
+        XCTAssertFalse(timestampLabels(in: app).firstMatch.exists)
         XCTAssertFalse(app.buttons["Cancel reply"].exists, "a left drag must not start a reply")
+        rows[rows.count - 1].press(forDuration: 0.6)
+        let timestamp = app.staticTexts["message.sent-time"]
+        XCTAssertTrue(timestamp.waitForExistence(timeout: 5))
+        XCTAssertTrue(timestamp.label.hasPrefix("Sent "))
+        XCTAssertGreaterThan(timestamp.label.count, 12, "the menu must show a date and time")
+        app.buttons["Close"].tap()
+        XCTAssertTrue(timestamp.waitForNonExistence(timeout: 5))
     }
 
     private func timestampLabels(in app: XCUIApplication) -> XCUIElementQuery {

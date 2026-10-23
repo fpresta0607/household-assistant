@@ -10,8 +10,8 @@
 // there, whatever joins the bottom or grows there keeps the newest row just above the
 // composer, through the keyboard rising and falling too (ThreadCollectionView). Scrolled up,
 // nothing the person reads moves, and a control to jump back to the newest shows (section
-// 21b). Swiping left drags every row's time out from its side. The room supplies the rows
-// and what they do.
+// 21b). Sent times live in the message menu; horizontal drags belong to the cards
+// inside a message. The room supplies the rows and what they do.
 
 import SwiftUI
 
@@ -29,11 +29,8 @@ struct ThreadList: View {
     var preparation: ThreadPreparation? = nil
     var returnToLatest: (() -> Void)? = nil
 
-    @Environment(\.reducesMotion) private var reducesMotion
     /// The part of the window no bar, composer or keyboard covers.
     @State private var uncovered = CGRect.zero
-    @State private var timestampReturn: Task<Void, Never>?
-    @ScaledMetric(relativeTo: .caption) private var timestampWidth: CGFloat = 80
 
     var body: some View {
         ZStack {
@@ -66,68 +63,5 @@ struct ThreadList: View {
             }
             #endif
         }
-        .gesture(ThreadTimestampGesture(
-            onBegin: { point in
-                // The swipe reveals the timestamp of the message it began on, and no other.
-                timestampReturn?.cancel()
-                timestampReturn = nil
-                var transaction = Transaction(animation: nil)
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    state.timestampReveal = 0
-                    state.showsTimestamps = false
-                    state.revealedRow = state.rowAt(point)
-                }
-            },
-            onChange: { distance in
-                guard state.revealedRow != nil else { return }
-                timestampReturn?.cancel()
-                timestampReturn = nil
-                // Follow the finger directly, including when a second swipe interrupts
-                // the return. Only letting go animates; dragging never springs.
-                var transaction = Transaction(animation: nil)
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    state.showsTimestamps = distance > 0
-                    state.timestampReveal = min(distance, timestampWidth)
-                }
-                #if DEBUG
-                DemoTimestampObservation.shared.held(state.timestampReveal > 0)
-                #endif
-            },
-            onEnd: {
-                timestampReturn?.cancel()
-                #if DEBUG
-                ThreadLog.note("timestamps released at \(state.timestampReveal)")
-                DemoTimestampObservation.shared.held(false)
-                #endif
-                withAnimation(reducesMotion ? nil : .easeOut(duration: 0.18)) {
-                    state.timestampReveal = 0
-                }
-                // Rows have separate hosting controllers. Retain their labels until
-                // the return finishes, then remove them from both drawing and accessibility.
-                // A new drag cancels this cleanup before it can hide the new timestamps.
-                if reducesMotion {
-                    state.showsTimestamps = false
-                    state.revealedRow = nil
-                } else {
-                    timestampReturn = Task { @MainActor in
-                        do { try await Task.sleep(for: .milliseconds(200)) }
-                        catch { return }
-                        state.showsTimestamps = false
-                        state.revealedRow = nil
-                        timestampReturn = nil
-                    }
-                }
-            }
-        ))
-        .onDisappear {
-            timestampReturn?.cancel()
-            timestampReturn = nil
-            state.timestampReveal = 0
-            state.showsTimestamps = false
-            state.revealedRow = nil
-        }
     }
 }
-

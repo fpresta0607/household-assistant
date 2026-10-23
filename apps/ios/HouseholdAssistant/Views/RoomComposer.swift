@@ -57,9 +57,8 @@ struct RoomComposer: View {
     /// True from a cancel in the middle of a drag until that finger lifts, so the rest
     /// of the drag does not start a second note.
     @State private var isDragSpent = false
-    /// True while a finger is on the microphone. iOS can cancel a touch rather than end it,
-    /// and a drag then never hears its end, so this going false is the finger lifting too.
-    @GestureState private var isTouchingMicrophone = false
+    /// True while the microphone's native touch recognizer holds the finger.
+    @State private var isTouchingMicrophone = false
     /// Counts the notes thrown away, for the tap that says so.
     @State private var cancels = 0
     /// Counts the messages sent from here, for the light tap each one gives.
@@ -317,17 +316,12 @@ struct RoomComposer: View {
                 _ = startNote(isLocked: true)
             }
         }
-        .onChange(of: isTouchingMicrophone) { _, isTouching in
-            if !isTouching {
-                liftOff("touch ended", at: Date())
-            }
-        }
         // A voice note playing takes the sound; once it lets it go, it is readied for the
         // next note again. Anything else that took it, Talk among them, is caught by the
         // recorder itself at the next touch, a little slower.
         .onChange(of: player.current) { _, current in
             if current == nil {
-                recorder.warm()
+                recorder.warm(afterPlayback: true)
             }
         }
         .onChange(of: scenePhase) { _, phase in
@@ -600,49 +594,38 @@ struct RoomComposer: View {
             glass: glass
         )
         .contentShape(Circle())
-        .gesture(
-            // In the window's space, since the microphone follows the finger.
-            DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                .updating($isTouchingMicrophone) { _, isTouching, _ in
-                    isTouching = true
+        .gesture(VoiceNotePressGesture(
+            onBegin: {
+                isTouchingMicrophone = true
+                guard !isDragSpent else { return }
+                ChatTiming.touchedMicrophone()
+                var instant = Transaction()
+                instant.disablesAnimations = true
+                instant.addAnimationCompletion {
+                    MainActor.assumeIsolated { ChatTiming.recordingSettled() }
                 }
-                .onChanged { drag in
-                    guard !isDragSpent else {
-                        return
-                    }
-                    // Timed from the touch, before the sound is readied: readying it can
-                    // hold the main thread, and a hold timed from after it read as a tap.
-                    // The drag's own time is not on the clock the note's other times are
-                    // read on.
-                    if gesture.phase == .idle {
-                        ChatTiming.touchedMicrophone()
-                        // Whole on the touch's own frame: the field's glass turning into the
-                        // recording, the held microphone and the dimmed thread, with no
-                        // spring easing them in. The spring took about half a second to
-                        // settle, which on the phone read as the microphone lagging.
-                        var instant = Transaction()
-                        instant.disablesAnimations = true
-                        instant.addAnimationCompletion {
-                            // On the main thread, once nothing the touch changed is still animating.
-                            MainActor.assumeIsolated {
-                                ChatTiming.recordingSettled()
-                            }
-                        }
-                        guard withTransaction(instant, { startNote(isLocked: false, at: Date()) }) else {
-                            isDragSpent = true
-                            return
-                        }
-                    }
-                    gesture.drag(x: drag.translation.width, y: drag.translation.height)
-                    if case .finished = gesture.phase {
-                        isDragSpent = true
-                    }
+                if !withTransaction(instant, { startNote(isLocked: false, at: Date()) }) {
+                    isDragSpent = true
+                }
+            },
+            onChange: { translation in
+                guard !isDragSpent else { return }
+                gesture.drag(x: translation.width, y: translation.height)
+                if case .finished = gesture.phase { isDragSpent = true }
+                settle()
+            },
+            onEnd: { cancelled in
+                isTouchingMicrophone = false
+                if cancelled, gesture.phase == .holding {
+                    // An interrupted touch must never send a partial note.
+                    gesture.discard()
                     settle()
-                }
-                .onEnded { _ in
+                    isDragSpent = false
+                } else {
                     liftOff("released", at: Date())
                 }
-        )
+            }
+        ))
         .disabled(!canSend)
         .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
         .accessibilityLabel("Record a voice note")
@@ -713,8 +696,7 @@ struct RoomComposer: View {
     }
 
     /// The finger came off the microphone at `moment`: a held note goes, as in Telegram and
-    /// Messages. The drag's end and the touch's state ending both say so, whichever comes
-    /// first.
+    /// Messages. A system-cancelled touch discards the held note instead.
     private func liftOff(_ how: String, at moment: Date) {
         isDragSpent = false
         guard gesture.phase == .holding else {

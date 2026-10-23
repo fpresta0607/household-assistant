@@ -146,8 +146,10 @@ struct ReactionOverlay<Lifted: View>: View {
     }
 
     private var menuHeight: CGFloat {
-        CGFloat(menuCount) * menuRowHeight + 16
+        CGFloat(menuCount) * menuRowHeight + 16 + timestampHeight
     }
+
+    @ScaledMetric(relativeTo: .caption) private var timestampHeight: CGFloat = 58
 
     private func fittedMenuHeight(in size: CGSize) -> CGFloat {
         min(menuHeight, max(44, size.height - reactionBarHeight - 3 * reactionGap))
@@ -297,6 +299,15 @@ struct ReactionOverlay<Lifted: View>: View {
                 .buttonStyle(.plain)
                 .accessibilityHint("Replies quoting this message, asking \(model.assistantName)")
             }
+            Divider()
+                .padding(.horizontal, 16)
+            Text("Sent \(message.sentAt.formatted(date: .abbreviated, time: .shortened))")
+                .font(.caption)
+                .foregroundStyle(Palette.secondaryText)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: timestampHeight)
+                .padding(.horizontal, 12)
+                .accessibilityIdentifier("message.sent-time")
         }
         .padding(.vertical, 8)
         }

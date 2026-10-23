@@ -344,10 +344,30 @@ test("a later turn's family history has an earlier voice note's words", async ()
 
     // Assert
     const earlier = channel.contexts[0].message.inboundHistory.find((entry) => entry.messageId === message.id);
-    assert.equal(earlier.body, `(voice note) ${said}`);
+    assert.equal(earlier.body, forAgent(said));
   } finally {
     await channel.stop();
   }
+});
+
+test("family history preserves a voice transcript beside its caption without hearing it again", async () => {
+  const said = "The appointment is at three on Thursday.";
+  const { bytes, note, message } = voiceNote("family", said);
+  message.text = "Details for this week";
+  const { channel, heard } = await channelHearing("corey", new Map([[note.id, said]]));
+  try {
+    await keepMedia(channel, bytes, note.id);
+    await channel.send(signedBy(FRANCO, message));
+    await until("the saved transcript", async () => (await transcriptOf(channel, message.id)) !== undefined);
+    await channel.send(signedBy(FRANCO, {
+      conversation: "family", id: `q-${String(++sequence).padStart(8, "0")}`, at: Date.now() + 1,
+      replyTo: null, text: "Corey, what time was the appointment?", media: [],
+    }));
+    await until("the follow-up turn", () => channel.contexts.length === 1);
+    const earlier = channel.contexts[0].message.inboundHistory.find((entry) => entry.messageId === message.id);
+    assert.equal(earlier.body, `${message.text}\n${forAgent(said)}`);
+    assert.equal(heard.length, 1, "reading history must reuse the saved words");
+  } finally { await channel.stop(); }
 });
 
 test("a voice note that cannot be heard still starts the owner's turn, with no words and nothing kept", async () => {

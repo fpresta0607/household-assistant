@@ -28,6 +28,14 @@ enum DemoLongMessages {
             room.react(to: question.id, by: DemoRoom.assistant, with: "👍", in: conversation)
             room.say("I will bring the garden notebook.", by: DemoRoom.assistant, in: conversation, replyTo: question.id)
             room.say("Everything is ready for the walk.", by: DemoRoom.person, in: conversation)
+            if UserDefaults.standard.bool(forKey: "StewardMessageMediaDemo") {
+                room.say("", by: DemoRoom.person, in: conversation, media: [room.voiceNote])
+                room.say("""
+                ```steward-card
+                {"type":"table","title":"Pocket Piggies spending","columns":["Merchant","Checking account","Category","Monthly target","Actual spending","Remaining balance"],"rows":[["Garden Market","Household Checking","Groceries","$800.00","$542.18","$257.82"]]}
+                ```
+                """, by: DemoRoom.assistant, in: conversation)
+            }
         }
     }
 }

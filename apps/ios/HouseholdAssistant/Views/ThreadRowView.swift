@@ -15,11 +15,8 @@ struct ThreadRowView: View {
     let row: ThreadRow
     let conversation: RoomConversation
     let actions: ThreadActions
-    var timestampReveal: CGFloat = 0
-    var showsTimestamps = false
 
     @Environment(AppModel.self) private var model
-    @ScaledMetric(relativeTo: .caption) private var timestampWidth: CGFloat = 80
 
     var body: some View {
         switch row.content {
@@ -85,36 +82,6 @@ struct ThreadRowView: View {
             .padding(.top, content.isFirst || placement.divider != nil ? 0 : (placement.startsRun ? 12 : 4))
             // While it is lifted, the message is only where it floats.
             .opacity(content.isLifted ? 0 : 1)
-            .offset(x: -timestampReveal)
-            .overlay(alignment: .bottomTrailing) {
-                // Visibility outlives the drag until its return animation has finished.
-                if showsTimestamps {
-                    Text(MessageTime.divider(for: message.sentAt).time)
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(Palette.secondaryText)
-                        .fixedSize()
-                        .padding(.bottom, 9)
-                        .offset(x: timestampWidth - timestampReveal)
-                        .opacity(min(1, timestampReveal / 24))
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(timestampReveal <= 0)
-                        .accessibilityIdentifier("room.timestamp.\(message.id)")
-                        .transition(.identity)
-                        #if DEBUG
-                        .onGeometryChange(for: CGRect.self) { geometry in
-                            geometry.frame(in: .global)
-                        } action: { frame in
-                            if DemoLongMessages.isRequested {
-                                DemoTimestampObservation.shared.frames[message.id] = frame
-                            }
-                        }
-                        .onDisappear {
-                            DemoTimestampObservation.shared.frames.removeValue(forKey: message.id)
-                        }
-                        #endif
-                }
-            }
             .accessibilityValue(MessageTime.divider(for: message.sentAt).time)
             if let readers = content.readers {
                 // Its room is there from the moment the message is sent, so the message never
@@ -203,6 +170,5 @@ struct ThreadRowView: View {
 extension ThreadRowView: Equatable {
     nonisolated static func == (lhs: ThreadRowView, rhs: ThreadRowView) -> Bool {
         lhs.row == rhs.row && lhs.conversation == rhs.conversation
-            && lhs.timestampReveal == rhs.timestampReveal && lhs.showsTimestamps == rhs.showsTimestamps
     }
 }

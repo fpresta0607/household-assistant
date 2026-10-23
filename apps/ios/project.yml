@@ -68,7 +68,7 @@ settings:
     # findings rather than stop on them. Set this to "6.0" once they are zero.
     SWIFT_VERSION: "5.0"
     SWIFT_STRICT_CONCURRENCY: complete
-    MARKETING_VERSION: "0.1.4"
+    MARKETING_VERSION: "0.1.5"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: YES

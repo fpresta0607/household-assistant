@@ -5,6 +5,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 
+import { openRoomStore } from "../../deploy/openclaw/plugins/household-app/store.js";
 import plugin from "../../deploy/openclaw/plugins/household-family-room/index.js";
 import { HISTORY_TEXT_CASES, mockHistoryTextSdk } from "./fixtures/openclaw-history-text.mjs";
 import telegramContexts from "./fixtures/openclaw-telegram-contexts.json" with { type: "json" };
@@ -692,7 +693,7 @@ test("family history admits the app's family room and its owner's own thread", a
     { ...APP_FAMILY_TURN, requesterSenderId: APP_OWNER, sessionKey: `agent:main:household:group:family:sender:${APP_OWNER}` },
     APP_PRIVATE_TURN,
   ]) {
-    assert.deepEqual((await page(setup.discover(overrides))).entries.map((entry) => entry.text), ["Family plans"], JSON.stringify(overrides));
+    assert.deepEqual((await page(setup.discover(overrides), { source: "transcript" })).entries.map((entry) => entry.text), ["Family plans"], JSON.stringify(overrides));
   }
 });
 
@@ -742,8 +743,64 @@ test("family history reads The Fam and the app's family room as one history, nev
     ["app-private-session", 1, said("POCKETPIGGIES_PRIVATE_SENTINEL app thread", APP_OWNER), START + 4],
   ]);
   for (const turn of [{}, APP_FAMILY_TURN, APP_PRIVATE_TURN]) {
-    const result = await page(setup.discover(turn));
+    const result = await page(setup.discover(turn), { source: "transcript" });
     assert.deepEqual(result.entries.map((entry) => entry.text), ["Said in The Fam", "Said in the app's family room"]);
     assert.doesNotMatch(JSON.stringify(result), /SENTINEL/);
   }
+});
+
+
+test("Steward history defaults to retained app messages and saved transcripts without opening audio", async (context) => {
+  const setup = await fixture(context, { hasDatabase: false });
+  const store = openRoomStore(path.join(setup.directory, "household-app", "room.sqlite"));
+  const voice = [{ id: "audio-does-not-exist", kind: "voice", mime: "audio/mp4" }];
+  const add = (id, conversation, text, media = [], author = APP_PEER) => store.addMessage({
+    id, conversation, author, at: START + Number(id.slice(-1)), text, media, origin: "local",
+  });
+  add("note1", "family", "Appointment details", voice);
+  store.setTranscript({ messageId: "note1", author: "corey", words: "Thursday at three.", at: START + 10 });
+  add("note2", "direct", "PRIVATE_SENTINEL", voice);
+  store.setTranscript({ messageId: "note2", author: "corey", words: "PRIVATE_AUDIO_SENTINEL", at: START + 11 });
+  add("note3", "family", "", voice);
+  add("note4", "family", "I will remind you.", voice, "corey");
+  store.close(); // The lookup must read what survived a restart, without a live hearing service.
+
+  const tool = setup.discover(APP_FAMILY_TURN);
+  assert.equal(tool.parameters.properties.source.default, "app");
+  const first = await page(tool, { limit: 1 });
+  assert.equal(first.source, "app");
+  assert.equal(first.entries[0].text, "Appointment details\n[Voice note transcript (machine-generated)]: Thursday at three.");
+  const second = await page(tool, { offset: first.nextOffset });
+  assert.deepEqual(second.entries.map((entry) => entry.text), [
+    "[Voice note: saved transcript unavailable]", "I will remind you.",
+  ]);
+  assert.equal(second.hasMore, false);
+  assert.match(second.retention.note, /do not download or re-transcribe old audio/);
+  assert.doesNotMatch(JSON.stringify([first, second]), /PRIVATE|audio-does-not-exist|room.sqlite/);
+  assert.deepEqual((await page(setup.discover(APP_PRIVATE_TURN))).entries.map((entry) => entry.messageId), ["note1", "note3", "note4"]);
+});
+
+test("Steward history bounds saved transcripts and paginates past malformed messages", async (context) => {
+  const setup = await fixture(context, { hasDatabase: false });
+  const file = path.join(setup.directory, "household-app", "room.sqlite");
+  const store = openRoomStore(file);
+  for (let index = 0; index < 55; index++) {
+    store.addMessage({ id: `voice-${index}`, conversation: "family", author: APP_OWNER, at: START + index,
+      text: "", media: [{ kind: "voice" }], origin: "local" });
+    store.setTranscript({ messageId: `voice-${index}`, author: "corey", words: "long transcript ".repeat(700), at: START + index });
+  }
+  store.close();
+  const db = new DatabaseSync(file);
+  for (const [index, body] of ["not json", "null", '{"media":[null]}'].entries()) {
+    db.prepare("UPDATE entries SET body = ? WHERE id = ?").run(body, `voice-${index}`);
+  }
+  db.close();
+  const tool = setup.discover(APP_FAMILY_TURN);
+  const first = await page(tool, { limit: 50 });
+  assert.equal(first.skippedMalformedEvents, 3);
+  assert.equal(first.truncated, true);
+  assert.equal(first.hasMore, true);
+  assert.ok(first.entries.every((entry) => entry.text.length <= 2000));
+  const second = await page(tool, { offset: first.nextOffset, limit: 50 });
+  assert.notEqual(first.entries.at(-1).messageId, second.entries[0].messageId);
 });

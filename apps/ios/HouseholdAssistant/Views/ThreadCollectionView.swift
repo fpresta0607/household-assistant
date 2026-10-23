@@ -208,12 +208,6 @@ final class ThreadCollectionView: UICollectionView {
             )
             bringSubviewToFront(jumpControl)
         }
-        #if DEBUG
-        // The part of the list nothing covers, on screen, where the timestamps are measured too.
-        if DemoLongMessages.isRequested {
-            DemoTimestampObservation.shared.viewport = convert(bounds.inset(by: adjustedContentInset), to: nil)
-        }
-        #endif
         onOpeningLayout?()
     }
 }
