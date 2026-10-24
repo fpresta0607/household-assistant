@@ -24,10 +24,9 @@ Each phone pairs with one gateway, and the assistant's name and emoji come from 
 | `HouseholdAssistantTests` | unit tests; every fixture is decoded, the connection is driven by the captured frames, and `ScreenshotTests` renders every screen and state to `build/screenshots/` |
 | `HouseholdAssistantUITests` | launches the app and checks it stays in the foreground |
 
-**None of the Swift that needs SwiftUI or UIKit has been compiled yet.**
-There is no Mac in the fleet, so the first build on the Mac runner is the first build there has been.
+Native builds, UI tests and screenshot captures run on GitHub's hosted Macs; see the [TestFlight runbook](../../docs/testflight.md) for verification and release commands.
 
-`Protocol` and `Model` need neither, and they are compiled and tested on Linux:
+`Protocol` and `Model` need neither SwiftUI nor UIKit, and they are compiled and tested on Linux:
 
 ```bash
 # verified

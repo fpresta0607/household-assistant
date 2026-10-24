@@ -91,7 +91,7 @@ The figures below are from then, and hold again if it ever goes private:
 |---|---|---|
 | a TestFlight build | 9 minutes, $0.56, build 12 on 15 October | its 45 minute timeout, $2.79 |
 | a preview, fix lane | 5 minutes, $0.31, with the cached build, 6 without, measured on 15 October | its 30 minute timeout, $1.86 |
-| a preview, full lane with every screenshot | 20 minutes, $1.24, measured on 15 October, 659 seconds of it the screenshots | its 30 minute timeout, $1.86 |
+| a preview, full lane with every screenshot | 20 minutes, $1.24, measured on 15 October, 659 seconds of it the screenshots | the full lane's timeout in [`ios-ci.yml`](../.github/workflows/ios-ci.yml) |
 
 A fix round is the fix lane: the build, the unit tests, and only the UI tests it names with `--ui-tests`.
 The full lane adds every UI test and both films, and is for the commit going to TestFlight:
