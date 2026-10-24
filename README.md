@@ -163,3 +163,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m mypy
 .venv/Scripts/python.exe -m pytest
 ```
+
+## License
+
+Apache License 2.0; see [LICENSE](LICENSE).
