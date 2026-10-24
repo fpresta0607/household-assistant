@@ -163,11 +163,19 @@ class AccountLink:
             attempts=0,
         )
         self.store.save(state)
+        # PocketPiggies' page names a household person's assistant by its client id, so the
+        # person can tell their own household's request from one somebody else registered
+        # to their account.
+        check = (
+            ""
+            if self.binding.is_telegram
+            else f" The page names your assistant {self.client_id}; allow it only if it does."
+        )
         return {
             "text": (
                 "Connect your PocketPiggies account. Sign in if needed and allow read-only access, "
                 "then come back here and send /pocketpiggies status. This link expires in "
-                "10 minutes."
+                f"10 minutes.{check}"
             ),
             "url": f"{self.api.base_url}/assistant/connect?request={request_id}",
         }

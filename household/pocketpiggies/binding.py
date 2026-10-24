@@ -42,6 +42,10 @@ class Binding:
             not TELEGRAM_ID.fullmatch(self.telegram_id) or self.client_id not in BOT_NAMES
         ):
             raise ValueError("a Telegram binding needs a numeric id and the corey or denise client")
+        # PocketPiggies keeps corey and denise for the two Telegram clients and refuses either
+        # as a household person's, so a key holder set up that way fails here, not there.
+        if self.telegram_id is None and self.client_id in BOT_NAMES:
+            raise ValueError("a household person's client is never corey or denise")
 
     @property
     def is_telegram(self) -> bool:

@@ -55,7 +55,7 @@ pytestmark = pytest.mark.skipif(os.name != "posix", reason="the key holder runs 
 # Corey's key holder as it runs for Franco: bound to his Telegram chat, where his grant was
 # made, and, once he links again under the household binding, to him as the app names him.
 TELEGRAM = Binding("corey", PERSON, OWNER)
-HOUSEHOLD = Binding("corey", PERSON)
+HOUSEHOLD = Binding("hh-7f3a9c21ab12", PERSON)
 IDENTITY = TELEGRAM.stored_identity()
 
 
@@ -203,6 +203,7 @@ def test_consent_binds_a_grant_that_never_leaves_the_key_holder(
     link = make_link(fake, provisioned(state_directory), clock)
     started = link.start()
     request_id = started["url"].rsplit("=", 1)[1]
+    assert "names your assistant" not in started["text"], "a Telegram consent names its bot"
     assert started["url"] == f"{fake.base_url}/assistant/connect?request={request_id}"
     with pytest.raises(PocketPiggiesError) as pending:
         link.complete(request_id)
@@ -235,7 +236,10 @@ def test_the_household_binding_links_and_reads_as_the_household_person(
     store = CredentialStore(directory, HOUSEHOLD.stored_identity())
     store.save(LinkState(CLIENT_CREDENTIAL, None, None))
     link = make_link(fake, store, binding=HOUSEHOLD)
-    request_id = link.start()["url"].rsplit("=", 1)[1]
+    started_link = link.start()
+    request_id = started_link["url"].rsplit("=", 1)[1]
+    # PocketPiggies' page names the assistant by its client id, so the person can check it.
+    assert f"names your assistant {HOUSEHOLD.client_id}" in started_link["text"]
     fake.approve(request_id)
     link.complete(request_id)
     Reader(api=PocketPiggiesApi(fake.base_url, timeout=5), link=link).catalog()
@@ -267,6 +271,7 @@ def test_a_binding_is_refused_unless_it_names_a_person_and_a_known_telegram_clie
         ("corey", "", None),
         ("Corey", "franco", None),
         ("hh-marina", "marina", OWNER),
+        ("corey", "marina", None),
         ("corey", "franco", "telegram:7000000001"),
     ]:
         with pytest.raises(ValueError):
@@ -1716,9 +1721,16 @@ def test_the_drop_in_names_the_binding() -> None:
 
     franco = {"POCKETPIGGIES_OWNER": PERSON, "POCKETPIGGIES_TELEGRAM_ID": OWNER}
     assert entry.binding_from("corey", franco) == TELEGRAM
-    assert entry.binding_from("corey", {"POCKETPIGGIES_OWNER": PERSON}) == HOUSEHOLD
+    household = {"POCKETPIGGIES_OWNER": PERSON, "POCKETPIGGIES_CLIENT_ID": HOUSEHOLD.client_id}
+    assert entry.binding_from("corey", household) == HOUSEHOLD
     marina = {"POCKETPIGGIES_OWNER": "marina", "POCKETPIGGIES_CLIENT_ID": "hh-7f3a"}
     assert entry.binding_from("ada", marina) == Binding("hh-7f3a", "marina")
-    for refused in ({}, {"POCKETPIGGIES_OWNER_TELEGRAM_ID": OWNER}):
+    # A drop-in that names no client and no Telegram id would make corey a household
+    # person's client, which PocketPiggies refuses.
+    for refused in (
+        {},
+        {"POCKETPIGGIES_OWNER_TELEGRAM_ID": OWNER},
+        {"POCKETPIGGIES_OWNER": PERSON},
+    ):
         with pytest.raises(ValueError):
             entry.binding_from("corey", refused)

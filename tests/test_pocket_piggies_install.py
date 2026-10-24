@@ -310,7 +310,11 @@ def test_the_key_holder_gets_its_own_user_root_owned_code_and_a_private_socket_d
         assert (units / f"household-pocketpiggies-guard.{name}").is_file()
     drop_in = (units / "household-pocketpiggies@corey.service.d" / "gateway.conf").read_text()
     assert f"Environment=POCKETPIGGIES_OWNER={OWNER}\n" in drop_in
-    assert "Environment=POCKETPIGGIES_CLIENT_ID=corey\n" in drop_in
+    # A household person's client, never corey, which PocketPiggies keeps for Telegram.
+    assert (
+        f"Environment=POCKETPIGGIES_CLIENT_ID={module.default_client_id('corey', None)}\n"
+        in drop_in
+    )
     assert "TELEGRAM" not in drop_in
     assert f"BindPaths={state / 'pocketpiggies'}:/run/household-pocketpiggies\n" in drop_in
     sockets = state / "pocketpiggies"
@@ -440,7 +444,7 @@ def test_client_provisioning_writes_only_into_the_key_holder_state_and_never_rot
     assert stored["grant"] is None and stored["pending"] is None
     assert stored["owner"] == OWNER and "ownerTelegramId" not in stored
     assert registration == {
-        "clientId": "corey",
+        "clientId": module.default_client_id("corey", None),
         "credentialSha256": registration["credentialSha256"],
         "subjectType": "household_person",
         "subject": OWNER,
@@ -1374,3 +1378,14 @@ def test_restart_judges_doctor_by_its_report_not_its_exit_code(
     else:
         module.main()
         assert "Verify the plugin" in capsys.readouterr().out
+
+
+def test_a_household_persons_client_is_named_for_the_box_and_never_a_telegram_one() -> None:
+    module = installer()
+
+    named = module.default_client_id("corey", None)
+
+    assert re.fullmatch(r"hh-[0-9a-f]{12}", named)
+    assert named == module.default_client_id("corey", None), "the same on every run"
+    assert named != module.default_client_id("denise", None)
+    assert module.default_client_id("corey", TELEGRAM_ID) == "corey"

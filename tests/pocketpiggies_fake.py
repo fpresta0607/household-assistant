@@ -27,6 +27,7 @@ CLIENT_CREDENTIAL = "ppc_" + "C" * 43
 # the household app names them, for every other grant (docs/deploy/pocketpiggies-server.md).
 OWNER = "7000000001"
 PERSON = "franco"
+HOUSEHOLD_CLIENT = "hh-7f3a9c21ab12"
 TELEGRAM_FIELDS = {"telegramUserId": OWNER, "chatId": OWNER, "chatType": "private"}
 HOUSEHOLD_FIELDS = {"subjectType": "household_person", "subject": PERSON}
 ACCOUNT = "11111111-2222-4333-8444-555555555555"
@@ -270,7 +271,8 @@ class _Handler(BaseHTTPRequestHandler):
         )
         if binding not in (
             ("corey", OWNER, OWNER, "private", None, None),
-            ("corey", None, None, None, "household_person", PERSON),
+            # A household person's client, which PocketPiggies never lets be corey or denise.
+            (HOUSEHOLD_CLIENT, None, None, None, "household_person", PERSON),
         ):
             self._send(403, {"code": "assistant_scope_denied"})
         elif path == "/api/assistant/catalog":

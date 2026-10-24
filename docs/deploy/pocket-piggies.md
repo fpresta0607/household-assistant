@@ -153,7 +153,7 @@ sudo python3 scripts/pocket-piggies-install.py corey --owner franco --telegram-i
 ```
 
 `--owner` is the household person the gateway's app belongs to.
-`--telegram-id` is only for Corey's and Denise's clients, which PocketPiggies registered under Franco's and Gia's Telegram chats; a new household leaves it out, and passes the client id PocketPiggies issued as `--client-id` (it defaults to the persona).
+`--telegram-id` is only for Corey's and Denise's clients, which PocketPiggies registered under Franco's and Gia's Telegram chats; a new household leaves it out, and its client id defaults to `hh-` and twelve hex characters named for its box and assistant (`--client-id` names another); PocketPiggies refuses `corey` and `denise` for a household person.
 The installer verifies the gateway's app owner and backs up the config and any previous plugin under `/opt/household-assistant/pocket-piggies-backups/`.
 It writes the plugin, every other chat channel switched off, the family room's tool list and the three finance tools to `tools.alsoAllow`.
 It creates the key holder's user, copies its code and a copy of the installer to `/opt/household-assistant/pocketpiggies/`, installs `household-pocketpiggies@.service` and its instance drop-in, creates the socket directory and starts the key holder.

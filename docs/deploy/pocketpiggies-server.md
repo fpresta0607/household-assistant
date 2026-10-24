@@ -43,7 +43,10 @@ What the server needs:
 1. **A client entry with a subject in place of a Telegram id and bot.**
    Its redirect URI is `steward://pocketpiggies/linked`, the same for every household.
 2. **Client ids that never collide.**
-   `corey` and `denise` are taken, and another household's assistants may well have the same names, so the id comes from PocketPiggies: issue one per gateway at registration (for example `hh-` and four random hex characters) and give it back to whoever registers it; the household passes it to the installer as `--client-id`.
+   `corey` and `denise` are taken, and another household's assistants may well have the same names.
+   The installer names a household person's client itself when it is not given `--client-id`: `hh-` and twelve hex characters of a hash of the household's box name and the assistant, the same on every run and different for every household.
+   PocketPiggies' `sql/0107_household_person_link.sql` takes any id of that shape except `corey` and `denise`, and refuses one already registered.
+   Its consent page names the assistant by this id, and the link message the assistant sends says the same id, so the person can check that the request is their own household's.
 3. **Optional, for more households: registering a client without a deploy.**
    An entry in the environment needs PocketPiggies redeployed for each household.
    A settings page where the signed-in PocketPiggies owner pastes the registration above, and which stores the client against their account, lets a household connect without Franco in the loop.
@@ -85,5 +88,5 @@ Once the server accepts the household binding, either can move:
 1. Revoke the old grant: `/pocketpiggies disconnect` in their thread.
 2. Stop the key holder and move its state file aside: `systemctl stop household-pocketpiggies@corey`, then `mv /var/lib/household-pocketpiggies/corey/connection.json{,.telegram}`.
    A state file written under one binding is never read under the other.
-3. `pocket-piggies-install.py corey --owner franco --client-id <the new id> --restart`, without `--telegram-id`, then `--provision-client`, and register what it prints.
+3. `pocket-piggies-install.py corey --owner franco --restart`, without `--telegram-id`, which names a new `hh-` client, then `--provision-client`, and register what it prints.
 4. `/pocketpiggies connect` in Franco's thread.

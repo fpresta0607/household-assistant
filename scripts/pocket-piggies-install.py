@@ -73,9 +73,25 @@ CHANNEL = "household"
 CHANNEL_SETTINGS = {"defaults", "modelByChannel"}
 # Each assistant's gateway, its state directory and container, from the household file's
 # members. The guard reads the same file, beside it in the key holder's code directory.
-GATEWAYS = {
-    member.assistant: (member.state, member.container) for member in load_household().members
-}
+HOUSEHOLD = load_household()
+GATEWAYS = {member.assistant: (member.state, member.container) for member in HOUSEHOLD.members}
+
+
+def default_client_id(persona: str, telegram_id: str | None) -> str:
+    """The client a key holder registers as when none is named.
+
+    A grant made through Telegram was made with the corey or denise client, so it keeps its
+    persona. Any other is a household person's, which PocketPiggies never lets take corey or
+    denise: it is named for the household's box and the assistant, `hh-` and twelve hex
+    characters, the same on every run, so the key holder's drop-in and the digest the
+    operator registers always agree and no two households share one.
+    """
+    if telegram_id is not None:
+        return persona
+    named = hashlib.sha256(f"{HOUSEHOLD.gateway_host}/{persona}".encode()).hexdigest()
+    return f"hh-{named[:12]}"
+
+
 FINANCE_TOOLS = ["pocketpiggies_catalog", "pocketpiggies_read", "pocketpiggies_records"]
 # The family room's tools. Must equal SAFE_GROUP_TOOLS in the plugin, which refuses finance
 # when the room has more, and FAMILY_TOOLS in openclaw-household-app.py, which writes the
@@ -405,7 +421,7 @@ def install_key_holder(
     remove anything inside it. The other gateway does not mount this state at all.
     """
     _check_owner(persona, owner, telegram_id)
-    client = client_id or persona
+    client = client_id or default_client_id(persona, telegram_id)
     if not CLIENT_ID.fullmatch(client) or (telegram_id is not None and client not in BOT_NAMES):
         raise ValueError("a Telegram-bound grant was made with the corey or denise client")
     user = key_holder_user(persona)
@@ -704,7 +720,7 @@ def provision_client(
     client_id: str | None = None,
 ) -> dict[str, str]:
     """Generate once in the key holder's state; never rotate an existing client."""
-    client = client_id or persona
+    client = client_id or default_client_id(persona, telegram_id)
     identity = _identity(owner, telegram_id)
     directory = state_root / persona
     if directory.is_symlink() or not directory.is_dir():
@@ -778,7 +794,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--client-id",
-        help="the PocketPiggies client this key holder was registered as (default: the persona)",
+        help="the PocketPiggies client this key holder was registered as (default: the persona "
+        "for a Telegram-bound grant, otherwise hh- and twelve hex characters named for the box)",
     )
     parser.add_argument(
         "--restart", action="store_true", help="restart only this gateway after install or rollback"
