@@ -950,6 +950,72 @@ test("the tool adds a weigh-in as rows, lists what is due, and marks a line done
   assert.deepEqual((await run(found, { action: "due" })).soon, []);
 });
 
+test("Denise logs a dated batch that Corey can read and correct on both gateways", async () => {
+  const { corey, denise, relay } = gateways();
+  const context = { ...DIRECT, requesterSenderId: "gia", sessionKey: "agent:main:household:direct:gia",
+    deliveryContext: { ...DIRECT.deliveryContext, to: "household:gia" } };
+  const found = createNoteTool({ context, owner: "gia", people: ["franco", "gia"], notes: denise, peerAssistantName: "Corey" });
+
+  const answer = await run(found, { action: "add", topic: "Kitten weights", day: "2026-10-17", rows: [
+    { item: "Mochi", text: "212 g" },
+    { item: "Pepper", text: "198 g" },
+    { item: "Biscuit", text: "two-something", unsure: "unclear number" },
+  ] });
+  assert.equal(answer.isError, false);
+  assert.deepEqual(answer.ask, [{ item: "Biscuit", heard: "unclear number" }]);
+  assert.deepEqual(relay(denise, corey), { accepted: 2, refused: 0 });
+  assert.deepEqual(corey.view("Kitten weights").lines.map(({ item, text, day, by }) => ({ item, text, day, by })), [
+    { item: "Mochi", text: "212 g", day: "Sat, Oct 17", by: "Denise" },
+    { item: "Pepper", text: "198 g", day: "Sat, Oct 17", by: "Denise" },
+  ]);
+  const correction = createNoteTool({ context: DIRECT, owner: "franco", people: ["franco", "gia"], notes: corey, peerAssistantName: "Denise" });
+  await run(correction, { action: "correct", line: answer.lines[0].id, text: "213 g" });
+  assert.deepEqual(relay(corey, denise), { accepted: 1, refused: 0 });
+  assert.deepEqual(denise.view("Kitten weights"), corey.view("Kitten weights"));
+  assert.equal(denise.view("Kitten weights").lines[0].text, "213 g");
+});
+
+test("a batch day defaults each row without replacing an explicitly dated row", async () => {
+  const { found } = tool(DIRECT);
+  const answer = await run(found, { action: "add", topic: "Kitten weights", day: "2026-10-17", rows: [
+    { item: "Mochi", text: "212 g" },
+    { item: "Mochi", text: "220 g", day: "2026-10-18" },
+  ] });
+  assert.equal(answer.isError, false);
+  assert.deepEqual(answer.lines.map(({ day }) => day), ["Sat, Oct 17", "Sun, Oct 18"]);
+});
+
+test("a rejected weigh-in explains the fields to repair and writes nothing until retried", async () => {
+  const { notes, found } = tool(DIRECT);
+  const rows = [{ item: "Mochi", text: "212 g" }];
+  const rejected = await run(found, { action: "add", day: "2026-10-17", rows, time: "19:19", every: "day" });
+  assert.equal(rejected.isError, true);
+  assert.match(rejected.message, /add does not accept: time, every/);
+  assert.match(rejected.message, /topic/);
+  assert.match(rejected.message, /Nothing was saved/);
+  assert.deepEqual(notes.view(), { topics: [] });
+
+  const missingTopic = await run(found, { action: "add", day: "2026-10-17", rows });
+  assert.equal(missingTopic.isError, true);
+  assert.match(missingTopic.message, /topic/);
+  assert.deepEqual(notes.view(), { topics: [] });
+
+  const saved = await run(found, { action: "add", topic: "Kitten weights", day: "2026-10-17", rows });
+  assert.equal(saved.isError, false);
+  assert.equal(notes.view("Kitten weights").lines.length, 1);
+});
+
+test("an invalid batch day rejects the complete weigh-in without a partial write", async () => {
+  const { notes, found } = tool(DIRECT);
+  const answer = await run(found, { action: "add", topic: "Kitten weights", day: "2026-02-30", rows: [
+    { item: "Mochi", text: "212 g", day: "2026-10-17" },
+    { item: "Pepper", text: "198 g" },
+  ] });
+  assert.equal(answer.isError, true);
+  assert.equal(answer.code, "invalid_line");
+  assert.deepEqual(notes.view(), { topics: [] });
+});
+
 for (const [why, args, code] of [
   ["an unknown action", { action: "erase" }, "invalid_arguments"],
   ["one line's fields beside rows", { action: "add", topic: "Kitten weights", text: "212 g", rows: [{ text: "198 g" }] }, "invalid_arguments"],

@@ -31,8 +31,8 @@ export function householdRoutingGuidance(config) {
   if (!/^[a-z][a-z0-9-]{0,31}$/.test(owner ?? "")) return "";
   return `All household communication is in the Steward household app. Telegram is retired. ` +
     `The Fam means the app's shared family room, read by both people and both assistants. ` +
-    `When asked to tell the family or coordinate with the other assistant, use message with action=send, channel=household, target=family. ` +
-    `Mention the peer by @Corey or @Denise so they can answer there. Use household_note for information explicitly shared with the family. ` +
+    `When asked to post a message to the family, use message with action=send, channel=household, target=family. ` +
+    `Keep family logs and facts in household_note, not a private tracker. To coordinate with the other assistant, use household_note with action=hand; their seen status and answer appear there without a family-room message. ` +
     `An ordinary answer stays in the current app conversation; private messages to your own person use channel=household, target=${owner}. ` +
     `Do not use Telegram handles, Telegram conversation references or the old coordinate.py relay. ` +
     `Never copy private information to The Fam without the owner's request, and never claim delivery until the tool succeeds.`;

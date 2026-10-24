@@ -82,6 +82,48 @@ test("another agent's turn is not given the note", async () => {
   }
 });
 
+test("a dated weigh-in saved by Denise's registered tool reaches Corey's family-room context", async () => {
+  const denise = await runningChannel({ channels: { household: {
+    owner: { id: "gia", name: "Gia" }, assistant: { id: "denise", name: "Denise" },
+    peer: { person: { id: "franco", name: "Franco" }, assistant: { id: "corey", name: "Corey" } },
+  } } });
+  let batch;
+  try {
+    const context = { ...OWNERS_THREAD, requesterSenderId: "gia", sessionKey: "agent:main:household:direct:gia",
+      deliveryContext: { ...OWNERS_THREAD.deliveryContext, to: "household:gia" } };
+    const saved = await run(noteTool(denise, context), { action: "add", topic: "Kitten weights", day: "2026-10-17",
+      rows: [{ item: "Mochi", text: "212 g" }, { item: "Pepper", text: "198 g" }] });
+    assert.equal(saved.lines.length, 2);
+    const outbox = path.join(denise.stateDir, "household-app", "outbox.json");
+    await until("Denise's dated weigh-in in her outbox", async () => {
+      batch = JSON.parse(await readFile(outbox, "utf8").catch((error) => {
+        if (error.code === "ENOENT") return "{}";
+        throw error;
+      }));
+      return batch.notes?.length === 2;
+    });
+  } finally {
+    await denise.stop();
+  }
+
+  const corey = await runningChannel(CFG);
+  try {
+    await writeFile(path.join(corey.stateDir, "household-app", "inbox", "0001-from-denise.json"), JSON.stringify({ from: "denise", batch }));
+    await until("Denise's dated weigh-in in Corey's room", async () =>
+      (await corey.promptBuild({ prompt: "Kitten weights" }, { agentId: "main", ...FAMILY_ROOM })).prependContext?.includes('"Pepper": "198 g"'));
+    const room = (await corey.promptBuild({ prompt: "Kitten weights" }, { agentId: "main", ...FAMILY_ROOM })).prependContext;
+    assert.match(room, /Sat, Oct 17: "Mochi": "212 g" \(Gia asked Denise\)/);
+    assert.match(room, /Sat, Oct 17: "Pepper": "198 g" \(Gia asked Denise\)/);
+    const view = await run(noteTool(corey, OWNERS_THREAD), { action: "view", topic: "Kitten weights" });
+    assert.deepEqual(view.lines.map(({ item, text, day }) => ({ item, text, day })), [
+      { item: "Mochi", text: "212 g", day: "Sat, Oct 17" },
+      { item: "Pepper", text: "198 g", day: "Sat, Oct 17" },
+    ]);
+  } finally {
+    await corey.stop();
+  }
+});
+
 test("a line crosses to the other gateway in the outbox, and the other gateway's lines come back through the inbox", async () => {
   // Arrange
   const channel = await runningChannel(CFG);
