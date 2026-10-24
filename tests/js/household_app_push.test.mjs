@@ -1,13 +1,21 @@
-// The family room's notifications through Apple, from deploy/openclaw/plugins/household-app.
+// The family room's notifications through Apple, straight or through the publisher's push
+// relay, from deploy/openclaw/plugins/household-app.
 //
 // Run with `node --test tests/js/household_app_push.test.mjs`.
 // tests/test_household_plugins.py runs it under pytest whenever node is on the PATH.
 
 import assert from "node:assert/strict";
-import { createDecipheriv, generateKeyPairSync, randomBytes, verify } from "node:crypto";
+import { createDecipheriv, createHash, generateKeyPairSync, randomBytes, verify } from "node:crypto";
 import { test } from "node:test";
 
-import { createPush, decryptPayload, isWanted } from "../../deploy/openclaw/plugins/household-app/push.js";
+import {
+  PLAIN_ALERT,
+  createPhonePush,
+  createPush,
+  createRelaySender,
+  decryptPayload,
+  isWanted,
+} from "../../deploy/openclaw/plugins/household-app/push.js";
 
 const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const PRIVATE_KEY = privateKey.export({ format: "pem", type: "pkcs8" });
@@ -216,3 +224,177 @@ test("whether a phone wants a message is decided the same way outside the sender
   assert.equal(isWanted({ notifications: { family: "mentions" } }, { ...NAMED, body: "@Denise?" }), true);
   assert.equal(isWanted({ notifications: { family: "mentions" } }, { ...NAMED, body: "Voice note" }), false);
 });
+
+// MARK: - Through the publisher's push relay, for a box without the Apple key
+
+const RELAY_KEYS = generateKeyPairSync("ed25519");
+const RELAY_PRIVATE = RELAY_KEYS.privateKey.export({ format: "pem", type: "pkcs8" });
+
+function fakeRelay(reply = { status: 200, body: { status: 200 } }) {
+  const calls = [];
+  return {
+    calls,
+    async fetch(url, options) {
+      calls.push({ url, options });
+      const { status, body } = typeof reply === "function" ? reply(calls.length) : reply;
+      return new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
+    },
+  };
+}
+
+function relayPush(relay, clock = { now: START }) {
+  return createPush({
+    sender: createRelaySender({
+      url: "https://push.example.com/",
+      household: "marina-steve",
+      privateKey: RELAY_PRIVATE,
+      fetch: relay.fetch,
+      now: () => clock.now,
+    }),
+  });
+}
+
+test("the relay is handed what Apple would have been, signed with the household's key", async () => {
+  const relay = fakeRelay();
+  const results = await relayPush(relay).notify([PHONE], NOTE);
+  assert.deepEqual(results, [{ token: PHONE.token, ok: true }]);
+  const [{ url, options }] = relay.calls;
+  assert.equal(url, "https://push.example.com/v1/push");
+  assert.equal(options.method, "POST");
+  const sent = JSON.parse(options.body);
+  assert.deepEqual(Object.keys(sent).sort(), ["collapseId", "environment", "payload", "token"]);
+  assert.equal(sent.token, PHONE.token);
+  assert.equal(sent.collapseId, "m-1");
+  assert.deepEqual(sent.payload.aps.alert, PLAIN_ALERT);
+  assert.equal(options.body.includes("milk"), false);
+  assert.deepEqual(decryptPayload(sent.payload.e, DEVICE_KEY).body, "Corey, are we out of milk?");
+  const { "x-household": household, "x-timestamp": timestamp, "x-signature": signature } = options.headers;
+  assert.equal(household, "marina-steve");
+  assert.equal(timestamp, String(START));
+  const digest = createHash("sha256").update(options.body).digest("hex");
+  assert.equal(verify(null, Buffer.from(`marina-steve\n${START}\n${digest}`), RELAY_KEYS.publicKey, Buffer.from(signature, "base64")), true);
+});
+
+test("the relay's notification is the same one the Apple key would have sent", async () => {
+  const apple = fakeApple();
+  const relay = fakeRelay();
+  await push(apple).notify([PHONE], NOTE);
+  await relayPush(relay).notify([PHONE], NOTE);
+  const direct = JSON.parse(apple.sent[0].body);
+  const relayed = JSON.parse(relay.calls[0].options.body).payload;
+  assert.deepEqual(relayed.aps, direct.aps);
+  assert.deepEqual(Object.keys(relayed).sort(), Object.keys(direct).sort());
+});
+
+for (const [status, reason] of [[410, "Unregistered"], [400, "BadDeviceToken"]]) {
+  test(`Apple's ${reason} through the relay still marks the phone's token as gone`, async () => {
+    const results = await relayPush(fakeRelay({ status: 200, body: { status, reason } })).notify([PHONE], NOTE);
+    assert.deepEqual(results, [{ token: PHONE.token, ok: false, gone: true, reason }]);
+  });
+}
+
+for (const [status, reason] of [[403, "the household is not let in"], [429, "the household has sent too many for now"], [410, "nothing"], [502, "Apple could not be reached"]]) {
+  test(`the relay's own ${status} keeps the phone's token`, async () => {
+    const results = await relayPush(fakeRelay({ status, body: { reason } })).notify([PHONE], NOTE);
+    assert.deepEqual(results, [{ token: PHONE.token, ok: false, gone: false, reason: `the push relay refused it: ${reason}` }]);
+  });
+}
+
+test("a relay that answers with something not JSON keeps the token", async () => {
+  const results = await relayPush(fakeRelay({ status: 502, body: "<html>Bad Gateway</html>" })).notify([PHONE], NOTE);
+  assert.deepEqual(results, [{ token: PHONE.token, ok: false, gone: false, reason: "the push relay refused it: HTTP 502" }]);
+});
+
+test("a relay that cannot be reached keeps the token", async () => {
+  const sender = createRelaySender({
+    url: "https://push.example.com",
+    household: "marina-steve",
+    privateKey: RELAY_PRIVATE,
+    fetch: async () => { throw new Error("fetch failed"); },
+  });
+  assert.deepEqual(await createPush({ sender }).notify([PHONE], NOTE), [{ token: PHONE.token, ok: false, gone: false, reason: "fetch failed" }]);
+});
+
+test("each request is signed afresh, so none is the same as another", async () => {
+  const relay = fakeRelay();
+  const clock = { now: START };
+  const sender = relayPush(relay, clock);
+  await sender.notify([PHONE], NOTE);
+  clock.now += 1;
+  await sender.notify([PHONE], NOTE);
+  const [first, second] = relay.calls.map((call) => call.options.headers["x-signature"]);
+  assert.notEqual(first, second);
+});
+
+test("a key that is not Ed25519 is refused before anything is sent", () => {
+  assert.throws(
+    () => createRelaySender({ url: "https://push.example.com", household: "marina-steve", privateKey: PRIVATE_KEY }),
+    /not an Ed25519 key/,
+  );
+});
+
+test("the relay is asked once whether it knows the household", async () => {
+  const known = createRelaySender({ url: "https://push.example.com", household: "marina-steve", privateKey: RELAY_PRIVATE, fetch: fakeRelay({ status: 200, body: { ok: true } }).fetch });
+  const unknown = createRelaySender({ url: "https://push.example.com", household: "marina-steve", privateKey: RELAY_PRIVATE, fetch: fakeRelay({ status: 403, body: { reason: "the household is not let in" } }).fetch });
+  assert.deepEqual(await known.check(), { ok: true });
+  assert.deepEqual(await unknown.check(), { ok: false, reason: "the household is not let in" });
+});
+
+// MARK: - Which way this gateway reaches Apple
+
+function recordingLog() {
+  const lines = [];
+  return { lines, info: (line) => lines.push(["info", line]), warn: (line) => lines.push(["warn", line]) };
+}
+
+const APPLE_ENVIRONMENT = {
+  HOUSEHOLD_APNS_KEY_ID: "ABC123DEFG",
+  HOUSEHOLD_APNS_TEAM_ID: "TEAM123456",
+  HOUSEHOLD_APNS_PRIVATE_KEY: PRIVATE_KEY.replaceAll("\n", "\\n"),
+};
+const RELAY_CONFIG = { push: { relay: { url: "https://push.example.com", household: "marina-steve" } } };
+const RELAY_ENVIRONMENT = { HOUSEHOLD_PUSH_RELAY_KEY: RELAY_PRIVATE.replaceAll("\n", "\\n") };
+
+test("a box with the Apple key sends to Apple itself, relay or not", async () => {
+  const apple = fakeApple();
+  const relay = fakeRelay();
+  const log = recordingLog();
+  const phonePush = createPhonePush({ config: RELAY_CONFIG, environment: { ...APPLE_ENVIRONMENT, ...RELAY_ENVIRONMENT }, log, fetch: relay.fetch, transport: apple });
+  await phonePush.notify([PHONE], NOTE);
+  assert.equal(apple.sent.length, 1);
+  assert.equal(relay.calls.length, 0);
+  assert.equal(apple.sent[0].headers["apns-topic"], "com.siqstack.stewardai");
+});
+
+test("a box with the relay's key and the relay named sends through the relay, and says whether it is let in", async () => {
+  const relay = fakeRelay((call) => (call === 1 ? { status: 200, body: { ok: true, household: "marina-steve" } } : { status: 200, body: { status: 200 } }));
+  const log = recordingLog();
+  const phonePush = createPhonePush({ config: RELAY_CONFIG, environment: RELAY_ENVIRONMENT, log, fetch: relay.fetch });
+  await phonePush.notify([PHONE], NOTE);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(relay.calls.map((call) => new URL(call.url).pathname).sort(), ["/v1/check", "/v1/push"]);
+  assert.deepEqual(log.lines, [["info", "household-app: phones are notified through the push relay at https://push.example.com"]]);
+});
+
+test("a relay that does not let the household in yet is said in the log", async () => {
+  const log = recordingLog();
+  createPhonePush({ config: RELAY_CONFIG, environment: RELAY_ENVIRONMENT, log, fetch: fakeRelay({ status: 403, body: { reason: "the household is not let in" } }).fetch });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(log.lines.length, 1);
+  assert.equal(log.lines[0][0], "warn");
+  assert.match(log.lines[0][1], /does not let in marina-steve yet \(the household is not let in\)/);
+});
+
+for (const [name, config, environment, level, words] of [
+  ["neither key", {}, {}, "info", /no Apple push key/],
+  ["the relay named without its key", RELAY_CONFIG, {}, "warn", /HOUSEHOLD_PUSH_RELAY_KEY is not in the environment/],
+  ["a relay key that is not Ed25519", RELAY_CONFIG, { HOUSEHOLD_PUSH_RELAY_KEY: PRIVATE_KEY.replaceAll("\n", "\\n") }, "warn", /cannot be used/],
+]) {
+  test(`a box with ${name} notifies no phone and says so once`, () => {
+    const log = recordingLog();
+    assert.equal(createPhonePush({ config, environment, log }), null);
+    assert.equal(log.lines.length, 1);
+    assert.equal(log.lines[0][0], level);
+    assert.match(log.lines[0][1], words);
+  });
+}

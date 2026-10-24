@@ -36,6 +36,12 @@ the plugin mount; nothing loads it until this names it in a gateway's config:
 - `channels.household.googleClientId`: Google's iOS OAuth client the app signs in with for
   Connect Google, which the gateway exchanges the phone's code with. It is not a secret,
   and it must be the one in the app's project.yml;
+- `channels.household.push.relay`: the app publisher's push relay, when the household file
+  names one (`pushRelay`), for a box that does not hold the app's Apple push key. Its
+  phones are then notified through the relay, signed with the household's own key, which
+  scripts/household-push-key.py puts in each gateway's env file (docs/deploy/push-relay.md).
+  A relay the household file no longer names is taken out; a box with the Apple key keeps
+  sending to Apple itself, whatever this says;
 - the Today card, a scheduled job in the gateway's own scheduler rather than its config:
   at 4:45 each morning, before the phone's 5 AM morning reset, and at 16:45 for tonight and
   tomorrow morning, in the gateway's time zone, a run of the main agent of its own reads
@@ -111,6 +117,12 @@ PHONE_URLS = {
 }
 # Who lets a new phone in that signed in with Apple, from their own app, on both gateways.
 APPROVER = IDENTIFIERS.approver
+# The app publisher's push relay the household's phones are notified through, if any.
+PUSH_RELAY = (
+    {"url": IDENTIFIERS.push_relay.url, "household": IDENTIFIERS.push_relay.household}
+    if IDENTIFIERS.push_relay is not None
+    else None
+)
 # The family room's tools: none reads the gateway's files or reaches the key holders.
 # Must equal GROUP_TOOLS in pocket-piggies-install.py, whose guard keeps the same list there
 # on a gateway with finance, and SAFE_GROUP_TOOLS in the PocketPiggies plugin.
@@ -382,6 +394,10 @@ def channel_patch(
     existing = _section(_section(config, "channels"), CHANNEL)
     if not _is_count(existing.get("talkDailyCharacters")):
         room["talkDailyCharacters"] = TALK_DAILY_CHARACTERS
+    if PUSH_RELAY is not None:
+        room["push"] = {"relay": dict(PUSH_RELAY)}
+    elif "relay" in _section(existing, "push"):
+        room["push"] = {"relay": None}
     room["familyTools"] = list(FAMILY_TOOLS)
     patch: dict[str, Any] = {"channels": {CHANNEL: room}}
     # The retired channel goes whole, its bot token with it.
@@ -485,6 +501,11 @@ def problems(config: dict[str, Any], gateway: Gateway) -> list[str]:
         wrong.append("Talk has no daily ceiling")
     if room.get("googleClientId") != GOOGLE_CLIENT_ID:
         wrong.append("Connect Google in the app is not set up on this gateway")
+    relay = _section(room, "push").get("relay")
+    if PUSH_RELAY is not None and relay != PUSH_RELAY:
+        wrong.append("the phones are not notified through the household's push relay")
+    if PUSH_RELAY is None and relay is not None:
+        wrong.append("the channel names a push relay the household file does not")
     if (
         _section(room, "owner").get("id") != gateway.person
         or _section(room, "assistant").get("id") != gateway.persona
