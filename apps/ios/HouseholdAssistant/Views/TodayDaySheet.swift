@@ -1,6 +1,4 @@
-// The whole day the Today card is a glance at, opened by a tap on it: everything the
-// assistant put on it, the soonest first, what has gone by dimmed, each with the line that
-// helps with it, and the day's verse at the foot.
+// Snapshot display rules: docs/deploy/openclaw.md#the-household-apps-family-room.
 
 import SwiftUI
 

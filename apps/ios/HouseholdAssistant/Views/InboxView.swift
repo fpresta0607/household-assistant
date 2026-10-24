@@ -102,8 +102,7 @@ struct InboxView: View {
                         } else {
                             TodayCardView()
                                 .modifier(Entering(order: RoomConversation.allCases.count, hasEntered: hasEntered))
-                            // The two faces stay far enough apart that the lines over them
-                            // never touch.
+                            // Keep the typing indicators above the two faces from touching.
                             HStack(alignment: .top, spacing: 40) {
                                 ForEach(Array(RoomConversation.allCases.enumerated()), id: \.element) { order, conversation in
                                     PinnedConversation(conversation: conversation)
