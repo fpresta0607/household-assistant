@@ -10,7 +10,7 @@ struct CalendarMarkTile: View {
             Text(verbatim: mark.month)
                 .font(.caption2.weight(.heavy))
                 .tracking(0.6)
-                .foregroundStyle(CardStyle.accent)
+                .foregroundStyle(Palette.text)
             Text(verbatim: mark.day)
                 .font(.title2.weight(.bold))
                 .monospacedDigit()

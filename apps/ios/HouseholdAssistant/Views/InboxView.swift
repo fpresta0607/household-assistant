@@ -259,7 +259,7 @@ private struct PinnedConversation: View {
                             Text(unread.formatted())
                                 .font(.caption2.weight(.bold))
                                 .monospacedDigit()
-                                .foregroundStyle(Palette.highlight)
+                                .foregroundStyle(Palette.text)
                                 .padding(.horizontal, 6)
                                 .frame(minWidth: 24, minHeight: 24)
                                 .background(CardStyle.panel, in: Capsule())
