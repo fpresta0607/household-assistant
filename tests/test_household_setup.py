@@ -158,7 +158,7 @@ def test_two_people_with_one_name_still_get_ids_of_their_own(
 
 
 @pytest.mark.parametrize(
-    ("name", "expected"), [("Mary Jo", "mary-jo"), ("Zoë", "zo"), ("42", "x-42")]
+    ("name", "expected"), [("Mary Jo", "mary-jo"), ("Zoë", "zoe"), ("José", "jose"), ("42", "x-42")]
 )
 def test_a_name_becomes_an_id_the_file_allows(setup: ModuleType, name: str, expected: str) -> None:
     assert setup.slug(name) == expected
@@ -167,3 +167,32 @@ def test_a_name_becomes_an_id_the_file_allows(setup: ModuleType, name: str, expe
 def test_the_publisher_has_not_filled_anything_in_yet(setup: ModuleType) -> None:
     assert setup.publisher() == {}
     assert os.path.isfile(ROOT / "deploy" / "publisher.json")
+
+
+def test_an_answer_the_file_would_refuse_is_asked_again_at_once(
+    setup: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    answers = (
+        "José",
+        "<b>Ada</b>",
+        "Ada",
+        "Zoë",
+        "R2-D2",
+        "",
+        "",
+        "NIV",
+        "EST",
+        "America/New_York",
+    )
+
+    assert run(setup, tmp_path, answers, (KEY,)) == 0
+
+    written = json.loads((tmp_path / "etc" / "household.json").read_text(encoding="utf-8"))
+    assert [(m["person"], m["name"], m["assistantName"]) for m in written["members"]] == [
+        ("jose", "José", "Ada"),
+        ("zoe", "Zoë", "R2-D2"),
+    ]
+    assert written["timezone"] == "America/New_York"
+    out = capsys.readouterr().out
+    assert "a name of up to 40 letters" in out
+    assert "a time zone like America/New_York" in out

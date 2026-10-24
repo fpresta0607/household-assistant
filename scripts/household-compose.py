@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from collections.abc import Sequence
@@ -48,7 +49,14 @@ IMAGE = re.compile(r"^\s+image: (openclaw/openclaw:\S+@sha256:[0-9a-f]{64})\s*$"
 PLUGINS = "/opt/household-assistant/plugins:/opt/household-plugins:ro"
 SCRIPTURE = "/var/lib/household-assistant/scripture:/opt/household-scripture:ro"
 PEER_SHARE = "/opt/household-peer"
-CPUS = "1.50"
+# What each gateway may use of the box's CPUs. Docker refuses a limit above the box's own
+# count, so on a box with one CPU each gateway may use all of it.
+CPUS = 1.5
+
+
+def cpu_limit(available: int | None = None) -> str:
+    count = available if available is not None else (os.cpu_count() or 1)
+    return f"{min(CPUS, float(max(count, 1))):.2f}"
 
 
 class ComposeError(ValueError):
@@ -110,7 +118,7 @@ def gateway(member: Member, peer: Member, household: Household, image: str) -> d
             "start_period": "30s",
         },
         "logging": {"driver": "json-file", "options": {"max-size": "10m", "max-file": "3"}},
-        "deploy": {"resources": {"limits": {"cpus": CPUS, "memory": member.memory}}},
+        "deploy": {"resources": {"limits": {"cpus": cpu_limit(), "memory": member.memory}}},
     }
 
 

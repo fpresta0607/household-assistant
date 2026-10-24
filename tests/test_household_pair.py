@@ -40,6 +40,8 @@ def test_a_person_or_their_assistant_names_the_gateway(pair: ModuleType) -> None
     assert pair.gateway_named("Gia").container == "openclaw-denise"
     assert pair.gateway_named("corey").container == "openclaw-gateway"
     assert pair.gateway_named("ada") is None
+    # By name as shown, as the setup's last words tell whoever runs the box.
+    assert pair.gateway_named("  DENISE ").container == "openclaw-denise"
 
 
 def test_the_link_comes_from_the_gateways_pair_call(

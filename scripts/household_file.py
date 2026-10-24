@@ -40,14 +40,18 @@ MEMBERS = 2
 # 4 GB box room for both and the system.
 MEMORY = "1536M"
 TIMEZONE = "America/Chicago"
-# The network a household's gateways share on a box whose file names its members, on a
-# subnet docker's default pools do not hand out, so the host's address on it, which each
-# gateway trusts as the tailnet proxy in front of it, is known before they start.
+# The network a household's gateways share on a box whose file names its members, on a fixed
+# subnet so the host's address on it, which each gateway trusts as the tailnet proxy in front
+# of it, is known before they start. Docker's default pools reach it only after a dozen other
+# networks, which a box that holds the household's gateways alone never has.
 GATEWAY_SUBNET = "172.31.240.0/24"
 GATEWAY_BRIDGE = "172.31.240.1"
 
 ID = re.compile(r"[a-z][a-z0-9-]{0,31}")
-NAME = re.compile(r"[A-Za-z][A-Za-z .'-]{0,39}")
+# A person's or an assistant's name as it is shown: a letter in any script, then letters,
+# digits, spaces, periods, apostrophes and hyphens, so José, Zoë and R2-D2 are names and
+# nothing that could be markup is.
+NAME = re.compile(r"[^\W\d_](?:[^\W_]|[ .'-]){0,39}")
 DIRECTORY = re.compile(r"[a-z0-9][a-z0-9_.-]{0,63}")
 SIZE = re.compile(r"[1-9][0-9]{2,4}M")
 ZONE = re.compile(r"UTC|[A-Z][A-Za-z_]+(/[A-Za-z0-9_+-]+){1,2}")
@@ -250,8 +254,21 @@ def _push_relay(raw: object, path: Path) -> PushRelay | None:
     )
 
 
+# What `main` answers for a household file that is missing or not one the box can run, so a
+# shell caller can tell it from a plain no.
+UNREADABLE = 3
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     command = list(sys.argv[1:] if argv is None else argv)
+    try:
+        return _answer(command)
+    except (OSError, ValueError) as error:
+        print(f"the household file cannot be read: {error}", file=sys.stderr)
+        return UNREADABLE
+
+
+def _answer(command: list[str]) -> int:
     if command == ["members"]:
         for member in load_household(HOUSEHOLD_FILE).members:
             fields = (

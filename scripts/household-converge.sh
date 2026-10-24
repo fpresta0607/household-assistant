@@ -25,11 +25,20 @@ UNITS="${HOUSEHOLD_UNITS-/etc/systemd/system}"
 
 step() { printf '\n==> %s\n' "$*"; }
 
-if ! python3 "${here}/household_file.py" has-members; then
-  echo "this box's household file names no members: it is the first household's, which is" >&2
-  echo "brought up to a release by hand (docs/deploy/openclaw.md, Bringing the box up to this)" >&2
-  exit 2
-fi
+named=0
+python3 "${here}/household_file.py" has-members || named=$?
+case ${named} in
+  0) ;;
+  1)
+    echo "this box's household file names no members: it is the first household's, which is" >&2
+    echo "brought up to a release by hand (docs/deploy/openclaw.md, Bringing the box up to this)" >&2
+    exit 2
+    ;;
+  *)
+    echo "nothing was changed" >&2
+    exit 1
+    ;;
+esac
 members="$(python3 "${here}/household_file.py" members)"
 personas=()
 while IFS=$'\t' read -r _ assistant _; do personas+=("${assistant}"); done <<<"${members}"
@@ -78,9 +87,17 @@ done
 
 step "each gateway on the household's tailnet"
 # HTTPS on the box's tailnet name, proxied to each loopback port, for the tailnet only:
-# never `tailscale funnel`, which openclaw-verify.sh fails on.
+# never `tailscale funnel`, which openclaw-verify.sh fails on. Without the tailnet's HTTPS
+# certificates `tailscale serve` prints a link to turn them on and waits for someone to, so
+# that is asked first, and any answer serve gives is shown.
+if ! tailscale status --json </dev/null | python3 -c \
+  'import json, sys; sys.exit(0 if json.load(sys.stdin).get("CertDomains") else 1)'; then
+  echo "the tailnet gives this box no HTTPS certificate: in the Tailscale admin console, under" >&2
+  echo "DNS, turn on MagicDNS and HTTPS Certificates, then run this again" >&2
+  exit 1
+fi
 while IFS=$'\t' read -r _ _ _ _ port _; do
-  tailscale serve --bg --https="${port}" "http://127.0.0.1:${port}" >/dev/null </dev/null
+  timeout 120 tailscale serve --bg --https="${port}" "http://127.0.0.1:${port}" </dev/null
 done <<<"${members}"
 
 step "the nightly backup"

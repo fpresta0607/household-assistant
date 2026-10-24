@@ -48,7 +48,9 @@ archive_coordination
     codex_of="${label}_codex_archive"
     codex_key="${codex_of}"
     [[ ${label} == openclaw ]] && codex_key=codex_archive
-    printf '%s\t%s\n%s\t%s\n' "${archive_of}" "${!archive_of}" "${codex_key}" "${!codex_of}"
+    files_of="${label}_files"
+    printf '%s\t%s\n%s\t%s\n%s\t%s\n' "${archive_of}" "${!archive_of}" "${codex_key}" "${!codex_of}" \
+      "${files_of}" "${!files_of}"
   done
   printf 'coordination_archive\t%s\n' "${coordination_archive}"
 } >"${dest}/MANIFEST.tsv"

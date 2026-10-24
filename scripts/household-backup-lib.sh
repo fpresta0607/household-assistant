@@ -41,6 +41,25 @@ household_gateways() {
   done <<<"${members}"
 }
 
+# The files a restored gateway is checked for. A gateway that is new may not have them all
+# yet: OpenClaw writes USER.md only into a brand-new workspace, and household-memory writes
+# kept.json the first time someone asks an assistant to keep something. So each backup
+# records which of them its gateway had, and the drill asks for exactly those.
+DRILL_FILES="openclaw.json workspace/AGENTS.md workspace/USER.md household-memory/kept.json"
+
+# drill_files <recorded>: what the drill asks one restored gateway for, from the files its
+# backup recorded: those and always openclaw.json, or all of them for a backup taken
+# before the files were recorded.
+drill_files() {
+  local files=$1
+  case ${files} in
+    '') files="${DRILL_FILES}" ;;
+    none) files="" ;;
+  esac
+  if [[ " ${files} " != *" openclaw.json "* ]]; then files="openclaw.json${files:+ ${files}}"; fi
+  printf '%s\n' "${files}"
+}
+
 # --- assistant state -------------------------------------------------------
 # OpenClaw keeps everything in SQLite, which must never be backed up by copying
 # the live files: a raw copy of a database being written is routinely torn.
@@ -57,7 +76,11 @@ household_gateways() {
 # Sets <label>_archive and <label>_codex_archive for the manifest.
 archive_assistant() {
   local label=$1 container=$2 state=$3 secrets=$4 codex=$5
-  local archive=none codex_out=missing image found staging
+  local archive=none codex_out=missing image found staging file had=""
+  for file in ${DRILL_FILES}; do
+    if [[ -s ${state}/${file} ]]; then had="${had:+${had} }${file}"; fi
+  done
+  printf -v "${label}_files" '%s' "${had:-none}"
   # "Installed" is decided by the state directory as much as by the compose
   # file: the state is the irreplaceable half, so its presence alone is enough
   # to require a backup.

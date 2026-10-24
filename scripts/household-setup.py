@@ -26,13 +26,16 @@ import re
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
 from household_file import (
     HOUSEHOLD_FILE,
+    NAME,
     TIMEZONE,
+    ZONE,
     UnsupportedConfig,
     load_household,
 )
@@ -47,6 +50,7 @@ OPENROUTER_KEY = "OPENROUTER_API_KEY"
 KEY_SHAPE = re.compile(r"sk-or-[A-Za-z0-9_-]{16,200}")
 
 Ask = Callable[[str], str]
+NAME_HINT = "a name of up to 40 letters, spaces, periods, apostrophes or hyphens, please"
 
 
 def editions() -> list[str]:
@@ -66,8 +70,10 @@ def publisher(path: Path = PUBLISHER) -> dict[str, Any]:
 
 
 def slug(name: str) -> str:
-    """A name as an id the household file allows: lowercase letters, digits and hyphens."""
-    flat = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    """A name as an id the household file allows: lowercase letters, digits and hyphens,
+    with accents taken off the letters, so José is jose."""
+    plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    flat = re.sub(r"[^a-z0-9]+", "-", plain.strip().lower()).strip("-")
     return (flat if flat[:1].isalpha() else f"x-{flat}")[:32].rstrip("-")
 
 
@@ -104,6 +110,18 @@ def asked(ask: Ask, question: str, default: str = "") -> str:
             return answer or default
 
 
+def matching(
+    ask: Ask, question: str, pattern: re.Pattern[str], hint: str, default: str = ""
+) -> str:
+    """An answer the household file allows, asked again until it is one, so a setup never
+    stops at the end over one answer."""
+    while True:
+        answer = asked(ask, question, default)
+        if pattern.fullmatch(answer):
+            return answer
+        print(f"  {hint}")
+
+
 def choice(ask: Ask, question: str, options: Sequence[str], default: str) -> str:
     while True:
         answer = asked(ask, f"{question} ({'/'.join(options)})", default)
@@ -124,8 +142,10 @@ def household_answers(
     members = []
     used: set[str] = set()
     for which in ("first", "second"):
-        name = asked(ask, f"The {which} adult's first name")
-        assistant_name = asked(ask, f"What should {name}'s assistant be called?")
+        name = matching(ask, f"The {which} adult's first name", NAME, NAME_HINT)
+        assistant_name = matching(
+            ask, f"What should {name}'s assistant be called?", NAME, NAME_HINT
+        )
         person, assistant = slug(name), slug(assistant_name)
         if person in used:
             person = f"{person}-2"
@@ -153,7 +173,9 @@ def household_answers(
         "googleClientId": known.get("googleClientId")
         or asked(ask, "The app's Google client id (from the app's publisher)"),
         "bibleVersion": choice(ask, "The Bible your household reads", editions(), "BSB"),
-        "timezone": asked(ask, "Your time zone", timezone),
+        "timezone": matching(
+            ask, "Your time zone", ZONE, "a time zone like America/New_York, please", timezone
+        ),
     }
     relay = known.get("pushRelay")
     if isinstance(relay, str):

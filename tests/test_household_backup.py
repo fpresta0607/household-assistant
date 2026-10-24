@@ -266,3 +266,50 @@ def test_the_drill_hands_its_scratch_to_the_gateway_user_by_number() -> None:
     drill = DRILL.read_text(encoding="utf-8")
     assert "-o 1000" not in drill
     assert 'chown -R 1000:1000 "${WORK}/${label}"' in drill
+
+
+def library_says(script: str, env: dict[str, str] | None = None) -> str:
+    bash = shutil.which("bash")
+    assert bash is not None
+    said = subprocess.run(
+        [bash, "-c", f'source "{LIBRARY.as_posix()}" && {script}'],
+        env={**os.environ, **(env or {})},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return said.stdout.strip()
+
+
+@needs_posix_bash
+@pytest.mark.parametrize(
+    ("recorded", "asked"),
+    [
+        ("", "openclaw.json workspace/AGENTS.md workspace/USER.md household-memory/kept.json"),
+        ("none", "openclaw.json"),
+        ("openclaw.json workspace/AGENTS.md", "openclaw.json workspace/AGENTS.md"),
+        ("workspace/AGENTS.md", "openclaw.json workspace/AGENTS.md"),
+    ],
+)
+def test_the_drill_asks_a_gateway_for_the_files_it_had_when_backed_up(
+    recorded: str, asked: str
+) -> None:
+    """A new gateway has no kept.json until someone asks to keep something, and OpenClaw
+    writes USER.md only into a brand-new workspace, so asking every gateway for all of them
+    failed every backup of a new box, and with it every update."""
+    assert library_says(f'drill_files "{recorded}"') == asked
+
+
+@needs_posix_bash
+def test_each_backup_records_the_files_its_gateway_had(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    (state / "workspace").mkdir(parents=True)
+    (state / "workspace" / "AGENTS.md").write_text("# agents\n", encoding="utf-8")
+    (state / "workspace" / "USER.md").write_text("", encoding="utf-8")
+    script = (
+        f'dest="{tmp_path / "dest"}"; openclaw_failed=0; '
+        f'archive_assistant ada openclaw-ada "{state}" "{tmp_path / "s"}" "{tmp_path / "c"}" '
+        '>/dev/null 2>&1; echo "${ada_files}"'
+    )
+
+    assert library_says(script) == "workspace/AGENTS.md"

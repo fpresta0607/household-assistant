@@ -50,7 +50,9 @@ def executable(path: Path, text: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
-def box(tmp_path: Path, *, keys: bool = True, failing: str = "") -> dict[str, str]:
+def box(
+    tmp_path: Path, *, keys: bool = True, failing: str = "", certificates: bool = True
+) -> dict[str, str]:
     scripts = tmp_path / "release" / "scripts"
     scripts.mkdir(parents=True)
     shutil.copy(ROOT / "scripts" / "household-converge.sh", scripts)
@@ -77,8 +79,15 @@ def box(tmp_path: Path, *, keys: bool = True, failing: str = "") -> dict[str, st
         (deploy / unit).write_text("", encoding="utf-8")
     shim = tmp_path / "bin"
     shim.mkdir()
-    for name in ("tailscale", "systemctl"):
-        executable(shim / name, f'#!/bin/sh\necho "{name} $*" >> "{log}"\n')
+    executable(shim / "systemctl", f'#!/bin/sh\necho "systemctl $*" >> "{log}"\n')
+    # What `tailscale status --json` says of the box's certificates, which serve needs.
+    domains = '["box.tail1234.ts.net"]' if certificates else "null"
+    executable(
+        shim / "tailscale",
+        "#!/bin/sh\n"
+        f'if [ "$*" = "status --json" ]; then echo \'{{"CertDomains": {domains}}}\'; exit 0; fi\n'
+        f'echo "tailscale $*" >> "{log}"\n',
+    )
 
     env_root = tmp_path / "etc"
     env_root.mkdir()
@@ -184,7 +193,9 @@ def test_a_gateway_without_an_openrouter_key_stops_it_before_anything_changes(
 def test_the_first_households_box_is_left_to_its_rollouts_by_hand(tmp_path: Path) -> None:
     env = box(tmp_path)
     data = json.loads(NEW_EXAMPLE.read_text(encoding="utf-8"))
+    # The first household's file, which names no members and so no approver of its own.
     del data["members"]
+    del data["approver"]
     legacy = tmp_path / "household.json"
     legacy.write_text(json.dumps(data), encoding="utf-8")
     env["HOUSEHOLD_FILE"] = legacy.as_posix()
@@ -244,3 +255,25 @@ def test_a_household_without_a_push_relay_makes_no_key(tmp_path: Path) -> None:
 
     assert converge(tmp_path, env).returncode == 0
     assert not any(line.startswith("household-push-key.py") for line in logged(tmp_path))
+
+
+def test_a_tailnet_without_https_certificates_stops_it_before_serve_waits(tmp_path: Path) -> None:
+    result = converge(tmp_path, box(tmp_path, certificates=False))
+
+    assert result.returncode == 1
+    assert "HTTPS Certificates" in result.stderr
+    assert not any(line.startswith("tailscale serve") for line in logged(tmp_path))
+
+
+def test_a_household_file_that_cannot_be_read_changes_nothing(tmp_path: Path) -> None:
+    env = box(tmp_path)
+    broken = tmp_path / "household.json"
+    broken.write_text("{not json", encoding="utf-8")
+    env["HOUSEHOLD_FILE"] = broken.as_posix()
+
+    result = converge(tmp_path, env)
+
+    assert result.returncode == 1
+    assert "cannot be read" in result.stderr
+    assert "first household" not in result.stderr
+    assert logged(tmp_path) == []

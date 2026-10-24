@@ -75,7 +75,11 @@ drill_gateway() {
     flunk "${label}: no .openclaw directory in the restored tree"
     return
   fi
-  for file in openclaw.json workspace/AGENTS.md workspace/USER.md household-memory/kept.json; do
+  # The files its gateway had when the backup was taken (DRILL_FILES in the library); a
+  # backup from before that was recorded is asked for all of them.
+  local files
+  files="$(drill_files "$(manifest "${label}_files")")"
+  for file in ${files}; do
     if [[ -s ${restored}/${file} ]]; then pass "${label}: restored ${file}"; else flunk "${label}: ${file} missing or empty"; fi
   done
   for database in state/openclaw.sqlite agents/main/agent/openclaw-agent.sqlite; do

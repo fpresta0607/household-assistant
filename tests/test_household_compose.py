@@ -143,3 +143,11 @@ def test_check_says_whether_the_box_runs_the_households_file(
     assert household_compose.main(["--household", str(NEW_EXAMPLE), "--check", str(deployed)]) == 0
     deployed.write_text(text.replace("1536M", "4096M"), encoding="utf-8")
     assert household_compose.main(["--household", str(NEW_EXAMPLE), "--check", str(deployed)]) == 1
+
+
+@pytest.mark.parametrize(
+    ("available", "limit"), [(1, "1.00"), (2, "1.50"), (8, "1.50"), (0, "1.00")]
+)
+def test_no_gateway_is_given_more_cpus_than_the_box_has(available: int, limit: str) -> None:
+    """Docker refuses a CPU limit above the box's count, which stopped a one-CPU box."""
+    assert household_compose.cpu_limit(available) == limit

@@ -21,12 +21,28 @@ import subprocess
 import sys
 from collections.abc import Sequence
 
-from gateway_config import GATEWAYS, Gateway, Runner, ask_gateway, first_json_object
+from gateway_config import (
+    GATEWAYS,
+    Gateway,
+    Runner,
+    ask_gateway,
+    first_json_object,
+    load_household,
+)
 
 
 def gateway_named(name: str) -> Gateway | None:
-    wanted = name.strip().lower()
-    return next((g for g in GATEWAYS if wanted in (g.person, g.persona)), None)
+    """The gateway of the person or assistant called `name`, by id or by name as shown."""
+    wanted = " ".join(name.split()).casefold()
+    member = next(
+        (
+            m
+            for m in load_household().members
+            if wanted in {m.person, m.assistant, m.name.casefold(), m.assistant_name.casefold()}
+        ),
+        None,
+    )
+    return next((g for g in GATEWAYS if member and g.persona == member.assistant), None)
 
 
 def setup_link(gateway: Gateway, run: Runner) -> str:

@@ -7,7 +7,7 @@ The first household's box is described in [OpenClaw on the shared VPS](openclaw.
 
 ## What the household needs first
 
-- **A server.** Any provider's virtual server running **Ubuntu 24.04 LTS** with **4 GB of memory** or more and 40 GB of disk; the first household's box has 8 GB, shared with other services.
+- **A server.** Any provider's virtual server running **Ubuntu 24.04 LTS** with **4 GB of memory** or more, two CPUs if the plan offers them (one works), and 40 GB of disk; the first household's box has 8 GB, shared with other services.
   Root access over SSH is all the setup asks for.
 - **A tailnet.** A free [Tailscale](https://tailscale.com) account, which the phones and the server join, so the assistants are never on the internet.
   In its admin console, under **DNS**, turn on **MagicDNS** and **HTTPS Certificates**: each assistant is reached at an HTTPS address on the tailnet, and the box cannot get its certificate without them.
