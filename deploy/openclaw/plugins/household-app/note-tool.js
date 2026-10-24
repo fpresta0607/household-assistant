@@ -72,8 +72,10 @@ export function createNoteTool({ context, owner, people, notes, peerAssistantNam
       "never keep family data in a file or tracker of your own, and when you find one, move what it holds here. " +
       "A log is one topic, such as \"Kitten weights\", with one row per item: `add` with `rows` takes a whole weigh-in at once, " +
       "each row's `item` (the kitten) and `text` (\"212 g\"), with `day` when it was not today. " +
+      "For example: {\"action\":\"add\",\"topic\":\"Kitten weights\",\"day\":\"2026-10-17\",\"rows\":[{\"item\":\"Mochi\",\"text\":\"212 g\"}]}. " +
+      "The top-level day applies to rows without their own day. `add` requires a topic; time and every belong only to remind. " +
       "A row whose value was unclear, such as a weight misheard in a voice note, goes in with `unsure` saying what you heard: it is not logged, and you ask about it instead of guessing. " +
-      "The answer's `logged` says what was logged, for a one-line reply. " +
+      "The answer's `logged` says what was logged, for a one-line reply. If a call fails, repair its arguments and retry; never claim it was saved or fall back to a private tracker. " +
       "Something due, such as a deworming dose, first shots, a vet visit or a deadline, is a line with `due`; `done` marks it done, and `due` lists what is overdue and due within a week. " +
       `Facts both of you must know, such as dates, church times or a code the family shares on purpose, are lines too. Anything you are asked to tell ${peerAssistantName} goes here, so it is never only a message. ` +
       `\`hand\` is your direct line to ${peerAssistantName}: it hands them a question or a piece of work without a word in the family room, their side marks it seen at once and answers it in a turn of their own, ` +
@@ -92,7 +94,7 @@ export function createNoteTool({ context, owner, people, notes, peerAssistantNam
       required: ["action"],
       properties: {
         action: { type: "string", enum: Object.keys(ACTIONS) },
-        topic: { type: "string", minLength: 1, maxLength: MAX_TOPIC, description: "What the line is about, in a few words, the same each time." },
+        topic: { type: "string", minLength: 1, maxLength: MAX_TOPIC, description: "Required for add: what the line is about, such as Kitten weights, the same each time. Optional topic filter for view." },
         ...ROW,
         rows: {
           type: "array",
@@ -102,14 +104,18 @@ export function createNoteTool({ context, owner, people, notes, peerAssistantNam
           items: { type: "object", additionalProperties: false, required: ["text"], properties: { ...ROW, unsure: UNSURE } },
         },
         line: { type: "string", description: "A line's id, such as hn-1a2b3c4d, from the note." },
-        time: { type: "string", pattern: "^([01]\\d|2[0-3]):[0-5]\\d$", description: "When a reminder goes off, HH:MM on a 24-hour clock, in the family's time." },
-        every: { type: "string", enum: REPEATS, description: "How often a reminder repeats; leave it out for once." },
+        time: { type: "string", pattern: "^([01]\\d|2[0-3]):[0-5]\\d$", description: "Only for remind, never add: when a reminder goes off, HH:MM on a 24-hour clock, in the family's time." },
+        every: { type: "string", enum: REPEATS, description: "Only for remind, never add: how often a reminder repeats; leave it out for once." },
       },
     },
     async execute(_id, args) {
       const allowed = typeof args?.action === "string" && Object.hasOwn(ACTIONS, args.action) ? ACTIONS[args.action] : null;
-      if (!allowed || Object.keys(args).some((key) => key !== "action" && !allowed.includes(key))) {
-        return failure("invalid_arguments", `Use one action of ${Object.keys(ACTIONS).join(", ")}, with only its own fields.`);
+      if (!allowed) {
+        return failure("invalid_arguments", `Use one action of ${Object.keys(ACTIONS).join(", ")}. Nothing was saved.`);
+      }
+      const unexpected = Object.keys(args).filter((key) => key !== "action" && !allowed.includes(key));
+      if (unexpected.length > 0) {
+        return failure("invalid_arguments", `${args.action} does not accept: ${unexpected.join(", ")}. Remove those fields and retry with only: action, ${allowed.join(", ")}. Nothing was saved.`);
       }
       // An owner by name, as the model writes it, is kept by id.
       const ownerOf = (value) => (value === undefined ? undefined : notes.whoIs(value) ?? value);
@@ -118,12 +124,12 @@ export function createNoteTool({ context, owner, people, notes, peerAssistantNam
         if (args.action === "view") return result(notes.view(args.topic));
         if (args.action === "due") return result(notes.due());
         if (args.action === "add") {
-          if (args.rows !== undefined && ROW_FIELDS.some((field) => args[field] !== undefined)) {
-            return failure("invalid_arguments", "Give either one line's fields or rows, not both.");
+          if (args.rows !== undefined && ROW_FIELDS.some((field) => field !== "day" && args[field] !== undefined)) {
+            return failure("invalid_arguments", "Give either one line's fields or rows, not both. A shared day may accompany rows. Nothing was saved.");
           }
           if (args.rows === undefined) return result(notes.add({ topic: args.topic, ...row, forWho: turn.sender }));
           const unsure = args.rows.filter((each) => each.unsure !== undefined);
-          const rows = args.rows.filter((each) => each.unsure === undefined).map((each) => ({ ...each, owner: ownerOf(each.owner) }));
+          const rows = args.rows.filter((each) => each.unsure === undefined).map((each) => ({ ...each, day: each.day ?? args.day, owner: ownerOf(each.owner) }));
           if (rows.length === 0) return result({ ...logged({ topic: args.topic, lines: [] }, 0, unsure), logged: "nothing yet" });
           const view = notes.add({ topic: args.topic, rows, forWho: turn.sender });
           return result({ ...logged(view, rows.length, unsure), ...view });

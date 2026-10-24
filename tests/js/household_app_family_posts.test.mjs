@@ -49,5 +49,8 @@ test("every agent turn learns the app family destination and privacy boundary", 
   assert.match(guidance, /Telegram is retired/);
   assert.match(guidance, /channel=household, target=family/);
   assert.match(guidance, /target=franco/);
+  assert.match(guidance, /To coordinate with the other assistant, use household_note with action=hand/);
+  assert.match(guidance, /without a family-room message/);
+  assert.match(guidance, /Keep family logs and facts in household_note, not a private tracker/);
   assert.match(guidance, /Never copy private information/);
 });

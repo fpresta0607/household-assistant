@@ -1,6 +1,11 @@
 # Household app communication rollout
 
-Telegram is retired. The household-app prompt hook identifies the app's `family` room as The Fam and directs peer coordination there by @Corey or @Denise. Normal replies stay in their current app conversation; private posts use the owner's household id. Legacy family message targets and conversation references resolve to that same app room with no Telegram copy. Unrecognized Telegram destinations are refused rather than turning private text into a family post.
+Telegram is retired.
+The household-app prompt hook identifies the app's `family` room as The Fam.
+For peer coordination, follow [the assistants' direct line](deploy/openclaw.md#the-assistants-direct-line).
+Normal replies stay in their current app conversation; private posts use the owner's household id.
+Legacy family message targets and conversation references resolve to that same app room with no Telegram copy.
+Unrecognized Telegram destinations are refused rather than turning private text into a family post.
 
 Install the updated plugin with scripts/household-app-install.sh, with no other host deployment running. Run scripts/openclaw-household-app.py apply --gateway corey, restart the openclaw-gateway container to load the new plugin code, and verify Corey. Then apply --gateway denise, restart openclaw-denise and verify Denise. A config-only hot reload is not enough to replace already-loaded JavaScript. The apply step disables channels.telegram.enabled while retaining its old group allowlist as privacy policy configuration. Stop and disable household-coordination@plan.timer and household-coordination@tick.timer, then stop their services on the host. The app's own relay continues carrying its family room. Preserve old chat history and credentials.
 
