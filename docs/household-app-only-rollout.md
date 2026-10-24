@@ -4,11 +4,9 @@ Telegram is retired.
 The household-app prompt hook identifies the app's `family` room as The Fam.
 For peer coordination, follow [the assistants' direct line](deploy/openclaw.md#the-assistants-direct-line).
 Normal replies stay in their current app conversation; private posts use the owner's household id.
-Legacy family message targets and conversation references resolve to that same app room with no Telegram copy.
-Unrecognized Telegram destinations are refused rather than turning private text into a family post.
+A post addressed to the family by one of its names goes to that app room, and anything addressed to Telegram is refused with where to post instead.
 
-Install the updated plugin with scripts/household-app-install.sh, with no other host deployment running. Run scripts/openclaw-household-app.py apply --gateway corey, restart the openclaw-gateway container to load the new plugin code, and verify Corey. Then apply --gateway denise, restart openclaw-denise and verify Denise. A config-only hot reload is not enough to replace already-loaded JavaScript. The apply step disables channels.telegram.enabled while retaining its old group allowlist as privacy policy configuration. Stop and disable household-coordination@plan.timer and household-coordination@tick.timer, then stop their services on the host. The app's own relay continues carrying its family room. Preserve old chat history and credentials.
-
-Run scripts/openclaw-verify.sh for each container and scripts/openclaw-household-app.py check for both. Verification uses the household-app policy once that channel is configured, and fails if Telegram is still enabled. Verify both gateways are healthy and the app relay is active. Do not send real test messages without the owner's authorization. Native app changes ship through the usual ios-release TestFlight workflow after the focused simulator checks pass.
+This first rollout switched Telegram's channel off and left its config in place.
+[Retiring Telegram](deploy/retiring-telegram.md) takes out what was left: the channel's config and bot token, the plugins and the relay that worked around Telegram, and the Telegram ids PocketPiggies and memory were keyed by.
 
 Phone-call closing turns receive a brief goodbye instruction. The iPhone waits until the final spoken sentence finishes before hanging up. A new request after thanks keeps the call open.

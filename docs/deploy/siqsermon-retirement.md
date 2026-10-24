@@ -73,12 +73,13 @@ The gateway takes it in process.
 ### 6. The family room gets it too
 
 `scripture` joined the list of tools safe in a group, so the family room can read the Bible as well.
-The lists move together, PocketPiggies' first, one gateway at a time, each with its owner's Telegram id from the household file:
+The lists move together, PocketPiggies' first, one gateway at a time.
+These are steps 3 and 4 of [Retiring Telegram](retiring-telegram.md), so a box that has run those already has them:
 
 ```
-python3 scripts/pocket-piggies-install.py corey --telegram-id <Franco's id> --restart
+python3 scripts/pocket-piggies-install.py corey --owner franco --telegram-id <Franco's id> --restart
 python3 scripts/openclaw-household-app.py apply --gateway corey
-python3 scripts/pocket-piggies-install.py denise --telegram-id <Gia's id> --restart
+python3 scripts/pocket-piggies-install.py denise --owner gia --telegram-id <Gia's id> --restart
 python3 scripts/openclaw-household-app.py apply --gateway denise
 ```
 

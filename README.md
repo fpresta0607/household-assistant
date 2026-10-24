@@ -109,7 +109,7 @@ The deployed gateways follow the owner-authorized exception in [the family group
 
 - **One small private server** runs both gateways as OpenClaw containers, behind the household's private network.
   Models come through OpenRouter, and each owner can choose fallback models in Settings.
-- **The app is the channel.** Telegram is retired, and the app's installer switches it off.
+- **The app is the channel.** Telegram is retired, and nothing on the gateways reads it any more.
 - **A relay on the host** carries the family room between the gateways, every message signed by the phone that sent it.
 - **Key holders** answer for the house and for PocketPiggies over a local socket.
 - **Backups** run every night: both gateways' state, then a restore drill that opens what it just wrote.
@@ -128,7 +128,7 @@ A TestFlight release is one click, from main.
 | Folder | What is in it |
 |---|---|
 | [apps/ios/](apps/ios) | The Steward AI app, as a text XcodeGen spec ([its README](apps/ios/README.md)) |
-| [deploy/openclaw/plugins/](deploy/openclaw/plugins) | The OpenClaw plugins: the app's channel, family room, memory, pictures, speech, scripture, job mirror, PocketPiggies |
+| [deploy/openclaw/plugins/](deploy/openclaw/plugins) | The OpenClaw plugins: the app's channel and family room, memory, pictures, scripture, PocketPiggies |
 | [deploy/openclaw/skills/](deploy/openclaw/skills) | The skills both assistants get |
 | [household/](household) | The identity and privacy spine, the home and PocketPiggies key holders |
 | [scripts/](scripts) | The installers, relay, backup and checks, run as root on the box |
@@ -140,7 +140,8 @@ A TestFlight release is one click, from main.
 - [OpenClaw on the server](docs/deploy/openclaw.md): reach it, restart it, back it up, roll it back, and how the family room works
 - [PocketPiggies](docs/deploy/pocket-piggies.md): who can read finance, and how
 - [Retiring SIQsermon](docs/deploy/siqsermon-retirement.md): scripture in the gateways, and SIQsermon's containers stopped
-- [The app-only rollout](docs/household-app-only-rollout.md): how the app replaced Telegram
+- [Retiring Telegram](docs/deploy/retiring-telegram.md): taking out what Telegram left, one gateway at a time
+- [PocketPiggies' server](docs/deploy/pocketpiggies-server.md): what it needs for linking from the app
 - [Apple activation checklist](docs/apple-activation-checklist.md): everything only the owner can do, in order
 - [TestFlight](docs/testflight.md) and [Apple signing](docs/apple-signing.md)
 - [Phase 0 headroom](docs/phase0/runbook.md) and [the memory budget](docs/phase0/budget.md)
