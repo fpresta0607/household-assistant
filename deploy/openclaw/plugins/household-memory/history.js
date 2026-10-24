@@ -1,9 +1,7 @@
 // Finding older chats: OpenClaw's own full-text index of transcripts, read-only,
-// limited to the chats a turn may see. In the family group that is the group alone. In
-// the owner's private chat it is every session linked to that chat, the one shared
-// main session from before 13 October included, and the group.
-// With the household app, its family room counts as the group and the owner's app
-// thread as the private chat.
+// limited to the household app's chats a turn may see. In the family room that is the
+// room alone. In the owner's own thread it is every session linked to that thread, and
+// the room.
 //
 // OpenClaw's sessions_search needs every word of a query to match. This takes any of
 // them and ranks lines by how many they share, so a question in different words from
@@ -52,17 +50,14 @@ function snippet(text, terms) {
   return `${start > 0 ? "…" : ""}${flat.slice(start, start + SNIPPET)}${start + SNIPPET < flat.length ? "…" : ""}`;
 }
 
-// Which conversations a chat may read: the family group, the app's family room, and in
-// the private chat also the owner's Telegram chat and app thread. Its parameters come
-// from visibleChats, in order.
+// Which conversations a chat may read: the app's family room, and in the private chat
+// also the owner's own thread. Its parameters come from visibleChats, in order.
 export const VISIBLE_CHATS = `(
-  (chat.channel = 'telegram' AND ((chat.kind = 'group' AND chat.peer_id = ?) OR (? AND chat.kind = 'direct' AND chat.peer_id = ?)))
-  OR (? AND chat.channel = 'household' AND ((chat.kind = 'group' AND chat.peer_id = 'family') OR (? AND chat.kind = 'direct' AND chat.peer_id = ?)))
+  chat.channel = 'household' AND ((chat.kind = 'group' AND chat.peer_id = 'family') OR (? AND chat.kind = 'direct' AND chat.peer_id = ?))
 )`;
 
-export function visibleChats({ group, owner, appOwner, isPrivate }) {
-  const isPrivateFlag = isPrivate ? 1 : 0;
-  return [group, isPrivateFlag, owner, appOwner ? 1 : 0, isPrivateFlag, appOwner ?? ""];
+export function visibleChats({ owner, isPrivate }) {
+  return [isPrivate ? 1 : 0, owner];
 }
 
 // The best `limit` lines, best first, from the sessions linked to the given chats. Each
@@ -72,7 +67,7 @@ export function visibleChats({ group, owner, appOwner, isPrivate }) {
 // the family room too, but its transcript holds what the owner's tools returned and the
 // words written beside those calls, which the room never saw. So only a search the owner's
 // private view makes reads it.
-export function searchHistory(stateDirectory, { group, owner, appOwner, ownersFamilySession, isPrivate, query, now, limit }) {
+export function searchHistory(stateDirectory, { owner, ownersFamilySession, isPrivate, query, now, limit }) {
   const terms = termsOf(query);
   if (terms.length === 0) return [];
   const needed = Math.min(2, terms.length);
@@ -98,7 +93,7 @@ export function searchHistory(stateDirectory, { group, owner, appOwner, ownersFa
       LIMIT ?
     `).all(
       terms.map((term) => `"${term}"*`).join(" OR "),
-      ...visibleChats({ group, owner, appOwner, isPrivate }),
+      ...visibleChats({ owner, isPrivate }),
       isPrivate ? 1 : 0,
       ownersFamilySession ?? "",
       MAX_ROWS,

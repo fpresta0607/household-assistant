@@ -12,29 +12,18 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "required": ["groupChatId", "ownerTelegramId", "people"],
+    "required": ["ownerPersonId", "people"],
     "properties": {
-      "groupChatId": {
+      "ownerPersonId": {
         "type": "string",
-        "pattern": "^-[1-9][0-9]*$",
-        "description": "The family group's Telegram chat id."
-      },
-      "ownerTelegramId": {
-        "type": "string",
-        "pattern": "^[1-9][0-9]*$",
-        "description": "The Telegram user id of the family member whose private chat this assistant is."
+        "pattern": "^[a-z][a-z0-9-]{0,31}$",
+        "description": "The household person id of the family member whose own thread in the app this assistant is, such as franco."
       },
       "people": {
         "type": "object",
-        "description": "Each family member's Telegram user id and the name to keep their requests under. The owner must be one of them.",
-        "propertyNames": { "pattern": "^[1-9][0-9]*$" },
+        "description": "Each family member's household person id, as the app's channel names them, and the name to keep their requests under. The owner must be one of them.",
+        "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,31}$" },
         "additionalProperties": { "type": "string", "pattern": "^[A-Za-z][A-Za-z .'-]{0,39}$" }
-      },
-      "appPeople": {
-        "type": "object",
-        "description": "Each family member's id in the household app, by their Telegram user id, so the app's own thread and family room share the kept list and older chats with Telegram. The owner must be one of them.",
-        "propertyNames": { "pattern": "^[1-9][0-9]*$" },
-        "additionalProperties": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" }
       }
     }
   }

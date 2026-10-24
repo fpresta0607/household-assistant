@@ -3,6 +3,11 @@
 // of the prompt and leaves it on disk, and a full list refuses a new record rather than
 // dropping an old one. Every change goes through `change`, one at a time, and lands with
 // a rename, so a reader never sees half a file.
+//
+// A record names who asked by `who`, the name it is shown under, and `person`, their
+// household person id. Records kept while the family used Telegram carry `whoId`, a
+// Telegram id, in place of `person`. Nothing reads either id, so both kinds load and are
+// shown as they are.
 
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -58,7 +63,7 @@ export function createKept(file, { now }) {
   }
 
   // Keeps one request, or finds it already kept: a retried turn builds its prompt again.
-  function keep({ who, whoId, where, scope, text, at = now() }) {
+  function keep({ who, person, where, scope, text, at = now() }) {
     const clipped = String(text).replace(/\s+/g, " ").trim().slice(0, MAX_TEXT);
     return change((records) => {
       const same = records.find((record) =>
@@ -66,7 +71,7 @@ export function createKept(file, { now }) {
       if (same) return { records: null, result: { kept: same, isNew: false } };
       if (records.length >= MAX_RECORDS) return { records: null, result: { full: true } };
       const id = records.reduce((highest, record) => Math.max(highest, record.id), 0) + 1;
-      const kept = { id, at, who, whoId, where, scope, text: clipped };
+      const kept = { id, at, who, person, where, scope, text: clipped };
       return { records: [...records, kept], result: { kept, isNew: true } };
     });
   }
