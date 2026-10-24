@@ -1,0 +1,29 @@
+{
+  "members": [
+    {
+      "person": "marina",
+      "name": "Marina",
+      "assistant": "ada",
+      "assistantName": "Ada"
+    },
+    {
+      "person": "steve",
+      "name": "Steve",
+      "assistant": "rex",
+      "assistantName": "Rex"
+    }
+  ],
+  "approver": "marina",
+  "gatewayHost": "household-box.example-tailnet.ts.net",
+  "googleClientId": "123456789012-abcdefghijklmnopqrstuvwxyz012345.apps.googleusercontent.com",
+  "sharedCalendar": {
+    "name": "Family Calendar",
+    "appleId": "marina@example.com"
+  },
+  "bibleVersion": "ESV",
+  "timezone": "America/New_York",
+  "pushRelay": {
+    "url": "https://push.example.com",
+    "household": "marina-steve"
+  }
+}

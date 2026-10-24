@@ -7,7 +7,8 @@
       "assistantName": "Corey",
       "container": "openclaw-gateway",
       "state": "openclaw",
-      "port": 18789
+      "port": 18789,
+      "memory": "1664M"
     },
     {
       "person": "gia",
@@ -16,7 +17,8 @@
       "assistantName": "Denise",
       "container": "openclaw-denise",
       "state": "openclaw-denise",
-      "port": 18790
+      "port": 18790,
+      "memory": "2048M"
     }
   ],
   "approver": "franco",
@@ -26,5 +28,6 @@
     "name": "Family Calendar",
     "appleId": "owner@example.com"
   },
-  "bibleVersion": "NIV"
+  "bibleVersion": "NIV",
+  "timezone": "America/Chicago"
 }

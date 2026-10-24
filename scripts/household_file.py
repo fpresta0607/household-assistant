@@ -9,7 +9,11 @@ their own. The household app's family room is shared by exactly two people and t
 assistants, so a household file names two members.
 
 This module needs nothing but the standard library, so the installers that copy
-themselves to the box, and run from there, can carry it beside them.
+themselves to the box, and run from there, can carry it beside them. The shell installers
+read the members through it too:
+
+    python3 scripts/household_file.py members      # one tab-separated line per member
+    python3 scripts/household_file.py has-members  # exits 0 when the file names them
 """
 
 from __future__ import annotations
@@ -17,20 +21,30 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 HOUSEHOLD_FILE = Path(os.environ.get("HOUSEHOLD_FILE", "/etc/household-assistant/household.json"))
-# Where each gateway's state lives on the box, one directory per member.
+# Where each gateway's root-only env file lives, and its state, one of each per member.
+ENV_ROOT = Path("/etc/household-assistant")
 STATE_ROOT = Path("/var/lib/household-assistant")
 # The first gateway's port on the box's loopback; each member after it takes the next one.
 FIRST_PORT = 18789
 MEMBERS = 2
+# What a gateway may hold in memory when the household file does not say, which leaves a
+# 4 GB box room for both and the system.
+MEMORY = "1536M"
+TIMEZONE = "America/Chicago"
 
 ID = re.compile(r"[a-z][a-z0-9-]{0,31}")
 NAME = re.compile(r"[A-Za-z][A-Za-z .'-]{0,39}")
 DIRECTORY = re.compile(r"[a-z0-9][a-z0-9_.-]{0,63}")
+SIZE = re.compile(r"[1-9][0-9]{2,4}M")
+ZONE = re.compile(r"UTC|[A-Z][A-Za-z_]+(/[A-Za-z0-9_+-]+){1,2}")
+RELAY_URL = re.compile(r"https://[a-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._/-]*)?")
 
 
 class UnsupportedConfig(ValueError):
@@ -50,25 +64,64 @@ class Member:
     container: str
     state: str
     port: int
+    # The most memory the gateway's container may hold, as compose writes it.
+    memory: str = MEMORY
 
     @property
     def state_dir(self) -> Path:
         return STATE_ROOT / self.state
 
+    @property
+    def env_file(self) -> Path:
+        """The gateway's root-only env file: its token, and its keys."""
+        return ENV_ROOT / f"{self.state}.env"
+
+    @property
+    def _suffix(self) -> str:
+        # The first household's Corey keeps codex and bin; every other gateway's are
+        # named after its state, as Denise's codex-denise and bin-denise are.
+        if self.state == "openclaw":
+            return ""
+        return "-" + self.state.removeprefix("openclaw-")
+
+    @property
+    def secrets_dir(self) -> Path:
+        """The key that recovers OpenClaw's legacy encrypted sidecar credentials."""
+        return STATE_ROOT / f"{self.state}-auth-secrets"
+
+    @property
+    def codex_dir(self) -> Path:
+        return STATE_ROOT / f"codex{self._suffix}"
+
+    @property
+    def bin_dir(self) -> Path:
+        """Binaries the gateway's bundled skills need, beside its state."""
+        return STATE_ROOT / f"bin{self._suffix}"
+
 
 # A household file written before it named its members is the first household's own:
 # Franco with Corey and Gia with Denise, on the gateways their box already runs.
 LEGACY_MEMBERS = (
-    Member("franco", "Franco", "corey", "Corey", "openclaw-gateway", "openclaw", 18789),
-    Member("gia", "Gia", "denise", "Denise", "openclaw-denise", "openclaw-denise", 18790),
+    Member("franco", "Franco", "corey", "Corey", "openclaw-gateway", "openclaw", 18789, "1664M"),
+    Member("gia", "Gia", "denise", "Denise", "openclaw-denise", "openclaw-denise", 18790, "2048M"),
 )
+
+
+@dataclass(frozen=True, slots=True)
+class PushRelay:
+    """The app publisher's push relay, which holds the app's Apple push key so that a
+    household's box never does, and the name the household is known by there."""
+
+    url: str
+    household: str
 
 
 @dataclass(frozen=True, slots=True)
 class Household:
     """The members, who lets in a phone that signed in with Apple and nobody linked, where
-    the phones reach the gateways, the app's Google client, the calendar the planner reads
-    and the Bible edition the household reads. The Telegram group and accounts a file
+    the phones reach the gateways, the app's Google client, the calendar the planner reads,
+    the Bible edition the household reads, the household's time zone and the push relay
+    its phones are notified through, if any. The Telegram group and accounts a file
     written before Telegram was retired still names are not read."""
 
     members: tuple[Member, ...]
@@ -78,6 +131,11 @@ class Household:
     shared_calendar: str
     shared_calendar_apple_id: str
     bible_version: str
+    timezone: str = TIMEZONE
+    push_relay: PushRelay | None = None
+    # Whether the file names its members. One written before it did is the first
+    # household's, whose box runs the compose file the repository holds.
+    names_members: bool = False
 
     def member(self, persona: str) -> Member:
         """The member whose assistant is `persona`."""
@@ -120,6 +178,7 @@ def _member(raw: object, index: int, path: Path) -> Member:
         ),
         state=_matching(raw.get("state", f"openclaw-{assistant}"), DIRECTORY, "a state", path),
         port=port,
+        memory=_matching(raw.get("memory", MEMORY), SIZE, "a memory limit", path),
     )
 
 
@@ -162,4 +221,46 @@ def load_household(path: Path = HOUSEHOLD_FILE) -> Household:
         shared_calendar=_text(calendar, "name", path),
         shared_calendar_apple_id=_text(calendar, "appleId", path),
         bible_version=_text(loaded, "bibleVersion", path),
+        timezone=_matching(loaded.get("timezone", TIMEZONE), ZONE, "a time zone", path),
+        push_relay=_push_relay(loaded.get("pushRelay"), path),
+        names_members="members" in loaded,
     )
+
+
+def _push_relay(raw: object, path: Path) -> PushRelay | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise UnsupportedConfig(f"{path}: pushRelay is not an object")
+    return PushRelay(
+        url=_matching(raw.get("url"), RELAY_URL, "a push relay address", path),
+        household=_matching(raw.get("household"), ID, "a push relay household", path),
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    command = list(sys.argv[1:] if argv is None else argv)
+    if command == ["members"]:
+        for member in load_household(HOUSEHOLD_FILE).members:
+            fields = (
+                member.person,
+                member.assistant,
+                member.container,
+                member.state,
+                str(member.port),
+                str(member.state_dir),
+                str(member.env_file),
+                str(member.secrets_dir),
+                str(member.codex_dir),
+                str(member.bin_dir),
+            )
+            print("\t".join(fields))
+        return 0
+    if command == ["has-members"]:
+        return 0 if load_household(HOUSEHOLD_FILE).names_members else 1
+    print("usage: household_file.py members | has-members", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

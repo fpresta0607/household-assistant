@@ -204,3 +204,106 @@ def test_an_approver_who_is_not_a_member_is_refused(tmp_path: Path) -> None:
     data["approver"] = "steve"
     with pytest.raises(UnsupportedConfig, match="approver"):
         load_household(written(tmp_path, data))
+
+
+NEW_EXAMPLE = ROOT / "deploy" / "household.new.example.json"
+
+
+def test_a_new_households_example_reads_with_its_zone_and_push_relay() -> None:
+    household = load_household(NEW_EXAMPLE)
+
+    assert [(m.person, m.assistant, m.container, m.port) for m in household.members] == [
+        ("marina", "ada", "openclaw-ada", 18789),
+        ("steve", "rex", "openclaw-rex", 18790),
+    ]
+    assert household.timezone == "America/New_York"
+    assert household.push_relay is not None
+    assert (household.push_relay.url, household.push_relay.household) == (
+        "https://push.example.com",
+        "marina-steve",
+    )
+    assert household.names_members
+
+
+def test_the_first_households_file_needs_no_zone_or_relay(tmp_path: Path) -> None:
+    data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+    del data["members"]
+    del data["timezone"]
+
+    household = load_household(written(tmp_path, data))
+
+    assert household.timezone == "America/Chicago"
+    assert household.push_relay is None
+    assert not household.names_members
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda data: data.update(timezone="Mars/Olympus Mons"), "a time zone"),
+        (lambda data: data.update(timezone="../../etc/passwd"), "a time zone"),
+        (lambda data: data.update(pushRelay="https://push.example.com"), "not an object"),
+        (
+            lambda data: data.update(
+                pushRelay={"url": "http://push.example.com", "household": "x"}
+            ),
+            "a push relay address",
+        ),
+        (
+            lambda data: data.update(pushRelay={"url": "https://push.example.com"}),
+            "a push relay household",
+        ),
+        (lambda data: data["members"][0].update(memory="lots"), "a memory limit"),
+    ],
+)
+def test_a_zone_relay_or_memory_a_box_could_not_use_is_refused(
+    tmp_path: Path, change: Callable[[dict[str, Any]], object], message: str
+) -> None:
+    data = json.loads(NEW_EXAMPLE.read_text(encoding="utf-8"))
+    change(data)
+
+    with pytest.raises(UnsupportedConfig, match=message):
+        load_household(written(tmp_path, data))
+
+
+def test_each_member_has_its_own_env_file_secrets_codex_and_bin() -> None:
+    first, second = load_household(EXAMPLE).members
+    new_first, _ = load_household(NEW_EXAMPLE).members
+    root = Path("/var/lib/household-assistant")
+
+    assert (first.env_file, first.secrets_dir, first.codex_dir, first.bin_dir) == (
+        Path("/etc/household-assistant/openclaw.env"),
+        root / "openclaw-auth-secrets",
+        root / "codex",
+        root / "bin",
+    )
+    assert (second.env_file, second.secrets_dir, second.codex_dir, second.bin_dir) == (
+        Path("/etc/household-assistant/openclaw-denise.env"),
+        root / "openclaw-denise-auth-secrets",
+        root / "codex-denise",
+        root / "bin-denise",
+    )
+    assert (new_first.env_file, new_first.codex_dir, new_first.bin_dir, new_first.memory) == (
+        Path("/etc/household-assistant/openclaw-ada.env"),
+        root / "codex-ada",
+        root / "bin-ada",
+        "1536M",
+    )
+
+
+def test_the_shell_installers_read_the_members_from_the_command_line(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import household_file
+
+    monkeypatch.setattr(household_file, "HOUSEHOLD_FILE", NEW_EXAMPLE)
+
+    assert household_file.main(["members"]) == 0
+    lines = [line.split("\t") for line in capsys.readouterr().out.splitlines()]
+    assert [line[:5] for line in lines] == [
+        ["marina", "ada", "openclaw-ada", "openclaw-ada", "18789"],
+        ["steve", "rex", "openclaw-rex", "openclaw-rex", "18790"],
+    ]
+    assert lines[1][6] == "/etc/household-assistant/openclaw-rex.env"
+    assert household_file.main(["has-members"]) == 0
+    assert household_file.main(["something"]) == 2
