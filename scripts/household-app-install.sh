@@ -32,7 +32,7 @@ for root in "${HOUSEHOLD_APP_TARGET}" "${HOUSEHOLD_APP_PLUGINS}" "${HOUSEHOLD_AP
       ;;
   esac
   # This runs rm -rf under the plugin root as root, so the root itself and anything too
-  # shallow are refused after canonicalising, as coordination-install.sh does.
+  # shallow are refused after canonicalising.
   canonical="$(realpath -m -- "${root}" | tr -s '/')"
   depth="$(printf '%s' "${canonical}" | tr -cd '/' | wc -c)"
   if [[ "${canonical}" == "/" || ${depth} -lt 2 ]]; then

@@ -35,7 +35,6 @@ from tests.capabilities import needs_nofollow_open, needs_symlinks
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "openclaw-family-group.py"
-DAEMON = ROOT / "scripts" / "coordination-daemon.py"
 
 FRANCO = "7100000001"
 GIA = "7100000002"
@@ -312,16 +311,6 @@ def test_the_patch_changes_the_family_group_entry_and_nothing_else(family: Modul
     del groups[THE_FAM]
     del before["channels"]["telegram"]["groups"][THE_FAM]
     assert after == before
-
-
-def test_the_policy_names_the_same_people_and_group_as_the_relay(family: ModuleType) -> None:
-    """The relay and this script both decide who in The Fam is a household member."""
-    daemon = load(DAEMON, "coordination_daemon_for_family_group")
-    assert daemon.GROUP_CHAT_ID == family.FAMILY_GROUP
-    assert {name: user for user, name in daemon.HOUSEHOLD_MEMBERS.items()} == family.HOUSEHOLD
-    assert [(g.persona_id, g.container, g.state_directory) for g in daemon.GATEWAYS] == [
-        (g.persona, g.container, g.state) for g in family.GATEWAYS
-    ]
 
 
 def write_state(path: Path, config: dict[str, Any]) -> Path:

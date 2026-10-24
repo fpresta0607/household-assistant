@@ -4,9 +4,10 @@
 # Each gateway's archive goes through OpenClaw's own `backup restore`, which verifies
 # the manifest, links and every SQLite database before it writes, into a scratch
 # directory, and what comes out is read back: both databases opened and checked, the
-# files a gateway cannot start or remember without found. The coordination copy is
-# opened and its off switch's table queried. household-backup.sh runs this on every
-# backup it writes; run it by hand on any other.
+# files a gateway cannot start or remember without found. A copy of the retired
+# coordination relay's database, from a box that still had one, is opened and its off
+# switch's table queried. household-backup.sh runs this on every backup it writes; run
+# it by hand on any other.
 #
 # usage: household-restore-drill.sh /var/backups/household-assistant/<stamp>
 set -euo pipefail

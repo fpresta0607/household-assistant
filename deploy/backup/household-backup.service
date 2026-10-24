@@ -1,5 +1,6 @@
-# Both gateways' state and the coordination relay's database, every night, with a
-# restore drill of what was written. scripts/household-backup.sh says what it does.
+# Both gateways' state, and the retired coordination relay's database where the box
+# still has it, every night, with a restore drill of what was written.
+# scripts/household-backup.sh says what it does.
 #
 # Lives at /etc/systemd/system/household-backup.service on the box, with the three
 # scripts it runs in /opt/household-assistant/backup.

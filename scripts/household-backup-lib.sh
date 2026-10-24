@@ -123,21 +123,20 @@ PY
   printf -v "${label}_codex_archive" '%s' "${codex_out}"
 }
 
-# --- the coordination relay's own state ------------------------------------
-# Not part of either gateway, because it deliberately lives outside both of them,
+# --- the retired coordination relay's state --------------------------------
+# Not part of either gateway, because it deliberately lived outside both of them,
 # so `openclaw backup create` never sees it.
 #
-# The reason it has to be here is the off switch rather than tidiness. The flag
-# defaults to ENABLED when its row is absent, so a restore that does not carry this
-# file turns Corey and Denise talking to each other silently back on. Somebody
-# switches the pair off, the box is restored, and it comes back without anyone
-# deciding that, at exactly the moment nobody is watching. The taste store goes with
-# it for a smaller reason: it is what makes the second proposal better than the first.
+# The relay that wrote it was retired with Telegram, so a new box never has this
+# file and skips it below, which is a clean backup. A box that ran the relay keeps
+# the database until someone removes it, with the off switch's position and the
+# planner's taste store in it, and while it is there it is still copied, so a
+# restore brings back what was there.
 #
-# Copied through SQLite's online backup API rather than by cp, because the relay
-# writes to it every fifteen seconds and a plain copy of a live database can be torn.
-# That is the same mechanism `openclaw backup create` uses above; the box has no
-# sqlite3 binary, so it is python3.
+# Copied through SQLite's online backup API rather than by cp, because a plain copy
+# of a database something might still have open can be torn. That is the same
+# mechanism `openclaw backup create` uses above; the box has no sqlite3 binary, so it
+# is python3.
 archive_coordination() {
 coordination_archive=none
 if [[ -f ${COORDINATION_DB} ]]; then

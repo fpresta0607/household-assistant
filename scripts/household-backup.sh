@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Every night: both gateways' state and the coordination relay's database, each
-# through SQLite's online backup API, then a restore drill of what was written, then
-# the oldest backups beyond the newest --keep complete ones removed.
+# Every night: both gateways' state and, on a box that still has it, the retired
+# coordination relay's database, each through SQLite's online backup API, then a
+# restore drill of what was written, then the oldest backups beyond the newest --keep
+# complete ones removed.
 #
 # siqsermon-backup.sh takes the same assistant half together with SIQsermon's data,
 # but SIQsermon's half stops Neo4j, so that one stays a job run by hand. Until
