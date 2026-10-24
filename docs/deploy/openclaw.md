@@ -1,7 +1,7 @@
 # OpenClaw on the shared VPS
 
 This is the runtime layer only: the box, the container, its state, its limits, and its backup.
-The [Phase 1 household service](../../README.md#phase-1---identity-and-privacy-spine) defines authenticated identity and scopes; the deployed gateways' group access and tool context are described in [The family group](#the-family-group).
+The [Phase 1 household service](../../README.md#phase-1---identity-and-privacy-spine) defines authenticated identity and scopes; the deployed gateways' family-room access and tool context are described in [What a family-room turn may use](#what-a-family-room-turn-may-use).
 
 The initial deployment was verified on the IONOS box on 2026-09-18; later changes are dated in their sections.
 
@@ -99,7 +99,7 @@ Two things changed because of that:
 - `openclaw-verify.sh` runs its HTTP probes inside the container, where the caller is local. From the host, `startupz` and `readyz` now answer 403.
 
 Nothing else on the box calls the gateway over HTTP.
-`household/openclaw.py` and the coordination daemon go through `docker exec`, which is loopback inside the container, and so does the container's own healthcheck.
+The app relay, the spend job and the `openclaw-*.py` scripts go through `docker exec`, which is loopback inside the container, and so does the container's own healthcheck.
 
 If either network is ever recreated on a different subnet, the phone path fails closed with the same 403, and `openclaw-verify.sh` reports it on its `websocket over the tailnet` line.
 Setting the new host address the same way brings it back.
@@ -148,8 +148,8 @@ Health, the way the box checks it:
 
 That script is `scripts/openclaw-verify.sh` in this repository.
 The repository is the source of truth; the copies on the box under `/var/tmp/ha-openclaw/scripts/` and `/var/tmp/ha-phase0/` are staging, and `/var/tmp` is cleaned of old files, so re-copy from a checkout rather than trusting what is there.
-Keep `openclaw-family-group.py`, `openclaw-openrouter.py` and `gateway_config.py` beside `openclaw-verify.sh` when staging the scripts; the verifier calls the first two for the family-group and model-backend checks, and both import the third.
-It is read-only and checks the container is healthy, was not OOM-killed, is running the pinned digest, publishes on loopback only, has not changed the firewall, is served on the tailnet with no funnel and accepts a WebSocket there, answers all three HTTP probes from inside the container, still has its state mounted from disk, has no [recurring heartbeat](#the-heartbeat-is-off) enabled, lets both people reach it in the [family group](#the-family-group), passes the [model-backend audit](#the-model-backend), can import [the calendar skill's library](#icloud-through-apple-cal-anywhere), and is inside its declared limits.
+Stage the whole `scripts/` directory, not `openclaw-verify.sh` alone: the verifier calls `openclaw-household-app.py`, `openclaw-openrouter.py`, `openclaw-speech.py` and `openclaw-pictures.py` for its household-app, model-backend, speech and pictures checks, and they import `gateway_config.py`.
+It is read-only and checks the container is healthy, was not OOM-killed, is running the pinned digest, publishes on loopback only, has not changed the firewall, is served on the tailnet with no funnel and accepts a WebSocket there, answers all three HTTP probes from inside the container, still has its state mounted from disk, has no [recurring heartbeat](#the-heartbeat-is-off) enabled, runs [the household app's channel](#the-household-apps-family-room) for its person with nothing Telegram left, passes the [model-backend audit](#the-model-backend), speaks nothing unasked ([Speaking](#speaking)), makes pictures and videos only through [the pictures plugin](#pictures-and-videos), can import [the calendar skill's library](#icloud-through-apple-cal-anywhere), and is inside its declared limits.
 It checks one gateway at a time, Corey's by default.
 Three values name a gateway, so checking Denise's means setting all three:
 
@@ -178,8 +178,8 @@ No systemd unit was added, because one would duplicate a restart policy that alr
 | `/var/lib/household-assistant/codex` | the Codex harness's working state: goals, memories, queue, skills | `1000:1000`, mode 0700 |
 | `/var/lib/household-assistant/bin` | binaries the bundled skills need, mounted at `~/.local/bin`; `gog` today | `root`, mode 0755 |
 | `/var/lib/household-assistant/openclaw/pylocal` | the Python packages [the calendar skill](#icloud-through-apple-cal-anywhere) imports, inside the state directory so a recreated container and the backup both keep them | `1000:1000` |
-| `/etc/household-assistant/openclaw.env` | the gateway token, the OpenRouter key, the Telegram bot token, the gog keyring password, and until SIQsermon is retired the SIQsermon credentials its export reads | `root`, mode 0600 |
-| `/etc/household-assistant/household.json` | the household's own identifiers: the family group, each person's Telegram account, the box's tailnet name, the app's Google client, the shared calendar and the Bible edition the scripture cards link, which the repository does not hold; read by the `openclaw-*.py` installers and the coordination relay through `load_household` in `gateway_config.py`, shaped like [`deploy/household.example.json`](../../deploy/household.example.json) | `root`, mode 0600 |
+| `/etc/household-assistant/openclaw.env` | the gateway token, the OpenRouter key, the gog keyring password, and until SIQsermon is retired the SIQsermon credentials its export reads | `root`, mode 0600 |
+| `/etc/household-assistant/household.json` | the household's own identifiers: the box's tailnet name, the app's Google client, the shared calendar and the Bible edition the scripture cards link, which the repository does not hold; read by the `openclaw-*.py` installers through `load_household` in `gateway_config.py`, shaped like [`deploy/household.example.json`](../../deploy/household.example.json) | `root`, mode 0600 |
 
 All three state directories are bind-mounted into the container, so replacing the image never loses memory.
 `1000:1000` is the `node` user the image runs as; the container does not run as root.
@@ -189,6 +189,20 @@ The workspace lives inside the state directory rather than beside it, so a singl
 
 Treat this directory as credentials.
 The Codex OAuth token is a plaintext row in that SQLite, and the separate key directory does not encrypt it.
+
+### The household plugins
+
+The household's plugins are code that runs inside the gateway, so their files are not in the assistant's own state directory.
+`scripts/openclaw-install.sh` copies `deploy/openclaw/plugins/` to `/opt/household-assistant/plugins/`, root-owned, and the compose file mounts that read-only at `/opt/household-plugins` in both containers.
+It does that through `scripts/install-household-plugins.sh`, which replaces each household plugin the repository ships and touches nothing else there.
+`pocket-piggies-corey` and `pocket-piggies-denise` are copies `scripts/pocket-piggies-install.py` makes in the same mount, so until 14 October, when the install still emptied the whole mount, running it would have deleted both.
+A plugin the repository no longer ships stays in the mount until it is removed by hand, as household-family-room, household-speech and household-job-mirror do until [Retiring Telegram](retiring-telegram.md#7-what-is-left-on-the-box) removes them.
+A plugin loads only once a gateway's config names it, as `openclaw-household-app.py apply` does for household-app, and naming one for the first time makes that gateway restart itself in process.
+The same directory holds household-openrouter-video, which `openclaw-openrouter.py apply` names, and which `apply` refuses to name until the installer has put it there.
+`apply` adds household-openrouter-video to an existing `plugins.allow` list while keeping its other entries.
+It preserves video plugin policy blocks from `plugins.enabled` and `plugins.deny`.
+`check` and `verdict` also report an allow list that excludes the video plugin before apply merges it.
+The apply plan reports any remaining blocks for the operator to resolve.
 
 ---
 
@@ -292,7 +306,7 @@ It was pulled, never built: a source build wants around 6 GB of RAM, which is mo
 
 Two jobs share one definition of the assistant half, `scripts/household-backup-lib.sh`:
 
-- **`scripts/household-backup.sh`, every night.** Both gateways' state and the coordination relay's database, then a restore drill of what it wrote, then the oldest backups pruned.
+- **`scripts/household-backup.sh`, every night.** Both gateways' state, and the retired coordination relay's database on a box that still has it, then a restore drill of what it wrote, then the oldest backups pruned.
   It writes to `/var/backups/household-assistant/<utc-timestamp>/` at mode 0700.
   See [The nightly backup](#the-nightly-backup).
 - **`scripts/siqsermon-backup.sh`, by hand.** The same assistant half together with SIQsermon's data.
@@ -310,10 +324,10 @@ A failed copy fails the assistant step the same way a failed archive does.
 If the assistant state is missing, or its archive fails, the job still completes the SIQsermon dump and the manifest, records `openclaw_archive` as `missing`, and exits non-zero.
 SIQsermon's data is irreplaceable and never waits on the assistant; the rehearsal fails such a backup at step 6 rather than reporting green.
 
-The coordination relay's database, `/var/lib/household-assistant/coordination/coordination.db`, sits outside both gateways on purpose, so `openclaw backup create` never sees it and the job copies it on its own with the same online backup API.
-It is archived for the off switch rather than for tidiness: the flag defaults to enabled when its row is absent, so a restore that does not carry this file turns the pair back on silently, and [`../plan/coordination-between-assistants.md`](../plan/coordination-between-assistants.md) is where that switch is documented.
-The copy is reopened, checked with `integrity_check`, and queried against `coordination_flag`, so a copy missing the off switch's table fails; an empty `coordination_flag` passes, because that is the ordinary state until somebody switches the pair off.
-`MANIFEST.tsv` records the outcome as `coordination_archive`: the filename when it was copied, `none` when the relay is not installed, and `missing` when the copy failed its own verification and was deleted rather than left behind to be hashed into `SHA256SUMS`.
+The coordination relay was retired with Telegram, and its database, `/var/lib/household-assistant/coordination/coordination.db`, sat outside both gateways, so `openclaw backup create` never sees it.
+A box that ran the relay keeps the file, with the off switch's position and the planner's taste store in it, until someone removes it ([Retiring Telegram](retiring-telegram.md#7-what-is-left-on-the-box)), and while it is there the job still copies it on its own with the same online backup API, so a restore brings back what was there.
+The copy is reopened, checked with `integrity_check`, and queried against `coordination_flag`, so a copy missing the off switch's table fails; an empty `coordination_flag` passes.
+`MANIFEST.tsv` records the outcome as `coordination_archive`: the filename when it was copied, `none` when the box has no such file, and `missing` when the copy failed its own verification and was deleted rather than left behind to be hashed into `SHA256SUMS`.
 A failed copy fails the assistant step the same way a failed archive does, so the job finishes the SIQsermon half and exits non-zero.
 
 The assistant step runs after Neo4j is back up, so it does not lengthen the five-second Neo4j window Phase 0 measured.
@@ -323,9 +337,9 @@ The assistant step runs after Neo4j is back up, so it does not lengthen the five
 `household-backup.timer` starts `household-backup.service` every night at 04:30 Chicago time, and a night missed while the box was down runs when it comes back.
 The service runs `/opt/household-assistant/backup/household-backup.sh --keep 14`:
 
-1. Each gateway through `openclaw backup create --verify`, its Codex directory through SQLite's online backup API, and the coordination database, as above.
+1. Each gateway through `openclaw backup create --verify`, its Codex directory through SQLite's online backup API, and the coordination database where there is one, as above.
 2. `MANIFEST.tsv` and `SHA256SUMS`.
-3. `household-restore-drill.sh` on what it just wrote: the checksums, then each gateway's archive through OpenClaw's own `backup restore` into a scratch directory under `/var/tmp`, both of its databases opened with `integrity_check`, its `openclaw.json`, `AGENTS.md`, `USER.md` and `household-memory/kept.json` found, its Codex archive read, and the coordination copy opened with its off switch's table queried.
+3. `household-restore-drill.sh` on what it just wrote: the checksums, then each gateway's archive through OpenClaw's own `backup restore` into a scratch directory under `/var/tmp`, both of its databases opened with `integrity_check`, its `openclaw.json`, `AGENTS.md`, `USER.md` and `household-memory/kept.json` found, its Codex archive read, and a coordination copy, when there is one, opened with its off switch's table queried.
 4. Only when every archive was written and the drill passed: a `RESTORED` file, then the newest 14 backups marked `RESTORED` kept and older ones removed.
    A backup that failed is never counted toward the 14, and a failed run removes nothing.
 
@@ -630,14 +644,14 @@ The migration changes a global default only when it would embed elsewhere, clear
 
 Each agent's `memory.search` also carries `"sources": ["memory", "sessions"]` and `"experimental": {"sessionMemory": true}`.
 Without them, OpenClaw 2026.9.4 indexes chat transcripts only while "remember across conversations" is on, and that setting defaults to off as soon as `session.dmScope` is anything but `main` (`resolveRememberAcrossConversations`).
-The family group change on 13 October set `per-channel-peer`, which dropped transcripts from both indexes.
+The Telegram family-group change on 13 October set `per-channel-peer`, which dropped transcripts from both indexes.
 An index whose sources no longer match its settings pauses search until it is rebuilt, so from then on every `memory_search` answered "paused": 17 of 17 in the recall run on 14 October.
 `scripts/openclaw-memory.py check` reports what each gateway indexes, worked out the way 2026.9.4 does it.
 
 ### What a family member asks to keep
 
-On 14 October both assistants were asked 20 older facts from private chats and the family group, each in a throwaway session.
-They found 18, but none through memory search, and 8 by grepping raw files with a shell, which the family group's tools do not allow.
+On 14 October both assistants were asked 20 older facts from private chats and the Telegram family group, each in a throwaway session.
+They found 18, but none through memory search, and 8 by grepping raw files with a shell, which the family room's tools do not allow.
 The two misses were both things a family member had asked them to keep: one was never written down at all, the other only as a later decision.
 Their instructions sent such a request to the day's note, which search ranks down by half every 30 days, and told them to remove outdated entries.
 Nothing had been deleted: every chat since 18 September was still in each gateway's database.
@@ -651,24 +665,25 @@ Both asks to keep that had been missed were answered from the kept list without 
   A question such as "do you remember..." is not kept.
   The rule is judged sentence by sentence, so a long voice note that asks about the past in one sentence is not kept for it.
 - **Show.** Every turn starts with what was kept for that chat, newest first within 4,000 characters, with the items that share words with the message ahead of the rest.
-  Kept in the owner's private chat, it is shown only there.
-  Kept in the family group, it is shown there and in both private chats.
+  Kept in the owner's own thread, it is shown only there.
+  Kept in the family room, it is shown there and in the owner's thread.
 - **Find.** A question about the past gets the three best lines from that chat's own history, read from OpenClaw's transcript index.
-  In the family group that is the group alone.
-  In the private chat it is the owner's private chats, the shared main session from before 13 October included, and the group.
+  In the family room that is the room alone.
+  In the owner's own thread it is every session linked to that thread, and the room.
   It matches any of the question's words and ranks lines by how many they share, where `sessions_search` needs every word.
 
-In the private chat the model also gets `recall`, whose only parameter is the words to look for, and `forget`, which marks a kept item done by its number.
-The family group's tool list does not change: the PocketPiggies guard holds it to a fixed six, and keeping and finding there need no tool.
+In the owner's own thread the model also gets `recall`, whose only parameter is the words to look for, and `forget`, which marks a kept item done by its number.
+A family-room turn the owner started, which runs in the owner's own session of the room, has them too.
+The family room's tool list does not change: keeping and finding there need no tool.
 
-The household app is the same two chats on another channel.
-With `appPeople` in the plugin's config, which `openclaw-memory.py apply` writes from each person's app id, the owner's app thread counts as the private chat and the app's family room as the family group.
-So a request kept on Telegram is shown in the app and the other way round, from one list, and finding older chats reads both channels.
-Until 15 October the plugin knew only Telegram's sessions, so nothing said in the app was kept, shown or found, and the app thread had no `recall` or `forget`.
+The chats are the household app's: the owner's own thread is the private chat, and the family room the family group.
+The plugin knows everyone by their household person id, `franco` or `gia`, as the app's channel does, from its config's `ownerPersonId` and `people`, which `openclaw-memory.py apply` writes; `check` prints whose requests each gateway keeps.
+While the family used Telegram the config named people by their Telegram ids.
+The plugin now refuses a config that still does, with one log line saying to run `openclaw-memory.py apply`, and chats held only on Telegram are no longer searched; what was kept from them stays kept and shown.
 
 What is kept lives in `household-memory/kept.json` under each gateway's state directory, so [the nightly backup](#the-nightly-backup) archives it with the rest of the state, and its restore drill checks it came back.
 Nothing removes a record: `forget` sets `doneAt` and keeps it, and past 2,000 records a new request is refused, with the assistant told to say so, rather than an old one dropped.
-Each assistant keeps its own list; something told only to Denise in the group is not in Corey's.
+Each assistant keeps its own list; something told only to Denise in the family room is not in Corey's.
 
 Each workspace's `AGENTS.md` says the same, under "Write It Down" and "Local notes": a request to remember is kept automatically and only needs confirming, and an older chat is found from the kept list and the added lines first, then `recall`, then `memory_search`, never by grepping files or copying a database.
 
@@ -730,7 +745,7 @@ On 14 October `openclaw backup create` could not be used for this step, because 
 They were given back to uid 1000 the same day, and `openclaw-verify.sh` now names anything in a gateway's state that `backup create` would refuse (`state the backup can read`): a file uid 1000 does not own, or an absolute link outside the directories it skips as regenerable.
 The PocketPiggies socket directory is left out, since it belongs to its key holder.
 The same day an empty virtualenv the assistant had made in Corey's workspace on 2 October, whose `python3` linked to `/usr/bin/python3`, was moved out of it into that day's backup folder.
-Anything written into a state directory as root has to be handed back with `chown 1000:1000`, as the speech and memory steps above do for `AGENTS.md`.
+Anything written into a state directory as root has to be handed back to uid 1000, as the memory rollback above does for `AGENTS.md`.
 
 ---
 
@@ -789,7 +804,6 @@ After deployment of the branch's first version, `b51c6da`, both live gateways de
 Those fixes reached the box on 9 October, when `openclaw-install.sh` was run from main at `7cd0827` and restarted both gateways onto the new plugin code.
 Both plugins loaded without an error on each gateway, `infer video describe` described the kept test clip through `openrouter-video` on each, the family-group and model-backend checks passed, and `openclaw-verify.sh` passed 21 of 21 on both.
 The plugins' own tests under `tests/js`, which CI runs through `tests/test_household_plugins.py`, passed 50 of 50 against that commit.
-What a photo, a video or a quoted message in The Fam now does has not been exercised there since.
 The plugin files from before are in `/var/backups/household-plugins-20261009T232032Z`.
 
 Both containers need `OPENROUTER_API_KEY`, and `apply` refuses to write anything until each has it.
@@ -810,7 +824,7 @@ An env-file change reaches only a recreated container, and `docker compose resta
 Never paste a key into a chat with either assistant: the transcript keeps it, and the backups keep the transcript.
 
 Then, as root on the box, from a checkout.
-This script and `openclaw-family-group.py` both import `scripts/gateway_config.py`, so a copy has to carry the whole `scripts/` directory, not one file:
+This script imports `scripts/gateway_config.py`, as every `openclaw-*.py` script does, so a copy has to carry the whole `scripts/` directory, not one file:
 
 ```
 python3 scripts/openclaw-openrouter.py check            # read-only: every route, the key, the pins
@@ -822,7 +836,7 @@ python3 scripts/openclaw-openrouter.py apply            # clear pins, back up an
 It rebuilds the memory index on each gateway whose config changed, since a new embedding provider pauses vector recall until the index is rebuilt.
 A failed rebuild or a timeout is reported with the command to retry, and the other gateway is still processed.
 Anything it cannot safely clear, a plugin's own model setting for instance, it lists for a person to change rather than guessing.
-Its backups sit beside each live config as `openclaw.json.pre-openrouter-<UTC stamp>`; restore one the way [the family group's rollback](#rolling-it-back-1) does, then rebuild the memory index.
+Its backups sit beside each live config as `openclaw.json.pre-openrouter-<UTC stamp>`; restore one by copying it over `openclaw.json` inside the container, as the gateway's own user, the way [the household app's rollback](#rolling-it-back-2) does, then rebuild the memory index.
 `check` and the verifier's `verdict` both audit config and read container credential presence without printing values, including OpenAI-backed speech fallbacks and direct Perplexity search credentials.
 `check` additionally reads effective model status, credential availability and session pins; `verdict` does not inspect those.
 Resolve any remaining routes reported by `apply` before relying on a passing `check`.
@@ -838,398 +852,126 @@ SIQsermon ran on this box too, and this repository cannot see its config.
 The scripture skill's verse search went through SIQsermon's backend until the household-scripture plugin replaced it, so before the account closes, check whether SIQsermon itself calls OpenAI.
 `grep -c '^OPENAI' /etc/siqsermon/runtime.env` counts the lines without printing any value.
 
+### Why she reads as weaker even when she answers
+
+Until the move to OpenRouter, Corey answered on `openai/gpt-5.6-luna` through Codex, and Denise on `openrouter/z-ai/glm-5.3-flash`, a small fast model.
+The heartbeat measurement below is a fair picture of that gap: told to stay silent unless there was something to say, none of the 142 heartbeat turns Corey ran on Codex broke it, while on `glm-5.3-flash` at least 12 of Corey's 45 and 28 of Denise's 45 did.
+A family-room turn is that same kind of judgement, when to speak, how much and to whom, so no setting of the room closes it; only the model does.
+
+`openclaw-openrouter.py` puts both on one chain, so neither is the weaker one by configuration any more.
+That chain starts on the same small fast model, though, so the two are now equally quick and equally loose.
+To make one stronger, its person picks a larger model in the app's Settings, `z-ai/glm-5.3` for instance at $0.91 / $2.86 per million tokens against the flash model's $0.09 / $0.30.
+That is the Overlord's call, and until item 3 it bills SIQsermon's key on every turn.
+`apply` keeps any OpenRouter primary a gateway already has, so `CHAT_PRIMARY` is the primary only for a gateway whose primary is not on OpenRouter.
+
+**Since 17 October each person also picks their own assistant's second and third text models in the app (Settings, Model, Second and Third), and the gateway answers with them in that order when the one before fails.**
+- The phone signs `model.fallback.1` or `model.fallback.2` with a model id from the same OpenRouter list as the first, or an empty value for none, and the gateway writes them as `agents.defaults.model.fallbacks` and reads them back (`settings.js`).
+  A cleared second lets the third move up, a model already in the chain is refused, and a fallback picked as the first leaves the fallbacks.
+- `apply` keeps those fallbacks when each is a distinct model on OpenRouter's list and none is the primary; anything else gets the household's `CHAT_FALLBACKS` back, so a model OpenRouter delists is still repaired, and `check` and `verdict` report a delisted one.
+- OpenClaw tries the fallbacks only for a session that follows the configured chain.
+  A session pinned to a model with `/model`, a model picker or `sessions.patch` (`modelOverrideSource: user`) answers on that model alone, with no fallback and no Settings choice.
+  On 17 October Corey's main session and five reminder sessions carried such a pin to GLM 5.3 Flash, left from the move off Codex, and the rollout of the second and third models cleared them with `sessions.patch` and a null model; Denise had none.
+  `openclaw-openrouter.py check` lists any pin under `pinned`.
+- Proved on Corey's container with `openclaw agent exec --config <a temporary copy>` and isolated state, no channel and nothing delivered: with the first model unknown, the second answered; with the first two unknown, the third answered.
+  Run it with `OPENCLAW_CONFIG_PATH` set to the copy as well, or its log lines land in the gateway's own log file.
+
 ### Speaking
 
-**Both assistants speak only when asked, in an ElevenLabs voice through OpenRouter, and a spoken reply is one numbered set of voice notes under a ceiling.**
-On 9 October the Overlord first asked for every reply to be spoken and, the same evening, for speech on request only.
-On 10 October one spoken reply reached his chat as three unlabelled voice notes with its summary sent twice, and the household-speech plugin was written to close that.
+**Speech is asked for in the app, never sent: a person long-presses a message and chooses Speak, or talks with their assistant on a call (Talk), and the gateway speaks the words in an ElevenLabs voice through OpenRouter, under a daily ceiling.**
+No chat tool makes a voice note, and nothing speaks a reply unasked.
 
-**The plugin reached the box on 10 October, from main at `47ccdc1`.**
-Both gateways speak through it, as the last column says, and `openclaw-verify.sh` passes its `spoken replies` line on both.
-A real voice note has not been made through it yet: see [What was checked, and how](#what-was-checked-and-how).
+- household-app makes all of it through its `household-app.speak` method (`speak.js`): a message someone chose Speak for, each sentence Talk says, and a voice's sample in Settings.
+  It speaks at most 400 characters at once, through OpenClaw's own speech on the speech provider the gateway is configured with, for the household channel's account, so the phone never needs a key.
+  The audio is kept in the app's media store, and the phone reads it like any other attachment.
+- The model and the voice are the gateway's own: `tts.providers.openrouter.model` is `elevenlabs/eleven-v4-turbo`, and `tts.providers.openrouter.speakerVoice` is the voice picked in the app's Settings, one of the six ElevenLabs voices `settings.js` lists.
+  On 10 October the voices were `will` for Corey and `jessica` for Denise.
+- `channels.household.talkDailyCharacters` is the gateway's ceiling for a day, 20,000 characters, which `openclaw-household-app.py apply` writes only where a gateway has none, so a ceiling a person set stays.
+  Every character asked for counts before the provider is called, so a call that fails after it was billed is still under the ceiling.
+  Past it the method refuses with `Talk has reached today's limit of 20,000 characters. It starts again tomorrow.`
+  The count is kept by day in `household-app/settings.sqlite` under the state directory, on the container's own day, which the compose file sets to US Central.
+- OpenRouter's speech catalog, `https://openrouter.ai/api/v1/models?output_modalities=speech`, priced `elevenlabs/eleven-v4-turbo` at $0.00002 for each input character on 9 and 10 October, which is **two cents for each thousand characters**, so the ceiling is 40 cents a day for each assistant.
+  OpenRouter's own limit on the key is still the outer bound, and everything on the key shares it.
+  Each assistant's line on the Spend page includes what its voice cost this month ([The Spend page](#the-spend-page)).
 
-| setting | on the box until 10 October | since `openclaw-speech.py apply` ran that day |
-|---|---|---|
-| `tts.auto` | `off` | `off` |
-| `tools.alsoAllow` | `["tts"]` | `["speak"]` |
-| `plugins.entries.household-speech.config.replyCharacters` | not set | `8000` |
-| `plugins.entries.household-speech.config.dayCharacters` | not set | `25000` |
-| `tts.providers.openrouter.model` | `elevenlabs/eleven-v4-turbo` | the same |
-| `tts.providers.openrouter.speakerVoice` | `will` for Corey, `jessica` for Denise | the same |
-
-With `tts.auto` off, nothing is spoken unless the assistant calls a speech tool.
-Neither `tts` nor `speak` is in a tool profile, the `coding` profile both gateways use included, so `tools.alsoAllow` is what hands one to them: before it was set, `tools.effective` listed no `tts`.
-Since the deploy `tools.effective` lists no `tts` again.
-It does not list `speak` either, although the model is handed it and calls it, so that list is not where to look for a plugin's tool.
-Each workspace's `AGENTS.md` carries the rule under "Local notes": a request to speak means a call to the speech tool, and nothing is spoken unasked.
-It replaced a template line about `sag`, a tool this box does not have.
-
-On 15 October in the app, Corey planned a spoken answer to a request for a voice note and wrote it instead, with `speak` in hand.
-So a turn whose words may ask to hear the reply gets one line in the turn itself, from the plugin's `before_prompt_build` hook, saying to call `speak` with the whole reply (PR 150).
-OpenClaw blocks that hook for a plugin it did not bundle until `plugins.entries.household-speech.hooks.allowConversationAccess` is `true`, which `openclaw-speech.py apply` writes and the `spoken replies` check requires.
-
-#### What went wrong on 10 October
-
-Read from Corey's gateway on the box, that one turn only.
-
-- OpenClaw's `tts` tool refuses a text over 4,096 characters and has no rule for a longer one, so the model chose every length by itself.
-  It asked for 7,163 characters and was refused, spoke a shorter first part, asked for 4,253 and was refused, then spoke that part as two halves.
-  That is five calls: two refused before they reached the provider, and three made.
-- Nothing was spoken or billed twice, and nothing said which voice note was which.
-- OpenClaw holds every `tts` result until the model's written reply and sends them together.
-  Telegram's code puts the reply's text on the first voice note as its caption.
-  Its `deduplicateBlockSentMedia` then takes that audio out of the final reply and keeps the text, so the text goes out a second time alone.
-  That happens on every turn where a `tts` result rides with a written reply, not only on that one.
-- Nothing bounded what a turn or a day could spend.
-  Had the model made a part again after a refusal, it would have been paid for twice and sent twice.
-- The turn cost about 24 cents: 14 cents of speech for 7,158 characters, and 10 cents of model rounds, seven where three would have done.
-
-#### How a spoken reply is made
-
-The model is handed one tool, `speak`, in place of `tts`, and the household-speech plugin does the rest by rule, whatever the model does.
-
-1. The whole text comes in one call, however long.
-2. The plugin cuts it at sentence ends into even parts of 2,000 characters or fewer: three notes of a minute and a half, not two long ones and a scrap.
-   A text of 3,938 characters is three parts of 1,312.
-   OpenClaw refuses over 4,096 characters in one call, and on 10 October the provider took 34 seconds over 3,237, so a part is about two and a quarter minutes of speech, made in about 20 seconds.
-3. Each part is made by the gateway's own speech provider, so the model, the voice and the key are the ones in the table above.
-4. The plugin sends each voice note to the chat itself, in order, captioned `1 of 3`.
-   A reply of one part carries no caption.
-5. The tool hands the model one line of text and no audio.
-   OpenClaw then has no audio to attach the written reply to, and the written reply goes out once.
-
-When something fails:
-
-- A part the provider fails is tried once more and no more.
-- A refusal for want of credit or quota is not tried again and stops the reply there, because the same call would be refused again on a key other things share.
-  A rate limit is treated the same way.
-- A voice note that was sent is never sent again.
-  One that was made and that Telegram refused is not sent again either, because a send that failed may still have arrived.
-- A part that still fails is said in one plain line, as in `Sent 2 of 3 voice notes.` followed by `Part 2 of 3 could not be spoken.`
-- A reply is tried once: a second `speak` call in the same turn sends nothing, and says whether all of the first was spoken.
-- OpenClaw's own `tts` tool is refused, with a line that names `speak`, if a config ever hands it back to the model.
-
-#### What it costs, and the ceiling
-
-The model and the voice are OpenRouter's own ids, from its speech catalog at `https://openrouter.ai/api/v1/models?output_modalities=speech`, and they use the same `OPENROUTER_API_KEY` as everything else.
-That catalog priced `elevenlabs/eleven-v4-turbo` at $0.00002 for each input character on 9 and 10 October, which is **two cents for each thousand characters**, against $0.00000062 a character for OpenClaw's default, `hexgrad/kokoro-82m`.
-A 1,000-character clip moved the key's reported usage by two to three cents, with the assistants' own traffic on the same key.
-On the box the ElevenLabs model answered a short clip in 1.4 to 2.0 seconds and Kokoro took 19.
-The pinned image has no `ffmpeg`, so a voice note is the MP3 OpenRouter returns, which Telegram accepts.
-
-| ceiling | where it is set | what `apply` writes | the most it lets through |
-|---|---|---|---|
-| one spoken reply | `plugins.entries.household-speech.config.replyCharacters` | 8,000 characters | 16 cents: four or five voice notes, about nine minutes |
-| one day, for each assistant | `plugins.entries.household-speech.config.dayCharacters` | 25,000 characters | 50 cents |
-
-- Every character sent to the provider counts against the day, a second try included.
-  It is counted before the call, so a call that fails after it was billed is still under the ceiling.
-- The day is the container's own, which the compose file sets to US Central.
-- The count is one small file, `household-speech/spent.json`, under each gateway's state directory, so it survives a restart.
-  A count that cannot be read, or that is not a day and a whole number, stops speech and never reads as zero.
-- Each ceiling is said in one line when it is reached.
-  Before a reply: `Not spoken: this reply is 9,120 characters and one spoken reply may be 8,000.`, or `Not spoken: this reply is 3,000 characters and today has 1,200 left of 25,000.`
-  In the middle of one: `Stopped at part 3 of 4: today's speech limit of 25,000 characters is reached.`
-- OpenRouter's own limit on the key, 50 dollars a month on 10 October, is still the outer bound, and everything on the key shares it.
-
-To change a ceiling, as root on the box:
+`speak.js` reads the ceiling from the gateway's current config on every call.
+To change it on one gateway, as root on the box:
 
 ```
-docker exec openclaw-gateway node dist/index.js config set plugins.entries.household-speech.config.dayCharacters 40000 --strict-json
+docker exec openclaw-gateway node dist/index.js config set channels.household.talkDailyCharacters 40000 --strict-json
 ```
 
-`openclaw-speech.py apply` writes its default only where a gateway has no ceiling, so one set this way stays.
-`/tts status` in a chat says the ceilings in force.
-Whether a running gateway takes a changed ceiling without a restart has not been tried.
-
-A reply spoken automatically goes around all of this: `tts.auto` set to `always`, `inbound` or `tagged` calls the provider from the reply itself, with no split and neither ceiling.
-`openclaw-speech.py check` and `openclaw-verify.sh` report any such setting, and `apply` leaves it for a person, because speech on request is the Overlord's rule to change.
-
-OpenClaw keeps one more switch outside `openclaw.json`: `settings/tts.json` under each state directory, which the built-in `/tts on` and a client's speech switch write, and which it reads ahead of `tts.auto`.
-`check` and `openclaw-verify.sh` read that file too and report a stored switch that speaks replies unasked.
-Neither gateway had the file on 10 October.
-The plugin now answers `/tts on` and `/tts off` itself, so a chat can neither set that switch nor clear it: to clear one, delete the file as root.
-
-The two also report a key in the plugin's config that it does not know.
-The plugin refuses such a config and does not start, which would leave no `speak` tool and the built-in `/tts` answering, so `apply` takes the key out.
-
-To change a voice, set `tts.providers.openrouter.speakerVoice`, which the gateway reloads without a restart:
+To change a voice, pick another in the app's Settings, or set `tts.providers.openrouter.speakerVoice` on the box, which the gateway reloads without a restart:
 
 ```
 docker exec openclaw-gateway node dist/index.js config set tts.providers.openrouter.speakerVoice '"liam"' --strict-json
 ```
 
-`openclaw-openrouter.py` leaves every setting in the table alone, and it reads a model under `tts.providers.openrouter` as OpenRouter's own.
-Until that was fixed, `check` reported `tts.providers.openrouter.model is elevenlabs/eleven-v4-turbo` and `openclaw-verify.sh` failed its `openrouter only` line on both gateways.
+`openclaw-openrouter.py` leaves the model, the voice and `tts.auto` alone, and it reads a model under `tts.providers.openrouter` as OpenRouter's own.
 
-#### `/tts`
+#### Nothing else speaks
 
-OpenClaw's own `/tts latest` makes one call with the whole last reply.
-Over 4,096 characters it answers with an error line and speaks nothing, and nothing bounds what it spends in a day.
-It sends audio only, so it never doubled the text.
-The plugin takes `/tts` over, so that it follows the rules above.
+household-app's speech guard (`speech-guard.js`) closes every other way a turn could speak:
 
-It cannot do that by registering a command of that name.
-Telegram's code in 2026.9.4 keeps its own handler for every built-in command, reports the plugin's command as a conflict, and marks the turn so that plugin commands are skipped.
-So the plugin claims every turn that starts with `/tts` in the `before_dispatch` hook, which runs ahead of both, on every channel.
-That includes `/tts: on`, since OpenClaw takes a colon between a command and its words.
+- OpenClaw's own `tts` tool is refused if a config ever hands it back to the model, and so is `speak`, should a config still name it, with the line `To hear a message in Steward, long-press it and choose Speak. For a conversation aloud, start a call.`
+- `/tts` typed in a chat, `/tts on` included, is answered with that same line in the `before_dispatch` hook, which runs ahead of the built-in command, so the built-in `/tts on`, which would speak every reply with no ceiling, cannot be reached from a chat.
+  That includes `/tts: on`, since OpenClaw takes a colon between a command and its words.
+- Every turn is told to reply in text and not to call `speak` or `tts` (`REPLY_IN_TEXT`), since on 15 October, in the app, Corey planned a spoken answer to a request for a voice note.
 
-| typed in a chat | what happens |
-|---|---|
-| `/tts latest` | the last written reply the assistant sent in that chat is spoken by the rules above, once |
-| `/tts audio` and some words | those words are spoken by the same rules |
-| `/tts status` | one line, as in `Spoken today: 7,158 of 25,000 characters. One spoken reply may be 8,000.` |
-| anything else, `/tts on` included | one line of usage, so speech for every reply can no longer be switched on from a chat |
+With `tts.auto` off, nothing is spoken unless someone asks.
+`tts.auto` set to `always`, `inbound` or `tagged`, at the root or under an agent, a channel or an account, calls the provider from the reply itself, around the app and its ceiling.
+OpenClaw keeps one more switch outside `openclaw.json`: `settings/tts.json` under each state directory, which the built-in `/tts on` and a client's speech switch write, and which it reads ahead of `tts.auto`.
+A chat can no longer write it; to clear one, delete the file as root.
 
-- The last reply is kept in memory, by chat, so after a gateway restart there is no latest until the assistant next replies.
-- On Telegram a command's own answer, to `/status` for one, is not taken for the last reply, because Telegram sends it in the command's own session.
-  Neither is anything sent with no session, such as a post the coordination relay makes.
-- A reply that `/tts latest` already tried is not tried again, even when a part of it failed, because a second try would send the delivered parts again.
-- After a spoken reply, the last reply is the assistant's short line about it and not the long text.
-- A `/tts` turn that hits an error is still claimed and answered with one line, because one let through would be spoken by the built-in with no ceiling.
-- Telegram's command menu still lists the built-in `/tts` with its buttons.
-  A button sends its command the way a typed one arrives, so `On` gets the usage line and `Status` the plugin's own.
-
-#### What was checked, and how
-
-On 10 October, for the plugin:
-
-- `tests/js/household_speech.test.mjs` runs it against a stand-in speech provider and a stand-in Telegram, so every paid call and every message that would reach a chat is counted.
-  A long reply arrives as numbered parts in order, each once.
-  A failure in the middle sends no second copy of a delivered part, makes one more try and says which part failed.
-  The tool hands back text and no audio, which is what leaves the written reply nothing to be sent with twice.
-  Each ceiling stops a reply that is over it and says so.
-  They passed 78 of 78, and CI runs them through `tests/test_household_plugins.py`.
-- `tests/test_openclaw_speech.py` holds `openclaw-speech.py` to the config both gateways had that day, and `tests/test_openclaw_verify.py` runs the new `spoken replies` line of `openclaw-verify.sh`.
-- Every OpenClaw call the plugin makes was read in 2026.9.4's own code, as shipped in Corey's container: the speech runtime's `textToSpeech`, the channel's outbound `sendPayload`, a tool registered under `contracts.tools`, the `before_tool_call` and `before_dispatch` hooks, and the `message:sent` hook that household-family-room already uses on the box.
-  The order in which Telegram handles `/tts` was read the same way.
-
-On 10 October, on the box, after the pass below was run from `47ccdc1`:
-
-- `openclaw-verify.sh` passed 21 lines on each gateway before, with `spoken replies` its one failure, and 22 of 22 on each after.
-  No other line changed.
-- Each gateway restarted itself in process when `apply` named the plugin, and then listed household-speech among 18 plugins, with no line saying `not started`.
-- SIQsermon's four containers kept their start times, and its public `/health` answered 200 before and after.
-- In a throwaway session on Corey's gateway, sent through `chat.send` with no delivery, the model called `speak` once with one short sentence.
-  The tool handed back `Not spoken: there is no chat here to send a voice note to.` and no audio.
-  No speech call was made, and no Telegram send appears in either gateway's log.
-  A `chat.send` turn without `deliver` runs on OpenClaw's internal channel, which has no outbound adapter, so the plugin cannot reach a household chat from it.
-- **A real voice note has not been made through the plugin yet.**
-  The plugin makes no audio when it has nowhere to send it, so the provider call and the send to Telegram first run when someone asks an assistant to speak in a chat.
-  The answer to `/tts status` could not be read either, because a session with no chat has no client to receive it.
-- The pass's scripts were run through `bash`.
-  Until then git held `openclaw-install.sh` and `openclaw-verify.sh` without the executable bit, so from an archive copy they answered `Permission denied`.
-  They carry the bit now, and `tests/test_runbook_commands.py` holds every script this runbook runs by its path to it.
-- The backups are `openclaw.json.pre-speech-20261010T161937Z` beside each live config, the two `AGENTS.md` files in `/var/backups/household-agents-md-20261010T162039Z`, and the plugin folder, the compose file and both configs as they were in `/var/backups/household-speech-deploy-20261010T161834Z`.
-
-What was checked on 9 October, on both live gateways, with OpenClaw's own tool:
-
-- `infer tts convert --gateway` returned an MP3 in each configured voice.
-- In a throwaway session with no delivery, a written answer of about 1,800 characters followed by "Speak it to me." produced one `tts` call and none before it: 3 of 3 times on Denise before the `AGENTS.md` rule, and 4 of 4 across both gateways after it.
-- In Gia's own long-running chat that evening, before the rule, two requests to speak were answered in text with no `tts` call, although the tool was offered: the run's tool count had gone from 41 to 42.
-  A short session finds the tool unprompted and that long one did not, which is why the rule exists.
-  Whether the rule is enough in a long session has not been shown.
-
-#### Why `speak` said there was no chat, 13 October
-
-**Requested voice notes failed in real Telegram chats with `Not spoken: there is no chat here to send a voice note to.`, although the chat was there.**
-Corey's log showed it before any speech call, on owner turns in Franco's chat, in the run that answered his message and in a queued one alike.
-
-OpenClaw 2026.9.4 picks the plugins a turn's tools come from out of the tool policy.
-`tools.alsoAllow` asks for every plugin's default tools, and under the `coding` profile that includes codex, memory-wiki and onepassword.
-None of the three is loaded when the gateway starts, so the turn's plugin tools are bound to a registry loaded on the spot, and that registry has no channels.
-`speak` asks it for Telegram's voice adapter, finds none, and said there was no chat, because the plugin used one line for both a missing chat and a missing adapter.
-
-The fix keeps the `coding` profile and everything it hands over, and adds three things:
-
-| setting | until 13 October | after `openclaw-speech.py apply` and `openclaw-family-group.py apply` |
-|---|---|---|
-| `tools.deny` | not set | `["codex", "memory-wiki", "onepassword"]` |
-| `tools.alsoAllow` | `["speak"]` | `["speak", "family_history"]` |
-| `session.dmScope` | not set, so one shared main session | `per-channel-peer` |
-| `session.groupScope` | not set | `per-group` |
-| `plugins.entries.telegram.enabled` | `true` on Corey, not set on Denise | `true` |
-
-- None of the three denied plugins' tools was called on either gateway in the 21 days before 13 October.
-- A turn's plugins are either the running gateway's, which hold the Telegram channel it started, or loaded afresh from the config, which hold it only when the config enables the telegram plugin by name.
-  Denise's gateway started Telegram from its bot token alone, so a turn loaded afresh from her config had no voice adapter; `openclaw-speech.py apply` names the plugin, and leaves one switched off by name for a person.
-- `speak` now answers only in the family group or a family member's own private chat, the chats `family_history` answers in, and it checks membership again before each part is made and sent.
-  A sender outside the family, a run with no Telegram chat such as a `chat.send` turn, and a member whose access was taken away mid-reply get `Not spoken: this turn is not authorized for voice replies.` or the line about no chat, before any speech call.
-- Since 15 October `speak` also answers in the household app's family room, for its two people, and in the app owner's own thread, the chats `family_history` answers in there.
-  The app's adapter has `sendMedia` and no `sendPayload`, so each voice note goes to it as audio marked voice, with its number as the text.
-- A missing adapter now says `Not spoken: the voice delivery adapter is unavailable.`, separately from a missing chat.
-- With DMs kept per sender, each person's private chat with an assistant is its own session, `agent:main:telegram:direct:<their id>`.
-  The conversation before the change stays in the shared main session, which web chat and the CLI still use, so an assistant starts each private chat afresh once.
-  Every scheduled automation on either gateway delivers to a named chat, so each keeps arriving; one that runs in the shared main session no longer sees the private chat's newer messages.
-  A DM or group scope a person set is reported and left for them, not replaced.
-- `/tts` typed in a chat keeps its own rules from [`/tts`](#tts); the membership check above covers the `speak` tool.
-
-How it was shown, on 13 October, in Corey's own container and pinned image, with nothing sent anywhere:
-
-- A throwaway directory held the plugins from this change and the gateway's real config with synthetic people and a synthetic family group, a temporary state directory, fake keys, and a fake Telegram Bot API and speech endpoint on loopback.
-  Every other outbound connection was refused, and none was attempted.
-- Turns were built by OpenClaw's own code for a fresh and a queued message, in a private chat and in the group, and their tools by its ordinary tool construction.
-- With sessions kept apart and `family_history` allowed but nothing denied, the turn asked for codex, memory-wiki and onepassword, none was in the gateway's registry, the registry `speak` used had no channels, and all four turns answered that the adapter was unavailable.
-- With the three denied, nothing was missing, `speak` used the gateway's own registry with Telegram in it, and all four turns made one speech call and one `sendVoice` to the right chat: `Spoken as one voice note.`
-  The turn kept every tool the `coding` profile hands over today.
-- In the same turns `family_history` returned the group's synthetic messages without the hidden reasoning, and none of the synthetic private transcript.
-  A sender outside the family got neither tool's help, a run with no Telegram chat got no history tool and the line about no chat, and taking the person out of the group after the tools were built stopped both.
-- After the rollout, the same probe on each gateway's deployed config and installed plugins delivered on Corey's in all four turns.
-  On Denise's the turn's registry had no channels until the telegram plugin was named in the probe's copy of her config, and then all four delivered too.
-- The script, its output and their checksums are kept with the task's evidence, outside this repository.
-
-#### Family history and the voice fix on the box, 13 October
-
-**Both gateways run the fix, from main at `6bec018` and then `4b63e78`, and `openclaw-verify.sh` passes 22 of 22 on each.**
-Before, each passed 20, failing `family group` and `spoken replies` under the new checks.
-
-- Corey took his config at 13:04 UTC and restarted onto the new plugin code at 13:05; Denise did the same at 13:07 and 13:08.
-  Each restart was healthy within 30 seconds and listed the same 18 plugins, and nothing refused to start.
-- The probe on Denise's deployed config then showed the gap `4b63e78` closes, and its `apply` named her telegram plugin at 13:14.
-  Her gateway reloaded that in process, restarting only its Telegram channel, in under a second.
-- After that, the probe on each gateway's deployed config and installed plugins delivered one voice note to the right chat in all four fresh and queued, private and family turns, kept all 40 tools, and returned the group's history, with the same denials as before.
-- Each Telegram channel probe answered ok, and SIQsermon's four containers kept their start times.
-- The configs from before are `openclaw.json.pre-family-group-20261013T130442Z` beside Corey's and `openclaw.json.pre-family-group-20261013T130734Z` beside Denise's, and the plugin code from before is in `/var/backups/household-plugins-20261013T1305Z`.
-- **No real voice note has been made, and no real history read, since the change.**
-  Both need a person in a chat: ask an assistant to say something out loud, and ask it what was said earlier in the group.
-  Each person's first private message after the change starts a fresh isolated session.
-
-#### Bringing family history and the voice fix to the box, one gateway at a time
-
-Both gateways load household plugins from the one shared mount, and a gateway keeps the plugin code it loaded until it restarts.
-So each gateway takes its config first, which the plugin code it already runs works with, and then the new code with its own restart, Corey first.
-`openclaw-install.sh` is not used here, because it restarts both gateways at once when plugin code changes.
-As root on the box, from a copy of main with this change:
+`scripts/openclaw-speech.py` says, from each gateway's config, whether anything still speaks a reply nobody asked for:
 
 ```
-stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-
-# 1. Corey's config: validate, then write, each script saving the config it replaces.
-python3 scripts/openclaw-family-group.py apply --gateway corey --dry-run
-python3 scripts/openclaw-speech.py apply --gateway corey --dry-run
-python3 scripts/openclaw-family-group.py apply --gateway corey
-python3 scripts/openclaw-speech.py apply --gateway corey
-
-# 2. Keep the plugin code both gateways run now, put the two changed plugins in the mount,
-#    and restart Corey onto them.
-install -d -m 0700 "/var/backups/household-plugins-${stamp}"
-cp -a /opt/household-assistant/plugins/household-family-room /opt/household-assistant/plugins/household-speech \
-  "/var/backups/household-plugins-${stamp}/"
-for plugin in household-family-room household-speech
-do
-  install -o root -g root -m 0644 deploy/openclaw/plugins/${plugin}/* "/opt/household-assistant/plugins/${plugin}/"
-done
-docker restart openclaw-gateway
-scripts/openclaw-verify.sh
-
-# 3. Denise the same way, only once Corey's checks pass.
-python3 scripts/openclaw-family-group.py apply --gateway denise
-python3 scripts/openclaw-speech.py apply --gateway denise
-docker restart openclaw-denise
-CT=openclaw-denise PORT=18790 STATE=/var/lib/household-assistant/openclaw-denise scripts/openclaw-verify.sh
+python3 scripts/openclaw-speech.py check            # read-only: both gateways side by side
+python3 scripts/openclaw-speech.py apply --dry-run  # both gateways validate the patch; nothing written
+python3 scripts/openclaw-speech.py apply            # back up each config, write both, then check both
 ```
 
-Denise keeps the plugin code she loaded before step 2 until her own restart.
-Were she to restart early, the new code would refuse `speak` under her old config and offer no history tool, until step 3.
+- `check` prints each gateway's daily ceiling and its verdict: `speech only when someone asks for it`, or each thing that could still speak unasked or unbounded, which is automatic speech anywhere in the config, a stored switch that speaks, `tts` or `speak` in `tools.alsoAllow`, or the retired household-speech plugin in `plugins.entries`, `plugins.load.paths` or `plugins.allow`.
+- `apply` takes household-speech's entry, load path and allow entry out, and `speak` and `tts` out of `tools.alsoAllow`, and nothing else; `--gateway` writes one gateway.
+  It refuses until household-app's speech guard is in the plugin mount, so `/tts` is answered once the old plugin goes.
+  It leaves automatic speech and a stored switch for a person, because speech on request is the Overlord's rule to change.
+  Each config it replaces is kept beside the live one as `openclaw.json.pre-speech-<UTC stamp>`.
+- `openclaw-verify.sh` runs the same verdict on its `spoken replies` line, under "nothing speaks a reply unasked".
 
-To roll one gateway back, restore the first config the scripts saved for it, which is the one from before either change: each `apply` prints the path of the config it replaced, and one that had nothing to write saves none.
-Then restart that gateway:
+From 10 October each workspace's `AGENTS.md` carried a `**Speaking out loud:**` line under "Local notes" naming `speak`; no script writes `AGENTS.md`, and the guard refuses the tool whatever that line says.
 
-```
-docker exec openclaw-gateway cp /home/node/.openclaw/openclaw.json.pre-family-group-<stamp> /home/node/.openclaw/openclaw.json
-docker restart openclaw-gateway
-```
-
-The plugin code from before is in `/var/backups/household-plugins-<stamp>`.
-Copy it back with `cp -a /var/backups/household-plugins-<stamp>/. /opt/household-assistant/plugins/` while Denise still runs the old code, or when rolling both back, and restart whichever gateway should load it.
-
-#### Bringing the speech plugin to the box
-
-As root on the box, from a copy of main with this change, after a backup.
-`openclaw-install.sh` restarts both gateways because the plugin code changed, and naming a plugin makes a gateway restart itself in process, as it did for household-family-room.
-No step touches SIQsermon.
-
-```
-# 1. The plugin's files, root-owned, into the read-only mount. Restarts both gateways.
-scripts/openclaw-install.sh
-
-# 2. The plugin, its ceilings, and `speak` in place of `tts`, on both gateways.
-python3 scripts/openclaw-speech.py apply --dry-run   # both gateways validate the patch, nothing is written
-python3 scripts/openclaw-speech.py apply             # backs up each config, writes both, then checks both
-
-# 3. The rule each assistant reads names the tool, so it changes with it.
-stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-for state in openclaw openclaw-denise
-do
-  notes="/var/lib/household-assistant/${state}/workspace/AGENTS.md"
-  install -D -m 0600 "${notes}" "/var/backups/household-agents-md-${stamp}/${state}.md"
-  sed -i '/^\*\*Speaking out loud:\*\*/ s/`tts`/`speak`/g' "${notes}"
-  chown 1000:1000 "${notes}"
-done
-
-# 4. The plugin writes "not started" to the log when it refuses its config. No such line should be here.
-docker logs --since 10m openclaw-gateway 2>&1 | grep household-speech
-docker logs --since 10m openclaw-denise 2>&1 | grep household-speech
-
-# 5. Both gateways, end to end.
-scripts/openclaw-verify.sh
-CT=openclaw-denise PORT=18790 STATE=/var/lib/household-assistant/openclaw-denise scripts/openclaw-verify.sh
-```
-
-Then, in a chat with either assistant, which only its owner can do:
-
-1. `/tts status` answers with the day's count and both ceilings, which is what shows the running gateway loaded the plugin.
-2. Ask for a long answer, then for it to be spoken.
-   The voice notes arrive in order, captioned `1 of 3` and so on, and the written reply arrives once.
-3. `/tts latest` then speaks the last reply by the same rules.
-
-A spoken reply of 2,000 characters costs four cents.
-
-#### Switching the speech plugin off
-
-`apply` leaves each previous config beside the live one as `openclaw.json.pre-speech-<UTC stamp>`.
-Restore it the way [the family group's rollback](#rolling-it-back-1) does, and put the `AGENTS.md` line back from its copy under `/var/backups`.
-
-To switch only the plugin off on one gateway and hand OpenClaw's own tool back:
-
-```
-docker exec openclaw-denise node dist/index.js config set plugins.entries.household-speech.enabled false --strict-json
-docker exec openclaw-denise node dist/index.js config set tools.alsoAllow '["tts"]' --strict-json
-```
-
-The built-in `/tts` answers again from then on, with none of the rules.
-`check` and `openclaw-verify.sh` fail that gateway until `apply` turns the plugin back on.
-
-The configs from before any speech was set up sit beside the live ones as `openclaw.json.pre-voice-20261009T221312Z`, and the two `AGENTS.md` files as they were are in `/var/backups/household-agents-md-20261009T224600Z`.
+**Before the app, the household-speech plugin spoke replies as Telegram voice notes.**
+It was written after one spoken reply on 10 October reached the Overlord's chat as three unlabelled voice notes with its summary sent twice, and from then until Telegram was retired it handed the model a `speak` tool in place of `tts`, sent a long reply as numbered voice notes and held each assistant to 8,000 characters a reply and 25,000 a day.
+It was removed with Telegram, the one channel its voice notes went to, and household-app's guard took over `/tts`.
 
 ### Pictures and videos
 
 **Both assistants make a picture or a short video only when asked, through OpenRouter, and each person's pictures and videos have a daily limit on each gateway.**
 On 17 October the Overlord asked for pictures in the Steward app, OpenRouter's GPT image model by default, and pickers for the text, image and video models in Settings.
 OpenClaw's own `image_generate` and `video_generate` already reached OpenRouter, but its provider drops the `usage.cost` each answer carries, its request names nobody, and the model chooses the model and the count, so nothing could hold a day's spend.
-The household-pictures plugin replaces both, the way household-speech replaced `tts`, and `openclaw-pictures.py apply` hands it to both gateways.
+The household-pictures plugin replaces both, and `openclaw-pictures.py apply` hands it to both gateways.
 
 | setting | before | after `openclaw-pictures.py apply` |
 |---|---|---|
 | `tools.alsoAllow` | no `picture` or `video` | `picture` and `video` added |
 | `tools.deny` | `codex`, `memory-wiki`, `onepassword` | `image_generate` and `video_generate` added |
 | `plugins.entries.household-pictures.config` | not set | `pictureDayDollars` `2`, `videoDayDollars` `3` |
-| The Fam's `tools.allow` and `channels.household.familyTools` | `image_generate` and `video_generate` among them | `picture` and `video` in their place (`pocket-piggies-install.py`, then `openclaw-household-app.py apply`) |
+| the family room's list, `channels.household.familyTools` | `image_generate` and `video_generate` among them | `picture` and `video` in their place (`pocket-piggies-install.py`, then `openclaw-household-app.py apply`) |
 | `agents.defaults.mediaModels.image` | `openrouter/openai/gpt-5.4-image-2` | `openrouter/openai/gpt-image-2.5-flare`, or the model picked in Settings |
 
 - `picture` makes one picture from the model's description, with the photos a person sent to change or build on, by the image model chosen in Settings.
-  The plugin sends it to the chat itself: the app keeps it in the room at full size with its width and height, and Telegram sends it as a photo.
+  The plugin sends it to the chat itself, and the app keeps it in the room at full size with its width and height.
   The tool's result is one line of text, so the model is handed no picture.
 - `video` starts a job with the video model chosen in Settings and answers at once.
   The plugin asks OpenRouter every 5 seconds, for at most 15 minutes, and sends the video to the chat when it is made.
   A video still being made when the gateway restarts is lost.
 - Each one's cost is OpenRouter's own `usage.cost`, kept for 62 days in `household-pictures/ledger.json` under the state directory and logged with who asked, never with what was asked for.
   Each assistant's line on the Spend page counts this month's total from that file.
-- A person is counted by their app id, `franco` or `gia`, the owner on Telegram too, and anyone else in The Fam by their Telegram id.
+- A person is counted by their app id, `franco` or `gia`.
 - Past a person's day's limit the tool refuses in plain words.
   A video whose listed price would pass it is refused before it starts.
   A picture whose cost OpenRouter did not report closes that person's day, since spend that cannot be counted must not read as none.
-- Only a person's turn in the app's two conversations, in The Fam or in the owner's Telegram DM gets either tool, the rule `speak` keeps.
+- Only a person's turn in the app gets either tool: in the family room, for its two people, and in the owner's own thread, the turns `family_history` answers in.
+  A scheduled run, a sub-agent or a gateway client gets neither.
 - Settings lists the image models from `/api/v1/models?output_modalities=image` and the video models from `/api/v1/videos/models`, each read at most once an hour, and writes a pick to `agents.defaults.mediaModels`.
   `openclaw-openrouter.py apply` keeps a model picked there and names its default only for a slot with no OpenRouter model.
   Each row shows the model's price in the unit OpenRouter bills it by.
@@ -1238,8 +980,8 @@ The household-pictures plugin replaces both, the way household-speech replaced `
   A model OpenRouter gives no price for says so.
 - `openclaw-verify.sh` checks the plugin, its limits and both tool lists in its `pictures and videos` line.
 
-PocketPiggies' plugin refuses finance when a family group's tool list names a tool its safe list lacks, and its guard rewrites The Fam's list on both gateways from the installed installer.
-So the new list reaches each gateway together with PocketPiggies code that knows `picture` and `video`, and each gateway is restarted onto that code straight after.
+PocketPiggies' plugin refuses finance when the family room's tool list names a tool its safe list lacks, and its guard rewrites the room's list on both gateways from the installed installer.
+So the new list reached each gateway together with PocketPiggies code that knows `picture` and `video`, and each gateway was restarted onto that code straight after.
 
 ### Before the OpenRouter migration: Codex first, OpenRouter behind it
 
@@ -1297,7 +1039,7 @@ From 19 September she answered on `openrouter/z-ai/glm-5.3-flash`, with the free
 The free model was her primary until it was measured answering scripture from memory; see [It only works on a model that honours the skill catalog](#it-only-works-on-a-model-that-honours-the-skill-catalog).
 After the migration, she and Corey use the policy in [The model backend](#the-model-backend).
 Gia's Yahoo mailbox is connected read-only through the bundled `himalaya` skill: its account config lives at `/var/lib/household-assistant/openclaw-denise-himalaya/config.toml` (mounted at `~/.config/himalaya`), the app password is `YAHOO_APP_PASSWORD_GIA` in her env file read through `backend.auth.cmd`, and no send backend is configured on purpose.
-Her Telegram setup is covered in [The channels](#the-channels).
+Gia reaches her through the Steward app, as Franco reaches Corey; see [The channels](#the-channels).
 
 ---
 
@@ -1343,7 +1085,7 @@ The card still names the translation of its text, so a card with BSB verses can 
 
 ### In the family room
 
-`scripture` is on The Fam's tool list and the family room's, and on PocketPiggies' list of tools safe in a group, so a Bible question in the room gets the Bible too.
+`scripture` is on the family room's tool list, `FAMILY_TOOLS` in `openclaw-household-app.py`, and on PocketPiggies' list of tools safe in a group, so a Bible question in the room gets the Bible too.
 The SIQsermon skill could not do that: it ran a script, and the room has no shell.
 
 ### Retiring SIQsermon
@@ -1411,7 +1153,7 @@ Two tokens issued the same day and both dead three weeks later is what a consent
 If that is the cause, publishing the app is what stops it recurring.
 
 Authorizing again is the account owner's to do; see [What only the Overlord can finish](#what-only-the-overlord-can-finish).
-Corey's workshop skill `google-oauth-headless` records the listener flow dying four times on 3 and 4 October, because `gog` gives up after a few minutes and a callback pasted through Telegram arrives late.
+Corey's workshop skill `google-oauth-headless` records the listener flow dying four times on 3 and 4 October, because `gog` gives up after a few minutes and a callback pasted through Telegram arrived late.
 `gog auth add` also has a two-step form with no listener to outlive, which has not been run here:
 
 ```
@@ -1463,300 +1205,24 @@ A typed sign-in from the phone (iCloud, Email) goes the same way, into the env n
 
 ## The channels
 
-**Telegram, two bots: `@Corey_the_man_bot` and `@Denise_the_woman_bot`.**
-Corey's token lives in `/etc/household-assistant/openclaw.env` as `TELEGRAM_BOT_TOKEN_COREY`, and `openclaw.json` holds only an env reference to it, the same shape as the gateway token:
-
-```
-docker exec openclaw-gateway node dist/index.js config set channels.telegram.botToken \
-  --ref-provider default --ref-source env --ref-id TELEGRAM_BOT_TOKEN_COREY
-```
-
-`channels add --channel telegram --token <token>` writes the token as a literal into the config; run the `config set` above straight after it, or the plaintext stays there.
-Any bot token that has ever been pasted into a chat window should be revoked in BotFather and reissued.
-
-Direct messages are pairing-gated.
-The first message from a new sender gets a pairing code back and no reply; approve it on the box with `pairing approve telegram <code>`.
-The first approval also becomes the command owner (`commands.ownerAllowFrom`), which is the Overlord's Telegram account as of 18 September.
-
-Denise's token also uses an env reference, backed by her own env file, as confirmed on 5 October.
-`python3 scripts/openclaw-family-group.py check` describes each bot's token source without printing either token.
-
-A pairing lets a person DM the bot and nothing else.
-Who may talk to a bot in a group is a separate setting, and [The family group](#the-family-group) is where it is set.
-
----
-
-## The family group
-
-The Fam is the Telegram group with Franco, Gia and both bots in it, chat id `-5100000001`.
-On 5 October the Overlord reported that Denise was not answering there, and that she does not communicate as well as Corey.
-Those are two problems.
-The sections below were written before the box could be reached, and [What the box showed on 5 October](#what-the-box-showed-on-5-october) is what it turned out to be.
-
-### A gateway drops a group message it was not told about, and says nothing
-
-A group message reaches the agent only when all three of these hold on the gateway that received it.
-They were read out of the 2026.9.4 source the compose file pins:
-
-1. **The group is allowed.**
-   The channel's `groupPolicy` is `allowlist` unless it is set otherwise, and under it the group must be listed in `channels.telegram.groups`, by its chat id or by `"*"`.
-   Access settings come from the exact chat-id entry when present, otherwise from `groups.*`; an effective `enabled: false` or `groupPolicy: "disabled"` blocks the group.
-2. **The sender is allowed by the group's sender rules.**
-   The sender list is the selected entry's `allowFrom`, else `channels.telegram.groupAllowFrom`, else `channels.telegram.allowFrom`.
-   An explicit empty `allowFrom` on the selected group entry blocks everyone.
-   Under `groupPolicy: "allowlist"`, no effective sender entries lets everyone through only when the group is listed by its exact id; a wildcard-only group lets nobody through.
-   A DM pairing approval is on none of them: OpenClaw stopped counting pairings for groups in 2026.2.25, so a bot can answer someone's DMs and still ignore them in the group.
-3. **The message mentions the bot**, by its @handle, by its name, or as a reply to it, because `requireMention` is on unless a group turns it off.
-   A session's `/activation always` override can bypass the mention requirement and is not visible to the script's config checks.
-
-A message that fails the first or the second is dropped before any model sees it.
-At the log level the gateways run at, nothing about the drop reaches `docker logs`.
-A group missing from the list leaves a `skipping group message` line per message, reason `not-allowed`, in the gateway's own file log, `/tmp/openclaw/` inside the container by default, and a sender missing from the list leaves nothing anywhere.
-So the assistant just looks like it is ignoring people.
-
-Each way Denise's channel could plausibly have been set up was run through the pinned gateway on 5 October, against a fake Telegram Bot API and a fake model, with an @mention from each person:
-
-| how the channel was set up | Franco | Gia |
-|---|---|---|
-| a bot token, then Gia's DM pairing approved, which is all this runbook did for Corey's bot | dropped, `not-allowed` | dropped, `not-allowed`; her DMs were answered |
-| the setup wizard's default, `groups: {"*": {"requireMention": true}}`, with the same pairing | dropped, no sender list | dropped, no sender list |
-| the setup wizard's wildcard group plus a DM allowlist of Gia alone, `allowFrom: ["<Gia>"]` | dropped, not on the list | answered |
-| the entry below | answered | answered |
-
-Every one of the first three reads as "Denise is not responding" from Franco's side of the group.
-
-### What the box showed on 5 October
-
-Once the box was reachable, both gateways turned out to be on the same setting, and it was none of the rows above.
-Each listed The Fam by its chat id with an empty `groupAllowFrom`, which lets every member of the group through.
-Both bots had Telegram privacy mode off, and both tokens were env references.
-Denise had answered in the group on 20 and 26 September.
-
-Her silence was two things no group setting could change:
-
-- The group messages before the report did not address her, so her gateway skipped them, reason `no-mention` in its file log. One of them named Corey only, and Corey answered it.
-- Corey posted into The Fam on Franco's behalf, and Telegram never delivers one bot's messages to another bot. Nothing Corey says in the group can reach Denise; exchanges between the two go through the coordination relay.
-
-With no `mentionPatterns` configured, 2026.9.4 derives them from the agent's identity, so her name, her identity emoji, her @handle and a reply to one of her messages each count as addressing her.
-`apply` was run that afternoon.
-It narrowed both gateways from every member of the group to Franco and Gia, and `check` reports both following the policy.
-
-### One entry, the same on both gateways
-
-`scripts/openclaw-family-group.py` holds the policy and applies it:
-
-- The Fam is listed by its chat id on both gateways.
-- On both, its sender list is Franco and Gia, so nobody else in the group can trigger either assistant.
-- On both, a message has to mention the assistant it is for, so the two of them do not both answer everything.
-- On both, a message the assistant skipped still reaches its hooks (`ingest`), and the household-family-room plugin is loaded as described in [Voice notes](#voice-notes) and [Seeing each other in the group](#seeing-each-other-in-the-group).
-
-That is one entry under `channels.telegram.groups` and one under `plugins`, written with `openclaw config patch`, which validates them.
-The gateway hot-reloads the group entry without a restart; naming the plugin the first time makes it restart itself in process, which takes about a second.
-DMs, pairing, other groups and every other setting are left alone, because a sender list on the entry applies to this group only, and a plugin list that already names other plugins keeps them.
-
-Franco, the owner, explicitly authorized both people to address both assistants with their existing private tools in this group.
-This is an exception to the Phase 1 household service's group capability restrictions, not a change to those restrictions.
-**The cost is that a group turn runs on the addressed gateway with that gateway's tools.**
-Gia asking Corey in the group gets Corey with Franco's integrations, Franco asking Denise gets Denise with Gia's mailbox, and the answer lands in the group where both of them read it.
-To have each assistant answer only its own person instead, change `GROUP_SENDERS` in the script, commit, and apply again.
-
-As root on the box, from a checkout:
-
-```
-python3 scripts/openclaw-family-group.py check            # read-only: both gateways side by side
-python3 scripts/openclaw-family-group.py apply --dry-run  # each gateway validates the change; nothing written
-python3 scripts/openclaw-family-group.py apply            # back up each openclaw.json, then write both
-```
-
-`check` prints, for each gateway, the configured admission of an @mention from Franco, from Gia and from a representative outsider, whether a mention is required, the bot's Telegram privacy setting, whether its token is an env reference, its configured primary model, and whether the family-room plugin answers.
-Its verdict also rejects any extra admitted sender IDs in the complete effective sender list and unrestricted sender access.
-It asks Telegram through each gateway's own `channels status --probe`, so no token leaves its container.
-`apply` plans both gateways, validates each needed patch and prepares all backups before writing either live config.
-Naming the plugin for the first time makes each gateway restart itself in process, which takes about a second.
-It refuses, rather than overrides, a gateway whose Telegram channel, group policy or effective entry for The Fam was switched off on purpose, including a wildcard shutdown when no exact entry exists, or whose plugins are switched off or deny this one, and it refuses until `scripts/openclaw-install.sh` has put the plugin on the box.
-Each write shows up as `config hot reload applied (channels.telegram.groups.-5100000001)` in `docker logs` for that container.
-
-`openclaw-verify.sh` uses the same verdict to reject household admission failures, extra admitted senders and a disabled configured mention requirement:
-
-```
-PASS  family group                     ok
-```
-
-On any of the first three rows of the table it fails instead, naming who is dropped and why.
-
-### Rolling it back
-
-`apply` keeps each config it changes beside the live one as `openclaw.json.pre-family-group-<UTC stamp>`, mode 0600, owned like the original.
-If a write or the subsequent config-policy check fails, it attempts to restore every gateway whose write was attempted, in reverse order.
-Each failed restore is reported with the backup path for manual recovery; an incomplete rollback can leave the gateways on different policies.
-Putting it back is a copy, and the gateway hot-reloads that too.
-Make the copy inside the container, as the gateway's own user: the state directory belongs to the assistant, and root copying out of it would follow anything the assistant had swapped in there.
-
-```
-docker exec openclaw-denise cp /home/node/.openclaw/openclaw.json.pre-family-group-<stamp> \
-  /home/node/.openclaw/openclaw.json
-```
-
-Where there was no entry for The Fam before, removing it comes to the same thing:
-
-```
-docker exec openclaw-denise node dist/index.js config unset 'channels.telegram.groups["-5100000001"]'
-```
-
-### What Telegram delivers in the first place
-
-A bot has Telegram's privacy mode on unless BotFather was told otherwise, and Telegram then sends it only @mentions of its handle, replies to its own messages, and commands.
-That is enough for typed messages that use the handle, but "Denise, are you free Friday?" without the handle never reaches her, and neither does any voice note that is not a reply to her.
-A bot with privacy mode off, or one that is an admin of the group, receives every message: it still answers only when addressed, and it also sees the conversation around the question.
-**For voice notes this is not optional, so both bots need privacy mode off.**
-`openclaw-family-group.py check` prints each bot's setting and fails while either is on.
-
-To change it, use `/setprivacy` in BotFather, then remove the bot from The Fam and add it back, because Telegram applies the change only when the bot joins.
-Making a bot an admin instead can upgrade The Fam from a basic group to a supergroup, which gives it a new chat id.
-OpenClaw follows that move in its own config; `familyGroup` in `/etc/household-assistant/household.json`, which the installers and the coordination relay read, has to be changed by hand.
-
-### Voice notes
-
-A voice note has no text, so it can neither @mention a bot nor name one until it is transcribed.
-In a group that needs a mention, OpenClaw transcribes the note first and looks for the assistant's name in the transcript.
-A note that names nobody it then drops, and keeps only `[audio ...]` in the group history in place of the words, so a later turn knows a note was sent and not what it said.
-That is the half the household-family-room plugin closes (below): it transcribes each note its gateway skipped, through the same OpenRouter speech-to-text, and starts the assistant's next turns in the group with what was said.
-A photo or video in the group is dropped the same way when it names nobody, leaving only its caption or `<media:image>`, so the plugin also describes every photo and video a person posts there, through the image model and the household-openrouter-video provider, and keeps the description beside the caption.
-Photos and videos are deduplicated by a SHA-256 hash of their bytes while their records remain in the one-day window.
-A reply quoting already retained media keeps the original sender, caption and timestamp and causes no second description.
-A reply quoting media older than that window or never kept is still described and credited to the person replying.
-The pinned OpenClaw 3a9d69d `message:received` hook carries no reply provenance, so correcting that remaining attribution gap requires an OpenClaw hook contract change.
-
-Run through the pinned gateway on 6 October, with the entry above, OpenRouter transcription, the plugin and a fake Telegram serving the voice files:
-
-| voice note | Denise |
-|---|---|
-| Gia: "Denise, what's for dinner tonight?" | answered |
-| Franco, replying to Denise's message: "And what about dessert?" | answered |
-| Franco: "Can somebody grab milk on the way home?" | not answered, and heard: her next turns in the group began `Franco Marlowe, in a voice note (machine transcript): "Can somebody grab milk on the way home?"` |
-| Gia: "Corey, are you around this weekend?" | not answered; that one is Corey's |
-
-The model received each answered note as `[Audio transcript (machine-generated, untrusted)]: "…"`, with the sender's name and Telegram id beside it.
-
-Five things have to hold on both gateways, and the two scripts check all of them:
-
-1. **Telegram delivers the note**: privacy mode off, above.
-2. **Something transcribes it**: `openclaw-openrouter.py apply` sets OpenRouter's speech-to-text. In the same run without a working transcriber, a note naming Denise was dropped, and a voice reply to her was answered without her hearing a word of it.
-3. **The assistant's name counts as a mention**: OpenClaw takes the name from `agents.entries.main.identity.name` in openclaw.json, and a name that is only in IDENTITY.md does not count. `openclaw-family-group.py apply` adds it where it is missing.
-4. **The group still checks voice notes for the name**: nothing sets `disableAudioPreflight`, and the entry above writes it out as `false`.
-5. **A note that names nobody is still heard**: the entry above sets `ingest: true`, which is what shows OpenClaw's hooks a message it skipped, and the plugin is loaded. Without `ingest` the plugin never sees the note.
-
-OpenClaw's ambient mode (`messages.groupChat.unmentionedInbound: "room_event"`, with mention gating off) was tried first, because it keeps every message as context, and in the same run it heard all four notes.
-It also stops treating a spoken name as a mention.
-Gia's "Denise, what's for dinner tonight?" went unanswered, because in ambient mode a reply to room chatter waits on the model choosing to send one with the message tool.
-On a small fast model that is the wrong trade, so the household stays mention-gated and the plugin supplies what was said.
-
-### Seeing each other in the group
-
-Telegram never delivers one bot's messages to another, so each assistant needs the plugin and relay to see the other's posts:
-
-1. The household-family-room plugin in each gateway records successful Telegram posts through the internal `message:sent` hook, including finalized streamed and progress replies, in `household-family-room/outbox.json` under the gateway's state directory.
-   It keeps only what the assistant said in its own turns in the group: a send with no session, which is how the coordination relay posts a crossing and how the planner posts a proposal, is never kept, so the planner's web-derived venue prose still never reaches the other assistant.
-2. On every tick, the coordination relay (`household/family_room.py`, run by `coordination-daemon.py tick`) reads both files from the host and hands each new post to the other gateway's plugin through `gateway call household-family-room.peer`. It only reaches into a container when there is something new, and how far it has got is kept in `/var/lib/household-assistant/coordination/family-room.json`, root-only.
-3. That assistant's next addressed turns in the group start with selected posts from the previous day, as `Corey, the other household assistant, posted: "…"`, alongside retained group media in chronological order and before the person's message.
-
-A turn is handed at most thirty of these, from the last day.
-Past that, the other assistant's oldest posts are left out before any voice note, photo or video, in what is kept as well as in what a turn is shown, because this plugin preserves what skipped media conveyed.
-
-Run through two pinned gateways on 6 October, joined by the relay's own code: Gia asked Corey to grab milk and only Corey answered; Gia then asked Denise whether anyone was getting milk, and Denise's turn began with Corey's answer; Franco asked Corey what Denise had said, and Corey's turn began with hers.
-
-An ordinary post starts no turn: the other assistant only reads it when a person next addresses it in the group.
-
-**An @mention hands a request over, once** (household decision of 15 October).
-When a request in the group is the other assistant's to answer, the assistant says so and @mentions the other, as `@Denise_the_woman_bot` or `@Denise` (and `@Corey_the_man_bot` or `@Corey` the other way).
-Once the relay has handed that post over, it starts one turn of the other assistant with it (`DockerPeerHandover` in `household/family_room.py`):
-
-- The turn runs in the group's own session, `agent:main:telegram:group:<id>`, through `openclaw agent --deliver --reply-channel telegram --reply-to <id>`, so its answer is posted in the group by that assistant's own bot.
-- OpenClaw 2026.9.4 resolves a run's group tool policy from its session key (`resolveGroupToolPolicy`), so the turn has The Fam's allowlist and nothing else: no shell, no files, no finance.
-- Only the latest fresh post that mentions the other assistant is handed over, at most ten minutes old, and only once: a handover that fails to start is reported and not tried again.
-- An assistant that was handed something in the last ten minutes hands nothing on, so the two can never pass a request back and forth. Every handover therefore follows a post from a turn a person started.
-- `!coordination off` stops it with the rest of the handover.
-
-People @mention either assistant as before.
-Each assistant's `AGENTS.md` says when to @mention the other.
-`!coordination off` pauses the handover, and what is said while it is off is skipped rather than delivered later.
-The relay reads the group again just before each assistant's posts are handed over, as it does before a crossing, so a switch pulled in the middle of a tick stops the rest of it.
-To ask the other assistant something and get an answer, the `coordinate` skill is still the way; [the coordination design](../plan/coordination-between-assistants.md#each-sees-what-the-other-said-in-the-group) says what this path can and cannot carry.
-
-The plugin is code that runs inside the gateway, so its files are not in the assistant's own state directory.
-`scripts/openclaw-install.sh` copies `deploy/openclaw/plugins/` to `/opt/household-assistant/plugins/`, root-owned, and the compose file mounts that read-only at `/opt/household-plugins` in both containers.
-It does that through `scripts/install-household-plugins.sh`, which replaces each household plugin the repository ships and touches nothing else there.
-`pocket-piggies-corey` and `pocket-piggies-denise` are copies `scripts/pocket-piggies-install.py` makes in the same mount, so until 14 October, when the install still emptied the whole mount, running it would have deleted both.
-`openclaw-family-group.py apply` then names it in each openclaw.json, and each gateway restarts itself in process within about a second to load it.
-The same directory holds household-openrouter-video, which `openclaw-openrouter.py apply` names, and which `apply` refuses to name until the installer has put it there.
-`apply` adds household-openrouter-video to an existing `plugins.allow` list while keeping its other entries.
-It preserves video plugin policy blocks from `plugins.enabled` and `plugins.deny`.
-`check` and `verdict` also report an allow list that excludes the video plugin before apply merges it.
-The apply plan reports any remaining blocks for the operator to resolve.
-It also holds household-speech, which `openclaw-speech.py apply` names, see [Speaking](#speaking).
-`openclaw-family-group.py check` asks each gateway's family-room plugin to keep nothing, which is how it tells a loaded plugin from a configured one.
-
-### Reading the group's earlier messages
-
-A turn sees only its own session's recent history and the thirty relayed posts above, so an assistant asked about something said earlier in the group could not find it.
-The family-room plugin's `family_history` tool reads the group's retained messages a page at a time, oldest first.
-
-- It answers in the family group, or in a family member's own private chat, for the people listed in the group's `allowFrom`.
-  It checks that the turn's Telegram chat, its delivery target and its session all name the same place, so a web chat, a CLI run, the shared main session or another group gets no tool.
-  It checks membership again on every read.
-- It answers the same way in the household app's family room, for that room's two people, and in the app owner's own thread.
-  The app names no chat of its own, so there its delivery target and session must name the same place.
-- The family's history is The Fam and the app's family room together, oldest first, and an app message counts only when one of the room's two people sent it.
-- The database and the group are fixed by the gateway; the model chooses only the page size, up to 50, and where to start.
-- It reads only transcripts that belong to the group alone, so a private chat, or a session that was ever joined to a private chat, is never read.
-- Each page holds the visible words people and the assistant wrote, with a placeholder for media.
-  OpenClaw's own history cleaning takes out the assistant's reasoning and tool calls.
-  Text the assistant wrote beside a tool call narrates the call rather than answering, so it is left out unless the model marked it as its final answer.
-- `source: "room"` reads the plugin's own record of the other assistant's posts and what media showed, which keeps the last 24 hours and at most 120 entries.
-- Each page says where the next one starts and when the oldest retained message is from.
-  Messages the gateway never received, or that it pruned or archived, are not there to read.
-
-`openclaw-family-group.py apply` hands the tool over through `tools.alsoAllow` and keeps DMs per sender and groups per group, which is how the tool tells a member's own chat from a shared one; see [why `speak` said there was no chat](#why-speak-said-there-was-no-chat-13-october) for what that changes.
-
-To turn the family-room plugin off on one gateway, as root:
-
-```
-docker exec openclaw-denise node dist/index.js config set 'plugins.entries.household-family-room.enabled' false --strict-json
-```
-
-`check` and `openclaw-verify.sh` will then fail that gateway until `apply` turns it back on.
-
-### Why she reads as weaker even when she answers
-
-Until the move to OpenRouter, Corey answered in the group on `openai/gpt-5.6-luna` through Codex, and Denise on `openrouter/z-ai/glm-5.3-flash`, a small fast model.
-The heartbeat measurement below is a fair picture of that gap: told to stay silent unless there was something to say, none of the 142 heartbeat turns Corey ran on Codex broke it, while on `glm-5.3-flash` at least 12 of Corey's 45 and 28 of Denise's 45 did.
-A group turn is that same kind of judgement, when to speak, how much and to whom, so no group setting closes it; only the model does.
-
-`openclaw-openrouter.py` puts both on one chain, so neither is the weaker one by configuration any more.
-That chain starts on the same small fast model, though, so the two are now equally quick and equally loose.
-To make one stronger, its person picks a larger model in the app's Settings, `z-ai/glm-5.3` for instance at $0.91 / $2.86 per million tokens against the flash model's $0.09 / $0.30.
-`apply` keeps any OpenRouter primary a gateway already has, so `CHAT_PRIMARY` is the primary only for a gateway whose primary is not on OpenRouter.
-
-**Since 17 October each person also picks their own assistant's second and third text models in the app (Settings, Model, Second and Third), and the gateway answers with them in that order when the one before fails.**
-- The phone signs `model.fallback.1` or `model.fallback.2` with a model id from the same OpenRouter list as the first, or an empty value for none, and the gateway writes them as `agents.defaults.model.fallbacks` and reads them back (`settings.js`).
-  A cleared second lets the third move up, a model already in the chain is refused, and a fallback picked as the first leaves the fallbacks.
-- `apply` keeps those fallbacks when each is a distinct model on OpenRouter's list and none is the primary; anything else gets the household's `CHAT_FALLBACKS` back, so a model OpenRouter delists is still repaired, and `check` and `verdict` report a delisted one.
-- OpenClaw tries the fallbacks only for a session that follows the configured chain.
-  A session pinned to a model with `/model`, a model picker or `sessions.patch` (`modelOverrideSource: user`) answers on that model alone, with no fallback and no Settings choice.
-  On 17 October Corey's main session and five reminder sessions carried such a pin to GLM 5.3 Flash, left from the move off Codex, and the rollout of the second and third models cleared them with `sessions.patch` and a null model; Denise had none.
-  `openclaw-openrouter.py check` lists any pin under `pinned`.
-- Proved on Corey's container with `openclaw agent exec --config <a temporary copy>` and isolated state, no channel and nothing delivered: with the first model unknown, the second answered; with the first two unknown, the third answered.
-  Run it with `OPENCLAW_CONFIG_PATH` set to the copy as well, or its log lines land in the gateway's own log file.
-That is the Overlord's call, and until item 3 it bills SIQsermon's key on every turn.
+**The Steward app is the household's only channel: the household-app plugin's `household` channel, on both gateways.**
+Franco talks to Corey and Gia to Denise in their own threads, and the four of them share the family room, The Fam; [The household app's family room](#the-household-apps-family-room) is how it works, and a phone pairs as [Pairing a phone](#pairing-a-phone) says.
+Each person is the owner only on their own gateway, as `household:<person>` in `commands.ownerAllowFrom`.
+No other chat channel is configured, and on both gateways the PocketPiggies guard switches one off again if it is ever switched on ([Who can reach finance](pocket-piggies.md#who-can-reach-finance)).
+
+Telegram was the household's first channel, with a bot for each assistant and The Fam as a Telegram group, until the app replaced it.
+`openclaw-household-app.py apply` deletes what it left in a gateway's config: `channels.telegram` with its bot token, the telegram plugin's entry, `telegram:` owners in `commands.ownerAllowFrom`, and the family-room and job-mirror plugins.
+Its `check`, and the `household app` line of `openclaw-verify.sh`, fail while any of that remains.
+[Retiring Telegram](retiring-telegram.md) has the order on the box, one gateway at a time, what is left to remove by hand, and how to roll it back.
 
 ---
 
 ## The household app's family room
 
-The Steward AI app is its own OpenClaw channel, `household`, so the family can talk to Corey and Denise without Telegram.
-It carries two conversations on each gateway: the family room, which Franco, Gia, Corey and Denise share, and each person's own thread with their assistant.
-The Telegram group and its plugins keep working beside it until Telegram is turned off.
-An assistant's post to the family lands in the app's family room first, and Telegram gets the same words after it, as [A post to The Fam goes to the app first](#a-post-to-the-fam-goes-to-the-app-first) says.
+The Steward AI app is its own OpenClaw channel, `household`, and the household's only one.
+It carries two conversations on each gateway: the family room, The Fam, which Franco, Gia, Corey and Denise share, and each person's own thread with their assistant.
+An assistant's post to the family lands in the family room, as [A post to The Fam goes to the family room](#a-post-to-the-fam-goes-to-the-family-room) says.
+How Telegram was taken off both gateways, and what is left of it to remove by hand, is in [Retiring Telegram](retiring-telegram.md).
 
 ### How it works
 
@@ -1766,11 +1232,11 @@ An assistant's post to the family lands in the app's family room first, and Tele
 - A reply that carries a file, such as a chart or a PDF the assistant made, is handed to the channel as soon as the assistant writes it: OpenClaw sends it as a block even with block streaming off, or as a tool's result, and leaves it out of the final that follows.
   The channel keeps a block as a reply like the final, a tool's result only when it carries a file, and never posts the same file twice in one turn.
   Until 22 October it kept finals only, so such a reply was lost whole, words and file, with nothing in any log: OpenClaw reports a delivery that answers nothing only at verbose level.
-- A turn in the app is a channel turn like a Telegram one: it carries who sent it, the family room's last twenty messages as group history, and the tools the same turn has on Telegram, as [What a family-room turn may use](#what-a-family-room-turn-may-use) says.
+- A turn in the app is an ordinary channel turn: it carries who sent it, the family room's last twenty messages as group history, and the tools [What a family-room turn may use](#what-a-family-room-turn-may-use) gives it.
   In the family room an assistant answers only when a message names it, by name or emoji, or replies to one of its messages, and a voice note is heard first to find out, as [Voice notes in the app](#voice-notes-in-the-app) says.
-- One assistant hands a request to the other by @mentioning it in the family room, `@Corey` or `@Denise`, the way PR 92 does in The Fam.
-  The @mention, matched by `mentions.js` against the family room's name and the agent's own, starts one family-room turn with The Fam's tools, whose sender is the other assistant, never a person, so PocketPiggies, the owner's thread and `household_location` stay out of reach.
-  An assistant's Telegram bot counts as its name, so `@Denise_the_woman_bot` mentions Denise, and whatever an assistant writes in the app says `@Denise` in its place, the mention a person's @ writes (`withAppMentions`): on 19 October Corey wrote the bot in the family room, which each assistant learned to write in The Fam, and the phones showed it as written.
+- One assistant hands a request to the other by @mentioning it in the family room, `@Corey` or `@Denise`.
+  The @mention, matched by `mentions.js` against the family room's name and the agent's own, starts one family-room turn with the family room's tools, whose sender is the other assistant, never a person, so PocketPiggies, the owner's thread and `household_location` stay out of reach.
+  An assistant's old Telegram bot name still counts as its name, so `@Denise_the_woman_bot` mentions Denise, and whatever an assistant writes in the app says `@Denise` in its place, the mention a person's @ writes (`withAppMentions`): on 19 October Corey wrote the bot's name in the family room, which each assistant had learned to write on Telegram, and the phones showed it as written.
   The phones draw a bot written before that as `@Denise` too.
   Every family-room message such a turn writes is marked `handedOver`, its reply and a tool's post alike: the turn names each run OpenClaw starts for it, and the tool hooks say which run each tool call is.
   The relay carries the mark, and a marked message never starts a turn; nor does one ten minutes old or older, and one message starts at most one turn however often it arrives, so the two cannot answer each other in a loop.
@@ -1839,85 +1305,49 @@ A person's voice note in the app is heard once, on each gateway that answers to 
   `add` with rows answers `logged` ("3 rows under "Kitten weights", Wed, Oct 21"), and the cart's list answers `logged` ("3 items in the cart").
   It is an instruction and two tool fields: no model call or wait is added to the turn.
 
-### A post to The Fam goes to the app first
+### Reading the family room's earlier messages
+
+A family-room turn carries only the room's last twenty messages, so an assistant asked about something said earlier in the room could not find it.
+household-app's `family_history` tool (`family-history.js`) reads the room's retained messages a page at a time, oldest first.
+
+- It answers only a turn of one of the room's two people: in the family room, in its shared session or the owner's own session of it, and in the owner's own thread.
+  The app names no chat of its own, so the turn's delivery target and its session must name the same place, and a web chat, a CLI run, a scheduled run or any other session gets no tool.
+  It checks again on every read.
+- It reads the family room's own messages in `household-app/room.sqlite`, every one, including those that never addressed an assistant, and never a private thread.
+  A voice note reads as the words the gateway saved for it ([Voice notes in the app](#voice-notes-in-the-app)); the tool never opens or transcribes audio, and a note with no saved words says so.
+  A photo, a video or a file is a placeholder.
+- It is read-only, and the database and the room are fixed by the gateway; the model chooses only the page size, up to 50, and where to start.
+  A page holds at most 2,000 characters of each message and about 20 KB in all.
+- Each page says where the next one starts and when the oldest retained message is from.
+- `openclaw-household-app.py apply` hands the tool over through `tools.alsoAllow` and keeps DMs per sender and groups per group, which is how the tool tells the owner's own thread from the room.
+
+It moved here from the household-family-room plugin when Telegram was retired, keeping its name and its bounds; The Fam's Telegram transcript and that plugin's 24-hour record of the other assistant's posts went with Telegram.
+
+### A post to The Fam goes to the family room
 
 On 17 October Denise posted to The Fam with `conversations_send` from a turn in Gia's own app thread, and the app never showed it, because nothing copied a Telegram post into the family room.
-The family room is now the first home of such a post, and Telegram, while the household still uses it, gets the same words after the room has them.
+Now the family room is the only place a post to the family goes (`family-posts.js`):
 
-- household-app's `before_tool_call` hook (`family-posts.js`) sees each call to `conversations_send` and `message` before it runs, from any session.
-  A call that posts words to The Fam is kept as this assistant's family-room message, through the same send the channel uses for anything the assistant posts there on its own.
-  That pushes the owner's phones under the family thread, and the relay carries the message to the other gateway, which keeps it and pushes its own owner's phones.
-  The tool then runs as before and sends Telegram the same words.
-- In the room it is any other post of this assistant's: one that @mentions the other assistant hands it a request, and one a handed-over turn makes is marked `handedOver` and starts nothing.
-- A call posts to The Fam when `conversations_send` names The Fam's `conversationRef`, or when `message` with the `send` or `broadcast` action sends on Telegram to The Fam's chat id, bare or after `telegram:`, `tg:` or `group:`.
-  Telegram means `channel: "telegram"`, or no channel from a turn in a Telegram session, since OpenClaw then sends on the session's own channel; from an app turn a send that names no channel would fail, so the room keeps nothing for it.
-  The target is the one the tool sends to, the first of `target`, `to` and `channelId` that holds anything (`resolveMessageToolTarget`), or each of a broadcast's `targets`, so The Fam named in a field the tool does not use posts nothing.
-- `conversations_turn` is left alone: it hands The Fam a turn's input rather than posting it, and what reaches the group is the reply.
-- The Fam's chat id is household-family-room's `groupChatId`, which household-pictures and household-speech read the same way.
-  On a gateway where that plugin is not switched on, a post reaches Telegram alone, as before.
-- A `conversationRef` is opaque to a plugin, so the hook builds The Fam's the way OpenClaw 2026.9.4 builds one (`buildConversationRef`), a hash of Telegram, the default account, a group and the chat id.
-  Both gateways' conversation registries held exactly that ref for The Fam, `conv_42423b3d2ab2219f114fdbc28e6c1b92`, on 17 October, and 27 `conversations_send` posts had gone to it between them since 19 September.
-  An OpenClaw upgrade that builds refs differently would leave these posts on Telegram alone, so compare The Fam's row in the registry's `conversations` table with `familyConversationRef` whenever the pinned version changes.
-- OpenClaw blocks a tool whose `before_tool_call` handler fails or runs past fifteen seconds, so the hook never fails, and Telegram's copy waits at most five seconds for the room and the owner's push.
-  When the room cannot take the post, as on a gateway whose household channel is not running, the log says so and the post reaches Telegram alone.
-- `conversations_send` refuses a sender OpenClaw knows is not the owner, and the hook keeps nothing for one either, from either tool.
-- A call is kept once however often OpenClaw hands it to the hook, by its call id within its run and session, as OpenClaw sends a conversation tool's retry to Telegram once.
-- The room keeps the post before the tool runs, so a send Telegram then refuses, for a bot no longer in the group, a rate limit or OpenClaw's own send policy, leaves the words in the room with no Telegram copy, and a model that tries again posts them twice.
-  Catching it after the tool succeeded would need a hook on what is sent, which turns off Telegram's draft previews (below), so the room keeping a post Telegram missed is the side this errs on.
-- The log line is `a family post from <tool> was kept in the app room before Telegram's copy`, never the words.
-
-The hook catches the call on its way in rather than the message on its way out, because while any plugin has a `message_sending` hook, OpenClaw 2026.9.4 shows no draft preview in any Telegram chat (`allowProviderPreview` in the Telegram extension's `bot-message-dispatch.ts`).
-
-What still reaches Telegram alone, or the app only after Telegram:
-
-- An assistant's own reply to a message someone sent in The Fam on Telegram, since the question was only ever on Telegram.
-- A scheduled run's announcement to Telegram, which [Scheduled messages in the app](#scheduled-messages-in-the-app) copies into the app whatever Telegram did with it; since 22 October every job announces to the app itself ([Telegram off](#telegram-off)).
-- A post with no session, which is how the coordination relay posts a crossing and the planner posts a proposal, so the planner's web-derived venue prose stays out of the app room and the other assistant's prompt, as [the coordination design](../plan/coordination-between-assistants.md#each-sees-what-the-other-said-in-the-group) requires.
-- A picture or file the `message` tool sends, with or without words beside it: the words come to the app, the attachment does not.
-- `sessions_send` to The Fam's session, whose reply goes out as that session's own.
-
-It needs no config change.
-The plugin goes to the box like any household-app update: `bash scripts/household-app-install.sh`, then `docker restart` one gateway at a time, Corey first, with the checks in [Bringing it to the box](#bringing-it-to-the-box-one-gateway-at-a-time-1) above between them.
-
-### What is left before Telegram can be retired
-
-- **Who reads it.** Everyone who reads the family on Telegram has to read it in the app, with notifications allowed.
-  For Gia that is her phone paired with Denise and registered for pushes; `/app` is sent on Telegram, and Sign in with Apple with the approver's yes is the way in without it.
-- **Scheduled messages.** Done 22 October: every automation that announced to The Fam or to a person's own Telegram chat announces to the app (`scripts/openclaw-app-deliveries.py`, [Telegram off](#telegram-off)).
-  household-job-mirror stays, and copies into the app any run still aimed at Telegram, whether or not Telegram took it.
-- **Tool posts.** The assistants post to the family with `message` on the household channel, target `family`, rather than to The Fam, which each assistant's `AGENTS.md` has to say.
-  Then `family-posts.js` has nothing left to catch and comes out.
-- **The coordination relay, the planner and the handover.** The relay's crossings and the planner's proposals post to The Fam through the CLI (`post_to_group` in `household/openclaw.py`), and `DockerPeerHandover` starts the other assistant's turn in The Fam's session.
-  Each needs the app's family room as its destination; the app's own @mention handover already exists.
-- **household-family-room.** The app's family room already hears a voice note to decide whether it is addressed and carries the other assistant's posts itself.
-  It does not describe a photo or video nobody named, which the plugin does for The Fam, so that moves to household-app first.
-  `family_history` then reads the family room alone.
-- **What reads The Fam's id.** household-pictures, household-speech and `family-posts.js` take it from household-family-room's config, household-memory has its own `groupChatId`, and the app room's `familyTools` is copied from The Fam's `tools.allow` by `openclaw-household-app.py apply`.
-  Each needs a source that does not name a Telegram group.
-
-### Telegram off
-
-On 22 October the Overlord decided (issue #6) to move the family's scheduled messages to the app and then turn Telegram off on both gateways.
-
-- `scripts/openclaw-app-deliveries.py apply --gateway <persona>` moves each job that announces to Telegram to the same people in the app, changing only its delivery (`automations edit <id> --announce --channel household --to household:<target> --account default`): The Fam to `household:family`, the gateway's own person's private chat to `household:<person>`.
-  A job to any other chat, such as the other parent's private chat, has no clear home, so apply refuses the whole gateway and says how many; `check` counts each gateway's jobs to Telegram and to the app.
-  Its prompt, schedule, session and name stay as they were, and nothing is read from them, so a job's words reach the same people as before and Denise's privacy rule holds.
-- Each moved job's own delivery preview (`automations show <id>`) names `household:<target>` as its route, with no run; jobs that already announced to the app had delivered there.
-- A reminder someone made that now announces straight to the app is still pushed Time Sensitive while it runs (`createReminderPushes` in `automations.js`), as the job mirror's copies of it were.
-- Only then `openclaw-household-app.py apply` writes `channels.telegram.enabled: false` on each gateway, under the rollout lock, and `openclaw-verify.sh` reads 24 of 24.
-- The coordination tick still runs every 15 seconds and posts only what a gateway queues for The Fam; nothing was queued in the 14 days before, and the planner's timer is not enabled.
+- household-app's `before_tool_call` hook sees each call to `message` before it runs, from any session.
+- A `send` or `broadcast` whose targets all name the family, `family`, `fam` or `the fam`, bare or after `household:`, on the household channel or with no channel named, is sent to `household` and `family`, the family room, as this assistant's message.
+  The target is the one the tool sends to, the first of `target`, `to` and `channelId` that holds anything, or each of a broadcast's `targets`.
+- In the room it is any other post of this assistant's: it pushes the owner's phones under the family thread, the relay carries it to the other gateway, one that @mentions the other assistant hands it a request, and one a handed-over turn makes is marked `handedOver` and starts nothing.
+- A call that names Telegram, as `channel: "telegram"` or `"tg"` or a target after `telegram:` or `tg:`, is refused with a line saying where to post, and nothing is sent; so is a post to the family that names an account other than the default.
+- Every turn is told the same (`householdRoutingGuidance`): The Fam is the app's family room, a post to the family is `message` with `channel=household` and `target=family`, a message to the owner alone goes to their household id, and family facts go in the household note.
 
 ### What a family-room turn may use
 
-A family-room turn the owner started, by a message one of their phones signed, is the owner's own and has every tool their own thread has; anyone else's family-room turn gets exactly the tools a turn in The Fam gets on the same gateway, and each person's own thread keeps every tool, as a private Telegram chat does.
+A family-room turn the owner started, by a message one of their phones signed, is the owner's own and has every tool their own thread has; anyone else's family-room turn gets the family room's tool list, and each person's own thread keeps every tool.
 The household decided the first on 17 October, so that a question asked of Corey or Denise in the family room works exactly as it does one to one, with the owner's private data answering there only when the owner asked.
-The Fam runs with a tool allowlist, `web_search`, `web_fetch`, `speak`, `family_history`, `picture`, `video`, `household_location`, `household_cart`, `household_home`, `household_react` and `household_note` ([Who can reach finance](pocket-piggies.md#who-can-reach-finance)), so nobody else's family-room turn can run a shell, read or write files, read sessions or reach the PocketPiggies key holder, whatever text was pasted into the room.
+The list is `FAMILY_TOOLS` in `scripts/openclaw-household-app.py`: `web_search`, `web_fetch`, `family_history`, `picture`, `video`, `household_location`, `household_cart`, `household_home`, `household_react`, `household_note` and `scripture`.
+It must equal `GROUP_TOOLS` in `scripts/pocket-piggies-install.py`, whose guard keeps the same list there on a gateway with finance, and `SAFE_GROUP_TOOLS` in the PocketPiggies plugin ([Who can reach finance](pocket-piggies.md#who-can-reach-finance)).
+So nobody else's family-room turn can run a shell, read or write files, read sessions or reach the PocketPiggies key holder, whatever text was pasted into the room.
 Until 15 October the household channel set no group tool policy, so a family-room turn on either gateway ran with every tool, whoever asked.
 
 - The plugin answers OpenClaw's group tool-policy question for the channel (`groups.resolveToolPolicy`, in `family-tools.js`).
   OpenClaw asks it only for a session whose key names a group, `agent:main:household:group:family`, and for a sub-agent that session starts; the owner's thread, `agent:main:household:direct:<person>`, is never asked about.
-- The list is `channels.household.familyTools`, which `openclaw-household-app.py apply` copies from The Fam's own `tools.allow` on that gateway, so The Fam's entry is the one source.
-  Where The Fam has no plain allowlist, `apply` removes the room's list and warns, and `check` reports it.
+- The list is `channels.household.familyTools`, which `openclaw-household-app.py apply` writes from `FAMILY_TOOLS` every time it runs, and `check` reports a gateway whose list differs.
+  While the household used Telegram, `apply` copied it from The Fam's Telegram allowlist instead.
 - Without a list the room gets no tools at all, never every tool: OpenClaw 2026.9.4 reads an empty allow list as everything, so the plugin denies `*` instead, and the room still answers in words.
 - The one exception is the owner, and it lives in a session of its own.
   household-app runs a family-room turn the owner's signed message starts in the owner's own session of the room, OpenClaw's per-sender form of it, `agent:main:household:group:family:sender:<owner>`; everyone else's family-room turns run in the room's shared session.
@@ -1927,7 +1357,7 @@ Until 15 October the household channel set no group tool policy, so a family-roo
   For the owner's own group and the owner as sender the adapter answers with an empty deny list, a policy OpenClaw takes as restricting nothing, so the turn has the owner's own tools and never falls back to the room's list.
   Every turn in the room's shared session gets the list, the owner's included, and so do the other person, the other assistant's @mention handover, a gateway client's `chat.send` (which names its own client id), any run OpenClaw asks about with sender rules off (`senderPolicyMode: "never"`, a scheduled run), and an owner whose id is reserved, such as `cli` or `family`.
 - The plugin's own tools follow the same rule (`isOwnersTurn` in `turn.js`): in the owner's own session of the room `household_today` and `household_brief` are offered, `household_cart` records an order, `household_location` reads a share made only with the assistant, and a calendar or reminder change waits for the owner's yes in their own thread, exactly as in that thread.
-  PocketPiggies' finance tools and household-memory's `recall` and `forget` answer only that session too, and `family_history`, `speak`, `picture` and `video` accept it beside the shared one.
+  PocketPiggies' finance tools and household-memory's `recall` and `forget` answer only that session too, and `family_history`, `picture` and `video` accept it beside the shared one.
 - The phone follows the room's shared session for a reply as it streams, and, since the build after 19 October, the owner's own session of the room too, which every page names as `ownersFamilySession`, so the owner's own family-room replies stream into the room as theirs do.
   It is a field of its own, so a phone from before it, which reads `sessionKeys` as its two conversations, never meets a key that is not one.
   An older build still gets those replies whole, with the assistant typing until then.
@@ -1937,37 +1367,25 @@ Until 15 October the household channel set no group tool policy, so a family-roo
   That is the same kind of exposure the owner's thread has to what `web_fetch` and the other tools bring back, now with the room's words added, and anyone else's turn still cannot reach a tool that could act on them.
 - PocketPiggies refuses its finance tools whenever `channels.household` is configured, switched on or not, without a list made only of those tools for everyone else in the room.
 
-This was run on 15 October through OpenClaw 2026.9.4's own group tool-policy resolver and tool matcher, with the plugin loaded as a channel: on main the family session allowed `exec`, `read`, `write`, `sessions_history` and the finance tools; with the change it allowed only The Fam's list, a sub-agent of it the same, a room with no list nothing, and the owner's thread every tool, even when a caller named the family room as its group.
+This was run on 15 October through OpenClaw 2026.9.4's own group tool-policy resolver and tool matcher, with the plugin loaded as a channel: on main the family session allowed `exec`, `read`, `write`, `sessions_history` and the finance tools; with the change it allowed only the room's list, a sub-agent of it the same, a room with no list nothing, and the owner's thread every tool, even when a caller named the family room as its group.
 
-The owner's own session was run the same way on 17 October, inside both gateways' containers with each one's live household config: the owner in their own session of the room got `{ deny: [] }` and `exec`, `read`, `pocketpiggies_read` and `recall`, as their thread does; the owner in the room's shared session, the other person, the other assistant's handover, a gateway client's `chat.send` naming the owner's session, the other person naming it, and a run with sender rules off in it each got The Fam's ten tools and none of those.
+The owner's own session was run the same way on 17 October, inside both gateways' containers with each one's live household config: the owner in their own session of the room got `{ deny: [] }` and `exec`, `read`, `pocketpiggies_read` and `recall`, as their thread does; the owner in the room's shared session, the other person, the other assistant's handover, a gateway client's `chat.send` naming the owner's session, the other person naming it, and a run with sender rules off in it each got the room's list, ten tools that day, and none of those.
 
 - household-memory's search of older chats leaves the owner's own session out of every search but the owner's private view, since that session is linked to the room's conversation and its transcript holds the words written beside the owner's tool calls.
 - A checklist tick and a person's reaction wait for the room's shared session, so the owner's next turn in their own session does not see them.
 
-#### Closing it on the box, one gateway at a time
+The room's list first reached the box on 15 October, one gateway at a time.
+Today `openclaw-household-app.py apply` writes it with the rest of the channel ([Bringing it to the box](#bringing-it-to-the-box-one-gateway-at-a-time-1)), and this shows it on a gateway, the room's tools with no `exec` and the owner's thread with `exec`:
 
 ```
-# 0. Back up the gateway's state and take the PocketPiggies baseline (docs/deploy/pocket-piggies.md).
-# 1. The plugin into the mount. Corey runs the old one until it restarts.
-bash scripts/household-app-install.sh
-# 2. Corey onto it. Until step 3 writes the list, a family-room turn gets no tools at all.
-docker restart openclaw-gateway
-# 3. The Fam's allowlist into the room: validate, then write. The old plugin refuses the key.
-python3 scripts/openclaw-household-app.py apply --gateway corey --dry-run
-python3 scripts/openclaw-household-app.py apply --gateway corey
-python3 scripts/openclaw-household-app.py check
-# 4. PocketPiggies' plugin with the room in its check. Restarts Corey and the key holder.
-python3 scripts/pocket-piggies-install.py corey --telegram-id 7100000001 --restart
-# 5. The proof: the room's tools are The Fam's list with no exec; the owner's thread still has exec.
 docker exec openclaw-gateway node dist/index.js gateway call tools.effective \
   --params '{"sessionKey":"agent:main:household:group:family"}' --json
 docker exec openclaw-gateway node dist/index.js gateway call tools.effective \
   --params '{"sessionKey":"agent:main:household:direct:franco"}' --json
-# 6. Denise the same way (openclaw-denise, gia, 7100000002), only once Corey's checks pass.
 ```
 
 `tools.effective` reads a session that exists, so on a gateway where nobody has addressed its assistant in the family room yet it answers `unknown session key` until someone does.
-The gateway log should show no `pocket-piggies: finance is off` line after step 4.
+The gateway log should show no `pocket-piggies: finance is off` line.
 
 ### Bringing it to the box, one gateway at a time
 
@@ -1986,19 +1404,29 @@ python3 scripts/openclaw-household-app.py check
 
 Both containers read the plugin from the one host mount, but each loads it only when it starts.
 An update to a gateway that already runs the plugin therefore takes `docker restart <container>` after the install, one gateway at a time, and then `apply` if the config changed.
-Telegram reconnects by itself after a restart; on 15 October each gateway was healthy again within 25 seconds.
+On 15 October each gateway was healthy again within 25 seconds of a restart.
+On a gateway with PocketPiggies, `pocket-piggies-install.py` runs before `apply`, so its guard no longer looks for Telegram ([Retiring Telegram](retiring-telegram.md#3-pocketpiggies-before-anything-takes-telegrams-config-away)).
 
 ### Pairing a phone
 
 Nobody types a host, a port or a token.
-Franco sends `/app` to Corey in Telegram, and Gia sends it to Denise.
-The reply leads with a link to `https://<gateway tailnet address>/household-app/pair#<code>`, then the same code alone to copy.
+A person with a paired iPhone gets a setup link for another one on Account, **Pair a new iPhone**, which asks their gateway with `household-app.pair.code`.
+A household's first iPhone, or one whose person has none left, gets its link from whoever runs the box, through `household-app.pair`, which needs `operator.admin`:
+
+```
+docker exec openclaw-gateway node dist/index.js gateway call household-app.pair --json --params "{}"
+```
+
+It prints `link` and `setupCode`; send the link to that person's phone and tap it there.
+Use `openclaw-denise` for Gia's.
+The owner can also send `/app` in their own thread in the app, and the reply leads with the same link, then the code alone to copy; `/app` refuses anyone OpenClaw does not count as the owner.
+Until Telegram was retired, `/app` sent to an assistant on Telegram was how a phone paired.
+
+The link is `https://<gateway tailnet address>/household-app/pair#<code>`.
 The code is OpenClaw's own single-use bootstrap token, which the gateway forgets after ten minutes, with the gateway's tailnet address for phones, `channels.household.phoneUrl`, which `apply` writes, and the person it is for.
 A tap on the link opens a page the plugin serves with no sign-in, which hands the code to the app as `steward://pair?code=`; the code rides after the `#`, which no browser sends, so the gateway never sees it in a request.
 The app pairs at once as the person the code names, with no chooser, or the person pastes the code instead.
 It connects as a mobile node; OpenClaw approves that connect by itself and hands the phone a chat-only operator token, never admin.
-Only the owner may ask: `/app` refuses anyone OpenClaw does not count as the owner.
-Whoever runs the box gets the same code with `openclaw gateway call household-app.pair --json --params "{}"`, which needs `operator.admin`.
 
 A phone paired this way speaks for its person in the family room at once.
 Each gateway trusts the app phones in its own `devices list`, and tells the other gateway which those are in its relay outbox, so nobody pins keys by hand.
@@ -2006,7 +1434,7 @@ That is the same source `apply` pins from, without the hand step: a gateway that
 Keys pinned by `apply` still count, and `apply` still prints each phone by device id, name and approval date and never its key.
 
 Account in the app lists its person's iPhones with `household-app.phones`, from the same `devices list`, by device id, name, model and when each last connected, never a key or a token.
-It removes one of the others with `household-app.phones.remove`, and asks for a setup code for a new iPhone with `household-app.pair.code`, the same code `/app` gives with its link.
+It removes one of the others with `household-app.phones.remove`, and asks for a setup code for a new iPhone with `household-app.pair.code`, which answers with the code and its link.
 Both are signed by one of the person's phones over `household-app/phone/v1` and share the settings replay guard.
 A removal runs OpenClaw's own `devices remove` inside the gateway's container, the way the box runs it, which drops the phone's tokens and closes its connections.
 The plugin then forgets the phone's push registration, and the next relay outbox leaves its key out, so the other gateway stops believing it too, unless `apply` pinned that key, which stays until `apply` runs again.
@@ -2014,13 +1442,13 @@ A phone never removes itself this way, since Pair this iPhone again does that on
 
 ### Signing in with Apple
 
-A phone can pair with no Telegram at all, by signing in with Apple.
+A phone can also pair with no setup link, by signing in with Apple.
 The app asks its gateway for a nonce with `POST /household-app/apple/nonce`, signs in with Apple using that nonce's SHA-256, and sends Apple's identity token to `POST /household-app/apple/pair`.
 These routes answer without a gateway token, since the phone has none yet, so the token is the proof: the plugin checks Apple's RS256 signature against Apple's published keys (read from `https://appleid.apple.com/auth/keys` at most once an hour), Apple as the issuer, `com.siqstack.stewardai` as the audience, the expiry, and a nonce this gateway issued in the last ten minutes, used once.
 The gateway is served on the tailnet with no funnel, so only tailnet devices reach these routes, and the plugin takes 30 sign-in requests a minute at most and bodies of 16 KB at most.
 
 Apple's stable user id is then looked up among the Apple IDs this gateway has linked to its person, never by email, since Apple can hide it.
-A linked Apple ID gets the same single-use setup code `/app` gives, and the app pairs with it at once.
+A linked Apple ID gets the same single-use setup code a link carries, and the app pairs with it at once.
 A phone already paired links its person's Apple ID with the `household-app.apple.link` method, so that person can later pair a new phone by signing in.
 
 An Apple ID nobody linked waits, at most eight at a time and for a day at most, until the household's approver says yes from his own app.
@@ -2063,17 +1491,17 @@ Precise or approximate is their own switch in iOS, and every position carries it
 - `household_location` is the assistant's one tool for it, read-only.
   It is offered in the owner's own thread, whose turn starts only from a message the owner's phone signed and names the owner as `requesterSenderId`, the same proof PocketPiggies takes.
   In the family room it answers only while the owner shares with the family, for a turn Franco or Gia started there, and it says the same thing whether the owner shares only with the assistant or not at all.
-  Telegram, every other session, automations, sub-agents and a gateway client's `chat.send` get no tool.
+  Every other session, automations, sub-agents and a gateway client's `chat.send` get no tool.
   Its description tells the assistant to use the position only for what was asked, never to keep it or send it anywhere but the conversation, and to search by town or street rather than coordinates.
 - Nothing runs in the background on the gateway: the tool reads the latest position when a turn asks for it.
 - The relay carries no position, so Corey knows only Franco's and Denise only Gia's, and asking Denise where Franco is gets no answer.
   Sharing across gateways is left out until the household needs it.
 
 `apply` hands the tool to the model through `tools.alsoAllow`, ahead of the PocketPiggies tools so the finance guard finds nothing to move, and `check` reports a gateway without it.
-The family room gets it because `household_location` is on The Fam's tool allowlist, which `apply` copies into the room as `channels.household.familyTools`.
+The family room gets it because `household_location` is on the family room's tool list, `FAMILY_TOOLS`, which `apply` writes as `channels.household.familyTools`.
 The household chose that on 15 October, since family sharing stays each person's own choice in the app.
-It takes two lists kept equal: `GROUP_TOOLS` in `scripts/pocket-piggies-install.py`, which writes The Fam's list, and `SAFE_GROUP_TOOLS` in the PocketPiggies plugin, without which finance turns itself off.
-The tool reads no file and reaches no key holder, and it is never offered on Telegram, so on The Fam itself it does nothing, and in the family room it answers only while that person shares with the family.
+The same list is `GROUP_TOOLS` in `scripts/pocket-piggies-install.py`, whose guard keeps it in the room, and `SAFE_GROUP_TOOLS` in the PocketPiggies plugin, without which finance turns itself off.
+The tool reads no file and reaches no key holder, and in the family room it answers only while that person shares with the family.
 
 ### Maps in a conversation
 
@@ -2100,7 +1528,7 @@ Amazon has no API to fill a personal cart or place an order, and Amazon Business
 
 - `household_cart` is the assistant's tool for it, in the owner's own thread and the family room, by the same turn proof as `household_location` (`turn.js`).
   An item is down for whoever asked, by the turn's signed sender, and no argument names a person.
-  Telegram, automations, sub-agents and a gateway client's `chat.send` get no tool.
+  Automations, sub-agents and a gateway client's `chat.send` get no tool.
 - Each gateway keeps every step either assistant took, add, remove, quantity and an order's status, in `household-app/cart.sqlite`.
   It publishes only its own steps in the outbox's `cart` section, the relay carries them to the other gateway when they change, and the receiving plugin checks each one before keeping it: the other assistant's own, a known kind, an item for Franco or Gia with a sensible name and quantity, and an amazon.com product link or none.
   Both gateways replay the same steps in time order, so both show the same cart.
@@ -2124,8 +1552,7 @@ Amazon has no API to fill a personal cart or place an order, and Amazon Business
 - The cart holds at most 40 open items, and an item's name at most 120 characters.
 
 The cards are the app's `cart` and `order` (`deploy/openclaw/skills/steward-cards/SKILL.md`).
-`apply` hands the tool to the model through `tools.alsoAllow` beside `household_location`, and The Fam's allowlist carries it to the family room, so it joins `GROUP_TOOLS` and `SAFE_GROUP_TOOLS` too.
-On The Fam itself it is never offered, since it answers only in the app.
+`apply` hands the tool to the model through `tools.alsoAllow` beside `household_location`, and it is on the family room's list, so it is in `FAMILY_TOOLS`, `GROUP_TOOLS` and `SAFE_GROUP_TOOLS`.
 
 #### Bringing it to the box, one gateway at a time
 
@@ -2133,10 +1560,10 @@ On The Fam itself it is never offered, since it answers only in the app.
 # 0. Back up the gateway's state and take the PocketPiggies baseline (docs/deploy/pocket-piggies.md).
 # 1. The plugins into the mount and the relay that carries cart steps. No gateway reloads yet.
 bash scripts/household-app-install.sh
-# 2. PocketPiggies' safe list and The Fam's allowlist together, which restarts Corey onto both plugins.
+# 2. PocketPiggies' safe list and the room's list together, which restarts Corey onto both plugins.
 #    The list must not name household_cart before finance's own list does, or finance turns off.
-python3 scripts/pocket-piggies-install.py corey --telegram-id 7100000001 --restart
-# 3. The tool to the model and The Fam's list into the room: validate, then write.
+python3 scripts/pocket-piggies-install.py corey --owner franco --telegram-id 7100000001 --restart
+# 3. The tool to the model and the room's list: validate, then write.
 python3 scripts/openclaw-household-app.py apply --gateway corey --dry-run
 python3 scripts/openclaw-household-app.py apply --gateway corey
 python3 scripts/openclaw-household-app.py check
@@ -2149,7 +1576,7 @@ docker exec openclaw-gateway node dist/index.js gateway call tools.effective \
 #    and before anyone uses the cart, since a step carried to a gateway without it is not sent again.
 ```
 
-To take it back, put back the config `apply` saved and the plugin from before, as in [Rolling it back](#rolling-it-back).
+To take it back, put back the config `apply` saved and the plugin from before, as in [Rolling it back](#rolling-it-back-2).
 The cart's steps stay in each gateway's `household-app/cart.sqlite` until it is deleted by hand.
 
 ### The household note
@@ -2158,7 +1585,7 @@ What the family keeps track of together, kitten weights, dates, lists, lives in 
 
 On 19 October Franco asked both assistants in the family room to put together the kitten weights they had saved, and Denise did not know the ones she had saved minutes before.
 Gia had copied Corey's family-room post with the weights into her own thread, and Denise saved them there in a file in her workspace, through a skill she had written herself; the words "save" and "log" are not ones household-memory keeps, so nothing reached the kept list.
-Franco's message in the family room started a turn in the room's shared session, which has The Fam's tools, so no file reads, and starts with the family's kept items only ([What a family-room turn may use](#what-a-family-room-turn-may-use)).
+Franco's message in the family room started a turn in the room's shared session, which has the family room's tools, so no file reads, and starts with the family's kept items only ([What a family-room turn may use](#what-a-family-room-turn-may-use)).
 So nothing an assistant saved in its owner's thread could reach that turn, by design, and nothing either assistant was asked to tell the other was ever more than a message in the room.
 
 On 22 October it happened again, with the note in place.
@@ -2183,7 +1610,6 @@ Every app turn on both gateways starts with the promises still open, this assist
   So words written in a turn with fewer tools, or by the other assistant, never start a turn that can act on them, which is the [exposure](#what-a-family-room-turn-may-use) the room's own history already has in the owner's session, and no wider.
   Franco and Gia read it through either assistant, so it is the household's shared record: a line is written only for what someone asked to keep, track or share with the family, or to tell the other assistant, and never anyone's private things unless they ask to share them, which the tool's description says.
   Private requests stay where they were: household-memory's kept list, `MEMORY.md` and the workspace's files, none of which a family-room turn anyone else starts can read.
-  Telegram's turns are not given the note.
 - **How it reads.** Lines are grouped by topic, the topic as its first line wrote it, its lines oldest first, each with its day (the day it happened when the line gives one), its item, who asked whom, and any correction.
   A line with a due date says whether it is due, overdue or done, and by whom it was marked done.
   A turn reads about 4,000 characters of it: first the promises still open, this assistant's own first and then by due date, and what else is overdue or due within a week, soonest first, from the lines that turn may show and using at most half of that; then the topics that share words with the message, then the most recently changed, a long topic's newest lines without those already listed, and the names of what was left out, which `view` shows.
@@ -2210,11 +1636,11 @@ Under "Write It Down", after the line about asks to remember (Corey's, with Fran
 
 For "Handing a request to Denise", follow [the assistants' direct line](#the-assistants-direct-line).
 
-`apply` hands the tool to the model through `tools.alsoAllow`, and The Fam's allowlist carries it to the family room, so it joins `GROUP_TOOLS` and `SAFE_GROUP_TOOLS` too, as the cart did.
+`apply` hands the tool to the model through `tools.alsoAllow`, and it is on the family room's list, in `FAMILY_TOOLS`, `GROUP_TOOLS` and `SAFE_GROUP_TOOLS`, as the cart is.
 
 #### Bringing it to the box, one gateway at a time
 
-The steps are the cart's, under the box's rollout lock: `household-app-install.sh` for the plugins and the relay, `pocket-piggies-install.py --restart` for the safe list and The Fam's allowlist together, `openclaw-household-app.py apply` for the tool and the room's list, then the proof with `tools.effective`, Corey first and Denise only once Corey's checks pass.
+The steps are the cart's, under the box's rollout lock: `household-app-install.sh` for the plugins and the relay, `pocket-piggies-install.py --restart` for the safe list and the room's list together, `openclaw-household-app.py apply` for the tool and the room's list, then the proof with `tools.effective`, Corey first and Denise only once Corey's checks pass.
 `notes.sqlite` is made the first time the channel starts on the new plugin.
 While Denise still runs the old plugin, a line written on Corey reaches her file only with the relay's next delivery of anything after her restart, a message, a read or a typing, since the steps ride along with every delivery but are a delivery of their own only when they change.
 
@@ -2226,7 +1652,7 @@ The Overlord asked for a line between them that both parents can watch, so it is
 - **A handoff.** `household_note` with `hand` writes a line for the other assistant to do (`owner` is that assistant), under "Handoffs" unless it names a topic, and it crosses like any step.
   The receiving gateway marks it `seen` as it arrives, a step of its own that crosses back, so the sender knows it landed with no model call and no message.
   A handoff under ten minutes old then starts one turn on the receiving gateway, in the direct line's own session, `agent:main:household:group:pair`, sent by the other assistant as a bot, told that both people read the line and that its person's private things are not the other assistant's to hear.
-  That session is a group of the household channel, so it gets The Fam's tools like any turn in the room's shared session (`family-tools.js`), and no household tool (`turn.js`), so it can neither run a shell or read finance nor hand anything back.
+  That session is a group of the household channel, so it gets the family room's tools like any turn in the room's shared session (`family-tools.js`), and no household tool (`turn.js`), so it can neither run a shell or read finance nor hand anything back.
   It starts with the whole household note.
   Its final reply is kept as the handoff's `reply`, one line of at most 2,000 characters, and posts nothing: no room entry, no push, and a tool's post finds no conversation by that name.
   An older handoff, one that arrived after a restart, is marked seen and waits in the note as that assistant's to do.
@@ -2260,7 +1686,7 @@ Each gateway answered its own name, and nothing said which of them had it.
 
 ### Family reminders from either assistant
 
-Denise said a weekly reminder for the family "lives on Corey's side, not mine", and on 22 October it did: the family's recurring reminders were Corey's automations delivering to The Fam on Telegram, which the job mirror copies into the app, and Denise had none for the family.
+Denise said a weekly reminder for the family "lives on Corey's side, not mine", and on 22 October it did: the family's recurring reminders were Corey's automations delivering to The Fam on Telegram, which a job mirror copied into the app, and Denise had none for the family.
 A turn in the room's shared session, which anyone's question starts, has no automations tool, and must not: an automation runs later with every tool, so the room's words would start a run that can use a shell or read finance.
 
 - **A reminder in the note.** `household_note` with `remind` keeps a family reminder as a line under "Reminders": its words, the day it next goes off (`due`), its time (`time`, HH:MM in the family's zone, which both containers run in) and how often it repeats (`every`: day, week or month, or never), owned by the assistant that took it.
@@ -2273,7 +1699,7 @@ A turn in the room's shared session, which anyone's question starts, has no auto
 - **The receiving gateway checks** a reminder's time, repeat and due date on every step from the other side, and only the owner's gateway ever posts it.
 - A reminder for one person alone stays an automation in that person's own chat, which since 22 October is their own thread in the app.
 - **Existing family automations, mirrored read-only** (`automations.js`).
-  Each gateway lists its own scheduler's jobs as OpenClaw reconciles it, whenever a job changes, and as the channel starts, and keeps one line under "Family automations" for each enabled job of the main agent that posts in the family room: delivered to The Fam (the family group of `household-family-room`'s config) or to the app's family room.
+  Each gateway lists its own scheduler's jobs as OpenClaw reconciles it, whenever a job changes, and as the channel starts, and keeps one line under "Family automations" for each enabled job of the main agent that posts in the family room, delivered to `household:family`.
   A line holds the job's name and when it runs, never its prompt; it is corrected when either changes and removed with the job, and a restart with nothing changed takes no step.
   Every turn of both assistants lists them under "Family automations, which post on their own", with whose they are, and neither assistant's `household_note` can correct, finish or remove one (`automation_line`): it changes only with the job itself.
 
@@ -2310,7 +1736,7 @@ It goes to each parent from that parent's own assistant.
 - A run has every tool, so it never reads words someone else wrote into the household note.
   The plugin itself adds those lines and posts the digest in its person's own thread: what is slipping (overdue lines and overdue promises, two named and a count), the trend of the most recently changed log whose topic says "weigh" (the latest weigh-in's count and average, and the change since the one before), how many items the cart holds, and the open promises, the first named.
   The tool answers the run with the number of lines alone.
-- `household_digest` is offered in the turns `household_brief` is: a scheduled run, the owner's own thread and own family-room session, and the owner's private Telegram chat; never in the room's shared session.
+- `household_digest` is offered in the turns `household_brief` is: a scheduled run, and the owner's own thread and own family-room session; never in the room's shared session.
   It joins the manifest's tools and `openclaw-household-app.py`'s `tools.alsoAllow`.
 
 ### The emergency card
@@ -2319,10 +1745,10 @@ Corey asked for one command that gives the vet, poison control, the pediatrician
 
 - The card's entries are household note lines under the topic "Emergency card" (`emergency.js`): one per contact, its item who it is (Vet, Poison control, Pediatrician, Insurance, Neighbor) and its words the name and number.
   Both assistants keep it current with `household_note`, as anything else the family shares, and the note tool's description tells them where it lives.
-- `/emergency` answers at once with no model, wherever the gateway's own person types it (the app and Telegram): "Emergency: call 911 first.", then one line per contact in that order, anything else after them.
+- `/emergency` answers at once with no model, wherever the gateway's own person types it in the app: "Emergency: call 911 first.", then one line per contact in that order, anything else after them.
   Poison control's public United States number is on the card until the family keeps one of its own, and an empty card says how to fill it.
   In the family room the asker's own assistant answers it, since the app gives commands to the owner alone.
-- Asked in words or by voice, the assistant reads the topic and gives those lines, and reads them aloud with `speak` when asked by voice; on a call every reply is spoken already.
+- Asked in words or by voice, the assistant reads the topic and gives those lines; on a call every reply is spoken already.
 
 ### Gift and wishlist memory
 
@@ -2378,15 +1804,14 @@ Corey asked for the week's dinners proposed from what is in the kitchen and what
 ### The house
 
 - `household_home` is the assistant's tool for the thermostat, the music and the living room TV, in the owner's own thread and the family room, by the same turn proof as `household_location` (`turn.js`).
-  Telegram, automations, sub-agents and a gateway client's `chat.send` get no tool.
+  Automations, sub-agents and a gateway client's `chat.send` get no tool.
 - It names only actions: `status`, `thermostat`, `volume`, `music`, `play`, `open_spotify`, `youtube`, `video` and `tv`.
   The plugin turns each into one call to the home key holder on the host, over `~/.openclaw/home/home.sock` (`home-tool.js`, `home-client.js`), and passes back the one text block the key holder answers.
   The token, the TV's pairing and the limits stay with the key holder ([Home control](#home-control)).
 - `confirmed` reaches the key holder as true only when the assistant passes exactly `true`.
   A change that needs a yes comes back as `needs_yes` with the question, and the tool tells the assistant to ask exactly that and call again only after the yes.
 - Without the key holder the tool answers `home_unavailable`, and nothing else is affected.
-- `apply` hands it to the model through `tools.alsoAllow`, and The Fam's allowlist carries it to the family room, so it joins `GROUP_TOOLS` and `SAFE_GROUP_TOOLS` too.
-  On The Fam itself it is never offered, since it answers only in the app.
+- `apply` hands it to the model through `tools.alsoAllow`, and it is on the family room's list, in `FAMILY_TOOLS`, `GROUP_TOOLS` and `SAFE_GROUP_TOOLS`.
 
 ### Tapbacks
 
@@ -2401,15 +1826,14 @@ Each reaction shows as a small badge on the bubble's top corner, an assistant's 
   The receiving gateway keeps the other assistant's reaction only when it is one of the five and on a person's message.
 - When Franco or Gia reacts to an assistant's message, or takes a reaction back, that assistant's gateway queues one line for its next turn in that conversation through OpenClaw's next-turn injection, as a checklist tick does: `Franco reacted ❤️ to your message: "<its first words>"`, and that it needs no answer.
   It never starts a turn, and a line not taken within a day is dropped (`tapbacks.js`).
-- `apply` hands the tool to the model through `tools.alsoAllow`, and The Fam's allowlist carries it to the family room, so it joins `GROUP_TOOLS` and `SAFE_GROUP_TOOLS` too, and goes to the box the way [the household cart](#bringing-it-to-the-box-one-gateway-at-a-time) did.
-  On The Fam itself it is never offered, since it answers only in the app.
+- `apply` hands the tool to the model through `tools.alsoAllow`, and it is on the family room's list, in `FAMILY_TOOLS`, `GROUP_TOOLS` and `SAFE_GROUP_TOOLS`; it went to the box the way [the household cart](#bringing-it-to-the-box-one-gateway-at-a-time-2) did.
 
 ### A step that waits for a yes
 
 When a step of the assistant's run waits for approval, OpenClaw hands the request to every channel that presents approvals natively, and the household channel is one.
 It shows the request as a card in the owner's own thread, never in the family room, with Approve and Deny, and pushes it to the owner's phones like a message.
 Only approvals from a turn in the app come there: by the turn's channel, or by the thread's session for a turn that names no channel.
-A turn on Telegram keeps Telegram's approvals exactly as before, and the household channel sends no notice into any chat.
+The household channel sends no notice into any chat.
 
 - The phone answers through `household-app.approval.answer`, signed by its device key over the approval's id and the decision, one line per field, as a message is.
   The gateway takes an answer only when one of the owner's paired phones signed it, only for a card it showed, and only with an answer that card offered.
@@ -2420,7 +1844,7 @@ A turn on Telegram keeps Telegram's approvals exactly as before, and the househo
 - How a card ended, approved, denied or no longer waiting, is an `approval` entry in the owner's thread, kept once, and each page of that thread says it for its cards.
 - In the owner's own thread, a step that changes a calendar or a reminder waits for the owner's yes.
   The plugin's own `before_tool_call` hook asks for it (`approval-asks.js`), only when the turn's requester is the household channel and its session is the owner's thread, and only for the scheduler tool and commands.
-  So Telegram, the family room, scheduled runs and every other session ask nothing more than before.
+  So the family room, scheduled runs and every other session ask nothing more than before.
 - A reminder asks when the scheduler tool adds, updates or removes a job, or a command runs OpenClaw's own `cron` or `automations` CLI to add, edit, enable, disable or remove one.
   OpenClaw 2026.9.4 names the tool `automations` and turns the model's `cron` into it before any hook sees the call.
 - A calendar asks when a command runs gog's `calendar` commands or apple-cal-anywhere's `applecal.py` for anything but a read.
@@ -2444,7 +1868,7 @@ Corey could draft an email but never send one, so every message ended with the o
 - The tool sends only when that call's own approval resolved `allow-once`, and only the draft whose hash the card showed, once: a denial, no answer, a changed draft and a second send are each refused (`not_approved`, `changed`).
 - Email goes from the owner's own Gmail, the account `orderMail` names, through `gog gmail send` with no shell; a gateway with no `orderMail` offers only an order.
   Amazon has no way for anyone but the buyer to place an order, so an order's tap hands over the cart's checkout link with the total the owner approved, and the buyer pays there.
-- A command's own Gmail send, `gog gmail send` or a draft's `send`, as a command's program, after variables it sets, or inside `sh -c`, is refused in every session, Telegram's included, so mail goes out after a tap or not at all.
+- A command's own Gmail send, `gog gmail send` or a draft's `send`, as a command's program, after variables it sets, or inside `sh -c`, is refused in every session, so mail goes out after a tap or not at all.
 - The phone shows a send's card with where it goes or its total, every word with no line limit, and Approve named for what it does: Send, Book or Order.
 
 ### The Spend page
@@ -2490,43 +1914,15 @@ What was said in the app stays in each gateway's `household-app/` directory unti
 
 ### Scheduled messages in the app
 
-Every briefing and reminder on both gateways is an automation that announces to a Telegram chat: the owner's private chat or The Fam.
-An automation has one delivery target, so until 15 October none of them reached the app, and each would go silent the day Telegram is turned off.
+Every briefing and reminder on both gateways is an automation that announces to the app: its person's own thread, `household:<person>`, or the family room, `household:family`.
+Until 15 October each announced to a Telegram chat, the owner's private chat or The Fam, and none reached the app.
+From then the household-job-mirror plugin copied each run into the app, and on 22 October every job's delivery was moved to the same people in the app, changing nothing else about it; the mirror went with Telegram.
 
-`deploy/openclaw/plugins/household-job-mirror` copies each one into the app, word for word, from the same run:
-
-- OpenClaw's `cron_changed` event for a finished run says whether it succeeded and whether it chose to stay silent (`deliverySuppressionReason`, such as a `NO_REPLY`), and `llm_output` carries its words.
-  A run that succeeded, chose to speak and carried words is copied, once, whether or not Telegram took it: with Telegram off every Telegram delivery fails, and the app is where the words belong (issue #6).
-- The event does not say where the job delivers, so the plugin reads every job's delivery from the scheduler that `cron_reconciled` hands it, again whenever a job changes, and keeps what it read, since a one-time reminder is deleted once it has run.
-- The owner's private chat goes to the owner's app thread, and The Fam to the app's family room, as `targets` in the plugin's config says.
-  The app's channel keeps the copy as the assistant's message and notifies the phone, and the relay carries a family-room copy to the other gateway.
-- A reminder's copy is pushed as Time Sensitive (`interruption-level: time-sensitive`), so it gets through a Focus.
-  A reminder is a job made in a conversation, one-time or recurring, "every Monday, bins out" included, and so is a recurring briefing someone asked for.
+- A reminder someone made, one-time or recurring, "every Monday, bins out" included, is pushed Time Sensitive while it runs (`interruption-level: time-sensitive`, `createReminderPushes` in `automations.js`), so it gets through a Focus.
+  A reminder is a job with no declaration key that announces to the app.
   A job our scripts install carries a declaration key, such as `household-app:daily-brief`, and is pushed as any message is.
-  The scheduler's `automations list` does not say who made a job, since OpenClaw keeps the creator (`createdActor`) off the public record, so every job without a declaration key counts as a reminder.
-  The app declares the Time Sensitive Notifications entitlement, which its App ID needs before a signed build.
-- A job that already announces to the app, or to any other chat, is left alone.
-
-`python3 scripts/openclaw-job-mirror.py check` reports both gateways, and `apply --gateway <persona>` sets one up, keeping the config it replaces as `openclaw.json.pre-job-mirror-<UTC stamp>`.
-On 22 October each job's delivery moved to the app itself ([Telegram off](#telegram-off)), so the mirror copies only a job still aimed at Telegram, such as one made later on a Telegram chat.
-
-#### Bringing it to the box, one gateway at a time
-
-```
-# 0. Back up the gateway's state and take the PocketPiggies baseline (docs/deploy/pocket-piggies.md).
-# 1. The plugin's files, root-owned, into the read-only mount. No gateway loads it until its config names it.
-install -d -m 0755 -o root -g root /opt/household-assistant/plugins/household-job-mirror
-cp -r deploy/openclaw/plugins/household-job-mirror/. /opt/household-assistant/plugins/household-job-mirror/
-chown -R root:root /opt/household-assistant/plugins/household-job-mirror
-chmod -R u=rwX,go=rX /opt/household-assistant/plugins/household-job-mirror
-# 2. Corey first: validate, then write. A new plugin loads only when the gateway starts.
-python3 scripts/openclaw-job-mirror.py apply --gateway corey --dry-run
-python3 scripts/openclaw-job-mirror.py apply --gateway corey
-docker restart openclaw-gateway
-# 3. Health within three minutes, the plugin in the log's "listening (N plugins: ...)" line,
-#    PocketPiggies again, then the next scheduled run seen in the app.
-# 4. Denise the same way, only once Corey's checks pass.
-```
+- The app declares the Time Sensitive Notifications entitlement, which its App ID needs before a signed build.
+- A family reminder either assistant takes is a `remind` line in the household note, which the owner's gateway posts itself ([Family reminders from either assistant](#family-reminders-from-either-assistant)).
 
 ---
 
@@ -2535,14 +1931,14 @@ docker restart openclaw-gateway
 Both gateways run with `agents.defaults.heartbeat.every` set to `0m`, since 25 September.
 
 The heartbeat is OpenClaw's built-in monitor.
-Unless it is turned off, every 30 minutes it runs a model turn in the agent's main session, with that session's whole history, and delivers the model's answer to the owner's Telegram DM unless the answer is the silent `NO_REPLY`.
+Until it was turned off, every 30 minutes it ran a model turn in the agent's main session, with that session's whole history, and delivered the model's answer to the owner's Telegram DM unless the answer was the silent `NO_REPLY`.
 Nobody configured it: it is on out of the box, and neither gateway has a heartbeat checklist for it to follow.
 
 **It was the source of the unprompted messages.**
 Each one was matched to a heartbeat run.
 From 21 September, as far back as `cron runs` keeps history, the pattern is the same every time: the run starts at the gateway's fixed half-hour slot, `[telegram] outbound send ok` follows a few seconds later, and the run's `finished` entry lands a few milliseconds after the send.
 The two sets of images on 20 September were matched through the session transcript instead.
-The coordination relay was not involved: its last crossing was on 21 September, every exchange it ever carried was opened by a person, and the planner's timer is disabled.
+The coordination relay, since retired, was not involved: its last crossing was on 21 September, every exchange it ever carried was opened by a person, and the planner's timer was disabled.
 
 | gateway | when (CDT) | messages | what the heartbeat turn did |
 |---|---|---|---|
@@ -2690,11 +2086,10 @@ Host memory after all of it: 2,568 MiB used of 7,878, 5,310 MiB available, swap 
 
 ---
 
-## Bringing the box up to this: OpenRouter, voice notes, and the two seeing each other
+## Bringing the box up to this
 
-Everything above that changed on 6 October reaches the box in one pass, as root, in this order.
+The model backend and the household on the app alone reach the box in one pass, as root, in this order.
 Each step is idempotent, so a step that fails can be fixed and the pass run again from there.
-Consult the relay's [first-deploy requirements](../plan/coordination-between-assistants.md#what-the-guards-hold-against-and-what-they-do-not) before step 6.
 
 ```
 # 0. From a machine with this repository: copy it to the box, which has no GitHub access.
@@ -2715,28 +2110,19 @@ done
 #    containers, which is also what makes them read the env files again.
 scripts/openclaw-install.sh
 
-# 3. Every model route on both gateways to OpenRouter, then how a spoken reply is made.
-#    The speech step is new on 10 October. "Speaking" above has the rest of what it needs.
+# 3. Every model route on both gateways to OpenRouter.
 python3 scripts/openclaw-openrouter.py apply
-python3 scripts/openclaw-speech.py apply
 
-# 4. In BotFather: /setprivacy, Disable, for both bots. Then remove each bot from The Fam and add it back.
+# 4. The app's relay and spend job. Then memory, PocketPiggies, the app's channel and speech,
+#    one gateway at a time, Corey first, in the order of docs/deploy/retiring-telegram.md, steps 2 to 5.
+bash scripts/household-app-install.sh
 
-# 5. The family group: who may reach each assistant, voice notes, and the family-room plugin.
-python3 scripts/openclaw-family-group.py apply
-python3 scripts/openclaw-family-group.py check    # privacy off, plugin loaded, follows the policy
-
-# 6. The relay, now also handing each assistant's group posts to the other.
-bash scripts/coordination-install.sh
-
-# 7. Both gateways, end to end.
+# 5. Both gateways, end to end.
 scripts/openclaw-verify.sh
 CT=openclaw-denise PORT=18790 STATE=/var/lib/household-assistant/openclaw-denise scripts/openclaw-verify.sh
 ```
 
-Then, in The Fam, send a voice note naming nobody or a photo or video with a caption, followed by a typed question to either assistant about it.
-The answer should use the retained transcript or description alongside any caption.
-A question to one assistant about what the other just said should be answered from the other's words.
+Then, in the app, the checks in [Retiring Telegram](retiring-telegram.md#6-verify): a finance answer in Franco's own thread, the family history read in the family room, and a picture in each thread.
 
 ## What only the Overlord can finish
 
@@ -2746,8 +2132,8 @@ The SIQsermon retune that funds [the assistant budget](../phase0/budget.md) is a
 In the order to do them.
 
 1. **Bring the box up to this branch, then close the OpenAI account.**
-   Decided 6 October: everything on OpenRouter, every voice note in The Fam heard, and each assistant seeing the other's posts there.
-   The pass is in [Bringing the box up to this](#bringing-the-box-up-to-this-openrouter-voice-notes-and-the-two-seeing-each-other); only he can type the OpenRouter key and change the bots in BotFather.
+   Decided 6 October: everything on OpenRouter.
+   The pass is in [Bringing the box up to this](#bringing-the-box-up-to-this); only he can type the OpenRouter key.
    Before closing the account, sign out of OpenAI on both gateways and check that SIQsermon does not call it; see [The model backend](#the-model-backend).
    Codex served Corey from 18 September until then.
 
@@ -2763,10 +2149,8 @@ In the order to do them.
 4. **Keep the OpenRouter balance funded.**
    With OpenAI gone, chat, memory recall and voice notes all stop together when the key runs dry, so set the credit limit and an alert on the OpenRouter side.
 
-5. **Turn Telegram's privacy mode off for both bots.**
-   It is step 4 of the pass above: `/setprivacy` in BotFather, then remove each bot from The Fam and add it back. Without it no voice note reaches either bot, and neither sees a message that does not name it.
-   See [The family group](#the-family-group), [Voice notes](#voice-notes) and [Seeing each other in the group](#seeing-each-other-in-the-group).
-   Any bot token that has ever been pasted into a chat window should be revoked in BotFather and reissued.
+5. **Finish retiring Telegram.**
+   What is left on the box once both gateways run on the app alone, and the two bots themselves, are in [Retiring Telegram](retiring-telegram.md#7-what-is-left-on-the-box).
 
 6. **Authorize OAuth access to mail and calendars.**
    Those consents require the account owner's approval and were deliberately left alone.
@@ -2781,10 +2165,5 @@ In the order to do them.
 8. **The Control UI is reachable without an SSH tunnel, from his tailnet devices only.**
    It is `https://household.example.ts.net:18789/`; see [How to reach it](#how-to-reach-it).
    Making it reachable from anywhere else would still mean a Caddy route, a public port, and authentication he trusts on a box that already serves a live site, so that stays a deliberate decision rather than a convenience.
-
-9. **Ask an assistant to speak.**
-   The first voice note through the speech plugin is his to ask for, in his own chat.
-   `/tts status` there costs nothing and answers with the day's count and both ceilings.
-   See [What was checked, and how](#what-was-checked-and-how).
 
 Nothing on this list is blocked by anything except him.
