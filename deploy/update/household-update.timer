@@ -1,0 +1,18 @@
+# Once a night, at a time of each box's own picking between two and four in the morning
+# on its clock, so the households' boxes do not all fetch the same release at once. A run
+# missed while the box was down happens when it comes back.
+#
+# Lives at /etc/systemd/system/household-update.timer on a box that updates itself.
+
+[Unit]
+Description=Nightly update of the household's box to the newest signed release
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+RandomizedDelaySec=2h
+FixedRandomDelay=true
+Persistent=true
+Unit=household-update.service
+
+[Install]
+WantedBy=timers.target

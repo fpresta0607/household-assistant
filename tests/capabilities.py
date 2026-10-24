@@ -50,6 +50,10 @@ needs_symlinks = pytest.mark.skipif(
     not _can_symlink(),
     reason="needs to create symbolic links, which this account may not; CI on Linux runs it",
 )
+needs_ssh_keygen = pytest.mark.skipif(
+    shutil.which("ssh-keygen") is None or shutil.which("git") is None,
+    reason="needs git and ssh-keygen to sign and check releases; CI on Linux runs it",
+)
 needs_posix_bash = pytest.mark.skipif(
     POSIX_BASH is None,
     reason="needs a POSIX bash to run the deployment scripts, and the only bash here "
