@@ -1,20 +1,31 @@
 #!/usr/bin/env python3
-"""Each gateway takes the phones' connections that `tailscale serve` carries to it.
+"""What the first household's gateways were given by hand, given to a new household's.
 
-`tailscale serve` is a reverse proxy in front of each gateway's loopback port, and a
-gateway refuses proxied traffic from an address it has not been told is a proxy: the
-phone's WebSocket is answered `403 proxy_attribution_required` and the app sits on
-"Connecting". On the first household's box both gateways were told by hand on
+Two settings, each of which a gateway on a new box would otherwise fail
+openclaw-verify.sh on.
+
+The phones' connections. `tailscale serve` is a reverse proxy in front of each gateway's
+loopback port, and a gateway refuses proxied traffic from an address it has not been told
+is a proxy: the phone's WebSocket is answered `403 proxy_attribution_required` and the app
+sits on "Connecting". On the first household's box both gateways were told by hand on
 2026-09-24 (docs/deploy/openclaw.md, "Why the gateway trusts the host as a proxy").
 
 A box whose household file names its members runs the compose file
 scripts/household-compose.py writes, whose network gives the host one fixed address,
 GATEWAY_BRIDGE, so this writes it: `gateway.trustedProxies` is that address alone, and
 `gateway.controlUi.allowedOrigins` gains the gateway's own tailnet address, which lets
-the Control UI load from it. The first household's box is left as it was set by hand.
+the Control UI load from it.
 
-    python3 scripts/openclaw-tailnet.py check
-    python3 scripts/openclaw-tailnet.py apply [--gateway <assistant>] [--dry-run]
+The heartbeat. OpenClaw runs a model turn every 30 minutes out of the box and delivers
+anything but a silent reply to the owner, which sent messages nobody asked for until both
+of the first household's gateways were set to `agents.defaults.heartbeat.every` "0m" on
+2026-09-25 (docs/deploy/openclaw.md, "The heartbeat is off"); a fresh onboarding brings it
+back, so a new household's gateways get the same.
+
+The first household's box is left as it was set by hand.
+
+    python3 scripts/openclaw-box.py check
+    python3 scripts/openclaw-box.py apply [--gateway <assistant>] [--dry-run]
 """
 
 from __future__ import annotations
@@ -38,7 +49,9 @@ from gateway_config import (
 )
 from household_file import GATEWAY_BRIDGE
 
-LABEL = "tailnet"
+LABEL = "box"
+# What `agents.defaults.heartbeat.every` is when the recurring heartbeat is off.
+NO_HEARTBEAT = "0m"
 
 
 def origin(gateway: Gateway) -> str:
@@ -53,8 +66,16 @@ def _gateway_section(config: dict[str, Any]) -> dict[str, Any]:
     return section if isinstance(section, dict) else {}
 
 
-def tailnet_patch(config: dict[str, Any], gateway: Gateway) -> dict[str, Any]:
-    """What lets the gateway take its tailnet traffic, or {} when it already does."""
+def _heartbeat_every(config: dict[str, Any]) -> object:
+    agents = config.get("agents")
+    defaults = agents.get("defaults") if isinstance(agents, dict) else None
+    heartbeat = defaults.get("heartbeat") if isinstance(defaults, dict) else None
+    return heartbeat.get("every") if isinstance(heartbeat, dict) else None
+
+
+def box_patch(config: dict[str, Any], gateway: Gateway) -> dict[str, Any]:
+    """What the gateway still lacks of its tailnet traffic and a heartbeat that is off, or
+    {} when it has both."""
     section = _gateway_section(config)
     ui = section.get("controlUi")
     ui = ui if isinstance(ui, dict) else {}
@@ -67,7 +88,10 @@ def tailnet_patch(config: dict[str, Any], gateway: Gateway) -> dict[str, Any]:
         patch["trustedProxies"] = [GATEWAY_BRIDGE]
     if origin(gateway) not in origins:
         patch["controlUi"] = {"allowedOrigins": [*origins, origin(gateway)]}
-    return {"gateway": patch} if patch else {}
+    whole: dict[str, Any] = {"gateway": patch} if patch else {}
+    if _heartbeat_every(config) != NO_HEARTBEAT:
+        whole["agents"] = {"defaults": {"heartbeat": {"every": NO_HEARTBEAT}}}
+    return whole
 
 
 def problems(config: dict[str, Any], gateway: Gateway) -> list[str]:
@@ -81,6 +105,8 @@ def problems(config: dict[str, Any], gateway: Gateway) -> list[str]:
     origins = ui.get("allowedOrigins") if isinstance(ui, dict) else None
     if not isinstance(origins, list) or origin(gateway) not in origins:
         found.append(f"the Control UI does not allow {origin(gateway)}")
+    if _heartbeat_every(config) != NO_HEARTBEAT:
+        found.append("the recurring heartbeat is on")
     return found
 
 
@@ -89,7 +115,7 @@ def _refuse_the_first_household() -> str | None:
         return None
     return (
         "this box's household file names no members, so it is the first household's, whose "
-        "proxies were set by hand for its own networks; nothing was written"
+        "gateways were set by hand; nothing was written"
     )
 
 
@@ -103,7 +129,7 @@ def check(gateways: Sequence[Gateway]) -> int:
         found = problems(read_config(gateway), gateway)
         print(
             f"{gateway.persona}: "
-            + ("takes its tailnet traffic" if not found else "; ".join(found))
+            + ("set as the first household's are" if not found else "; ".join(found))
         )
         failed = failed or bool(found)
     return 1 if failed else 0
@@ -118,7 +144,7 @@ def apply(gateways: Sequence[Gateway], *, run: Runner, dry_run: bool) -> int:
     for gateway in gateways:
         try:
             config = read_config(gateway)
-            patch = tailnet_patch(config, gateway)
+            patch = box_patch(config, gateway)
             if not patch:
                 print(f"{gateway.persona}: nothing to write")
                 continue

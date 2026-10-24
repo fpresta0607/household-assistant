@@ -67,13 +67,13 @@ step "the household app's plugin and spend job"
 bash "${here}/household-app-install.sh"
 
 for persona in "${personas[@]}"; do
-  step "${persona}: memory, the app, scripture, speech, pictures and the tailnet"
+  step "${persona}: memory, the app, scripture, speech, pictures, the tailnet and the heartbeat"
   python3 "${here}/openclaw-memory.py" apply --gateway "${persona}"
   python3 "${here}/openclaw-household-app.py" apply --gateway "${persona}"
   python3 "${here}/openclaw-scripture.py" apply --gateway "${persona}"
   python3 "${here}/openclaw-speech.py" apply --gateway "${persona}"
   python3 "${here}/openclaw-pictures.py" apply --gateway "${persona}"
-  python3 "${here}/openclaw-tailnet.py" apply --gateway "${persona}"
+  python3 "${here}/openclaw-box.py" apply --gateway "${persona}"
 done
 
 step "each gateway on the household's tailnet"

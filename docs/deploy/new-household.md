@@ -41,7 +41,7 @@ git clone https://github.com/fpresta0607/household-assistant.git /opt/household-
    - the Bible, built once from its public-domain sources;
    - every model route to OpenRouter;
    - each assistant's memory, the household app, scripture, speech and pictures;
-   - each gateway's address on the tailnet, with `tailscale serve`, and its trust in that proxy;
+   - each gateway's address on the tailnet, with `tailscale serve`, its trust in that proxy, and OpenClaw's half-hourly heartbeat switched off;
    - the nightly backup, with a restore drill of every backup it takes;
    - and `openclaw-verify.sh` on each gateway, which fails the whole pass if any check fails.
 7. **Turns on updates** from the publisher's signed releases, once the publisher signs them ([Keeping the box current](#keeping-the-box-current)).
@@ -93,7 +93,7 @@ PocketPiggies, for the family's budget, is optional and connects the same way on
 
 - The first household's box also runs Home Assistant, its mailbox reader and a web site, and its household file names no members, so its compose file is [`deploy/openclaw/docker-compose.yml`](../../deploy/openclaw/docker-compose.yml) as the repository holds it.
   Every other box's compose file is written from its household file, and `household-converge.sh` refuses to run on the first household's box, which is brought up to a release by hand.
-- A new household's gateways share a network on `172.31.240.0/24`, so the address each gateway trusts as its tailnet proxy, `172.31.240.1`, is fixed (`openclaw-tailnet.py`).
+- A new household's gateways share a network on `172.31.240.0/24`, so the address each gateway trusts as its tailnet proxy, `172.31.240.1`, is fixed; `openclaw-box.py` gives each gateway that address, its own tailnet address for the Control UI, and the heartbeat switched off, as the first household's gateways were given them by hand.
 - Its verification expects nothing listening to the internet and only SSH through ufw, and skips the first household's iCloud calendar library: a new household's calendars come through the app.
 - The scheduled jobs that read a shared iCloud calendar (`openclaw-scheduled-jobs.py`) are not set up; they need `sharedCalendar` in the household file.
 

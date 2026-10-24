@@ -55,7 +55,7 @@ echo "on the tailnet as $(tailscale status --self --json | jq -r '.Self.DNSName'
 step "the firewall: SSH from the internet, nothing else"
 # The phones reach the assistants over the tailnet, which Tailscale's own rules admit ahead
 # of ufw's, so the only port the internet needs is SSH, for whoever runs the box.
-ufw allow OpenSSH >/dev/null
+ufw allow 22/tcp >/dev/null
 ufw --force enable >/dev/null
 ufw status | sed -n '1,6p'
 

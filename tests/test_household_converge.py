@@ -41,7 +41,7 @@ PY_STEPS = (
     "openclaw-scripture.py",
     "openclaw-speech.py",
     "openclaw-pictures.py",
-    "openclaw-tailnet.py",
+    "openclaw-box.py",
 )
 
 
