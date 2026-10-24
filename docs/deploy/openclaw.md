@@ -99,7 +99,7 @@ Two things changed because of that:
 - `openclaw-verify.sh` runs its HTTP probes inside the container, where the caller is local. From the host, `startupz` and `readyz` now answer 403.
 
 Nothing else on the box calls the gateway over HTTP.
-The app relay, the spend job and the `openclaw-*.py` scripts go through `docker exec`, which is loopback inside the container, and so does the container's own healthcheck.
+The spend job and the `openclaw-*.py` scripts go through `docker exec`, which is loopback inside the container, and so does the container's own healthcheck.
 
 If either network is ever recreated on a different subnet, the phone path fails closed with the same 403, and `openclaw-verify.sh` reports it on its `websocket over the tailnet` line.
 Setting the new host address the same way brings it back.
@@ -179,7 +179,7 @@ No systemd unit was added, because one would duplicate a restart policy that alr
 | `/var/lib/household-assistant/bin` | binaries the bundled skills need, mounted at `~/.local/bin`; `gog` today | `root`, mode 0755 |
 | `/var/lib/household-assistant/openclaw/pylocal` | the Python packages [the calendar skill](#icloud-through-apple-cal-anywhere) imports, inside the state directory so a recreated container and the backup both keep them | `1000:1000` |
 | `/etc/household-assistant/openclaw.env` | the gateway token, the OpenRouter key, the gog keyring password, and until SIQsermon is retired the SIQsermon credentials its export reads | `root`, mode 0600 |
-| `/etc/household-assistant/household.json` | the household's own identifiers: the box's tailnet name, the app's Google client, the shared calendar and the Bible edition the scripture cards link, which the repository does not hold; read by the `openclaw-*.py` installers through `load_household` in `gateway_config.py`, shaped like [`deploy/household.example.json`](../../deploy/household.example.json) | `root`, mode 0600 |
+| `/etc/household-assistant/household.json` | the household's own identifiers, which the repository does not hold: its two members, each a person with their assistant and the container, state directory and port of that assistant's gateway; the approver who lets in a phone nobody linked; the box's tailnet name, the app's Google client, the shared calendar and the Bible edition the scripture cards link. Read by the installers through `load_household` in `household_file.py`, shaped like [`deploy/household.example.json`](../../deploy/household.example.json); a file written before it named its members is Franco with Corey and Gia with Denise, on the gateways below | `root`, mode 0600 |
 
 All three state directories are bind-mounted into the container, so replacing the image never loses memory.
 `1000:1000` is the `node` user the image runs as; the container does not run as root.
@@ -1239,14 +1239,14 @@ How Telegram was taken off both gateways, and what is left of it to remove by ha
   An assistant's old Telegram bot name still counts as its name, so `@Denise_the_woman_bot` mentions Denise, and whatever an assistant writes in the app says `@Denise` in its place, the mention a person's @ writes (`withAppMentions`): on 19 October Corey wrote the bot's name in the family room, which each assistant had learned to write on Telegram, and the phones showed it as written.
   The phones draw a bot written before that as `@Denise` too.
   Every family-room message such a turn writes is marked `handedOver`, its reply and a tool's post alike: the turn names each run OpenClaw starts for it, and the tool hooks say which run each tool call is.
-  The relay carries the mark, and a marked message never starts a turn; nor does one ten minutes old or older, and one message starts at most one turn however often it arrives, so the two cannot answer each other in a loop.
+  A handed-over message that @mentions or asks the first assistant by name may start one answer back, and everything that answer writes is marked `final` as well; a final message starts nothing, and neither does a family reminder's post, which is final from the start.
+  Nor does a message ten minutes old or older, and one message starts at most one turn however often it arrives, so the two answer each other at most twice and never in a loop.
+  Until 24 October a handed-over message started nothing, so an assistant asked a question back had no turn to answer it in.
   Any other message from the other assistant starts nothing.
-- Whoever is typing in the family room, either person or either assistant, shows on every phone in it: a phone says its person is typing with `household-app.typing`, an assistant's turn says so while it runs, and each gateway puts its own side's typing in its relay outbox for the other.
+- Whoever is typing in the family room, either person or either assistant, shows on every phone in it: a phone says its person is typing with `household-app.typing`, an assistant's turn says so while it runs, and each gateway puts its own side's typing in its outbox for the other.
   A stop is someone missing from the other side's list, which the receiving gateway tells its phones as a stop; until 19 October it told them nothing, so the dots stayed under a message just sent for up to 30 seconds.
-  A typing is written to the outbox again only once less than half of its 30 seconds is left, so an assistant's turn, which OpenClaw keeps typing every four seconds, makes a relay delivery about every 16 seconds rather than every four.
-- `scripts/household-app-relay.py` carries the family room between the gateways, from the host.
-  It reads each gateway's `household-app/outbox.json` without following a symlink and pipes what is new, with its attachments, into the other container's `relay-in.mjs`, which writes it into that plugin's inbox as the gateway's own user.
-  `household-app-relay.path` starts it whenever an outbox changes, so a message reaches the other phone in a second or two, and `household-app-relay.timer` runs it every fifteen seconds as the backstop.
+  A typing is written to the outbox again only once less than half of its 30 seconds is left, so an assistant's turn, which OpenClaw keeps typing every four seconds, rewrites the outbox about every 16 seconds rather than every four.
+- The two gateways share the family room with no relay between them ([The family room between the gateways](#the-family-room-between-the-gateways)): each writes its half into a share folder, and the other reads it straight from a read-only mount the moment it changes.
 - Each person's family-room message is signed by the device key of the phone that sent it, and the other gateway keeps it only when one of that person's pinned phones signed it.
   So an assistant that writes into its own state cannot pass words off as its person's to the other assistant.
 - A message in a person's own thread is signed the same way, with `direct` as its conversation, and their gateway keeps it, and starts a turn, only when one of that person's phones signed it.
@@ -1265,7 +1265,7 @@ How Telegram was taken off both gateways, and what is left of it to remove by ha
   Calendar marks follow the [app-wide appearance contract](../ios/appearance-themes.md#app-wide-contract).
 - An assistant's answer carries a `did` list, one item for each change its run made, which the app shows as chips under the answer: an event added, moved, changed or deleted, a reminder set, moved, changed or deleted, the household cart changed, or an email drafted, with its title and when it is.
   The plugin reads each from the run's own tool calls as OpenClaw's `after_tool_call` hook reports them, a calendar or reminder the way `approval-asks.js` reads it to ask, and keeps only a call that worked; a read adds nothing (`did.js`).
-  The turn names each run OpenClaw starts for it, as a handed-over turn does, so the list goes on that turn's reply, and the relay carries a family-room reply's list to the other gateway, which keeps only the items it can read.
+  The turn names each run OpenClaw starts for it, as a handed-over turn does, so the list goes on that turn's reply, and a family-room reply's list crosses to the other gateway with it, which keeps only the items it can read.
 - A voice call with a person's own assistant runs as ordinary messages in their own thread, and when it ends, the phone folds them into one call entry with `household-app.call.end`, signed like a message (`call-log.js`).
   Only that person's and their assistant's messages said while the call lasted fold; the entry keeps their words as text only, up to 50,000 characters, and the messages go with their reactions and read markers.
   A call never leaves the person's own thread, and the gateway drops it thirty days after it ended.
@@ -1276,6 +1276,39 @@ How Telegram was taken off both gateways, and what is left of it to remove by ha
   The figures are numbers only, never anything anybody said, so `docker logs openclaw-gateway | grep "iPhone metrics"` compares one build with the next on a real phone.
 
 Each person is the owner only on their own gateway: `household:<person>` is added to `commands.ownerAllowFrom`, and the other person's messages carry no command authority.
+
+
+### The family room between the gateways
+
+Each gateway's household-app plugin writes its half of the family room into `household-app/share/` in its own state: `outbox.json`, the entries its own person and its own assistant wrote in the room with the sign-ins, the cart's, the note's and the wishlist's steps and its side's typing, and `media/`, a hard link to each attachment those entries name (`share.js`).
+Nothing else of its state is in the folder: the owner's own thread, its attachments, the stores and the settings stay where only that gateway reaches them.
+The other gateway's container mounts that one folder read-only at `/opt/household-peer` (`docker-compose.yml`), and its plugin reads it the moment the folder's watch reports a change, and every two seconds as a backstop (`peer-link.js`).
+It narrows what may cross exactly as the host relay did before it: only the other side's own person and own assistant in the family room, and the room's own photo; the sign-ins waiting there for its own person and its approver's approvals for this side's; and the steps its own assistant took.
+A person's message counts only when that person's phone signed it, as before, and an attachment only when its bytes hash to its name.
+Every read of the share opens the file without following a link, refuses anything but a regular file and is bounded, since the folder belongs to the other gateway.
+What it has read is kept in `household-app/peer-cursor.json` in its own state, so a restart reads only what is new, and an outbox that starts over is read from its start, with what was already kept kept once.
+
+`scripts/openclaw-install.sh` makes each share folder before compose starts either container, as the gateways' own user, since it sits inside a directory the assistant controls and docker would otherwise make a missing one as root, which the gateway could not write; anything but a plain folder there is refused.
+
+Until 24 October `scripts/household-app-relay.py` carried the room from the host: a path unit started it when either outbox changed, it piped what was new into the other container with `docker exec` and a node script, and a timer ran it every fifteen seconds behind that.
+A message took a second or two to cross, sometimes fifteen, and the rule for a question both assistants were asked waited twenty seconds for the other's claim because of it; with signs crossing at once it waits eight.
+`scripts/household-app-install.sh` takes the relay's units off a box that still has them.
+The plugin still takes a batch left as a file in its `household-app/inbox/`, which is how the relay delivered, for replaying one by hand.
+
+#### Bringing it to the box
+
+```
+# 0. Back up both gateways' state, as for any rollout.
+# 1. The plugin, the compose file with the two read-only mounts, and the share folders.
+#    Recreates both gateways, which then write their shares and read each other's.
+scripts/openclaw-install.sh
+# 2. The relay's units, which have nothing left to carry, off the box.
+scripts/household-app-install.sh
+# 3. Both gateways, end to end.
+scripts/openclaw-verify.sh
+```
+
+Send a message in the family room from one phone and watch it arrive on the other; the other assistant's typing should show at once.
 
 ### Voice notes in the app
 
@@ -1292,7 +1325,7 @@ A person's voice note in the app is heard once, on each gateway that answers to 
   A note in the owner's thread is heard the same way, so a spoken question is answered as fast as a typed one, with no `exec`.
 - The words are kept once per message in `room.sqlite`, as an entry of kind `transcript`, so a later turn's family history shows `(voice note) …` in place of the audio, across restarts, and the owner's phone shows them under the note: what the assistant heard is what it answered to.
   A phone shows its own on-device words only for a note the gateway has no words for.
-- The words are never relayed.
+- The words never cross to the other gateway.
   Each gateway hears the family room's notes for itself, because words the other gateway wrote would be the other assistant's to put in a person's mouth, while the audio carries the person's phone signature.
   So a family note is heard twice in all, once on each gateway, and a note in an owner's thread once.
   OpenRouter lists `openai/whisper-large-v3-turbo` at $0.0002 a minute of audio through DeepInfra and $0.00067 through Groq on 17 October, so a half-minute family note heard on both gateways costs at most about $0.0007.
@@ -1331,7 +1364,7 @@ Now the family room is the only place a post to the family goes (`family-posts.j
 - household-app's `before_tool_call` hook sees each call to `message` before it runs, from any session.
 - A `send` or `broadcast` whose targets all name the family, `family`, `fam` or `the fam`, bare or after `household:`, on the household channel or with no channel named, is sent to `household` and `family`, the family room, as this assistant's message.
   The target is the one the tool sends to, the first of `target`, `to` and `channelId` that holds anything, or each of a broadcast's `targets`.
-- In the room it is any other post of this assistant's: it pushes the owner's phones under the family thread, the relay carries it to the other gateway, one that @mentions the other assistant hands it a request, and one a handed-over turn makes is marked `handedOver` and starts nothing.
+- In the room it is any other post of this assistant's: it pushes the owner's phones under the family thread, it crosses to the other gateway, one that @mentions the other assistant hands it a request, and one a handed-over turn makes is marked `handedOver` and starts nothing.
 - A call that names Telegram, as `channel: "telegram"` or `"tg"` or a target after `telegram:` or `tg:`, is refused with a line saying where to post, and nothing is sent; so is a post to the family that names an account other than the default.
 - Every turn is told the same (`householdRoutingGuidance`): The Fam is the app's family room, a post to the family is `message` with `channel=household` and `target=family`, a message to the owner alone goes to their household id, and family facts go in the household note.
 
@@ -1392,7 +1425,7 @@ The gateway log should show no `pocket-piggies: finance is off` line.
 ```
 # run on the box on 15 October 2026, for the pairing update and again for the turn fix
 # 0. Back up the gateway's state and take the PocketPiggies baseline (docs/deploy/pocket-piggies.md).
-# 1. The plugin into the mount, the relay and its units. No gateway loads it yet.
+# 1. The plugin into the mount. No gateway loads it yet.
 bash scripts/household-app-install.sh
 # 2. Corey first: validate, then write. This restarts Corey's channels in process.
 python3 scripts/openclaw-household-app.py apply --gateway corey --dry-run
@@ -1429,7 +1462,7 @@ The app pairs at once as the person the code names, with no chooser, or the pers
 It connects as a mobile node; OpenClaw approves that connect by itself and hands the phone a chat-only operator token, never admin.
 
 A phone paired this way speaks for its person in the family room at once.
-Each gateway trusts the app phones in its own `devices list`, and tells the other gateway which those are in its relay outbox, so nobody pins keys by hand.
+Each gateway trusts the app phones in its own `devices list`, and tells the other gateway which those are in its outbox, so nobody pins keys by hand.
 That is the same source `apply` pins from, without the hand step: a gateway that was itself compromised could vouch for a key of its own, which holds for pinning too, since the script reads the same list.
 Keys pinned by `apply` still count, and `apply` still prints each phone by device id, name and approval date and never its key.
 
@@ -1437,7 +1470,7 @@ Account in the app lists its person's iPhones with `household-app.phones`, from 
 It removes one of the others with `household-app.phones.remove`, and asks for a setup code for a new iPhone with `household-app.pair.code`, which answers with the code and its link.
 Both are signed by one of the person's phones over `household-app/phone/v1` and share the settings replay guard.
 A removal runs OpenClaw's own `devices remove` inside the gateway's container, the way the box runs it, which drops the phone's tokens and closes its connections.
-The plugin then forgets the phone's push registration, and the next relay outbox leaves its key out, so the other gateway stops believing it too, unless `apply` pinned that key, which stays until `apply` runs again.
+The plugin then forgets the phone's push registration, and the next outbox it writes leaves its key out, so the other gateway stops believing it too, unless `apply` pinned that key, which stays until `apply` runs again.
 A phone never removes itself this way, since Pair this iPhone again does that on the phone.
 
 ### Signing in with Apple
@@ -1453,8 +1486,8 @@ A phone already paired links its person's Apple ID with the `household-app.apple
 
 An Apple ID nobody linked waits, at most eight at a time and for a day at most, until the household's approver says yes from his own app.
 `apply` names Franco as the approver on both gateways, as `channels.household.approver`.
-His app lists the sign-ins waiting on both gateways through `household-app.apple.waiting`, since each gateway puts its own in the relay outbox, and approves one with `household-app.apple.approve`, signed by his phone's key.
-The other gateway hears his approval over the relay and checks that signature against the keys of his phones it already believes for his family-room messages, which is the same boundary the room draws: a gateway that was itself compromised could vouch for a key of its own.
+His app lists the sign-ins waiting on both gateways through `household-app.apple.waiting`, since each gateway puts its own in its outbox, and approves one with `household-app.apple.approve`, signed by his phone's key.
+The other gateway reads his approval from the first one's share and checks that signature against the keys of his phones it already believes for his family-room messages, which is the same boundary the room draws: a gateway that was itself compromised could vouch for a key of its own.
 The waiting phone holds a ticket it was given with its wait, and `POST /household-app/apple/status` gives it the setup code once approved, once.
 
 ### Faces
@@ -1462,12 +1495,12 @@ The waiting phone holds a ticket it was given with its wait, and `POST /househol
 Each person picks their own photo and their assistant's in the app, from Photos.
 Either person may also set the family room's own photo, from its page in the app.
 The phone uploads the photo like any attachment and names it with `household-app.avatar.set`, which takes only the phone's own person, that person's assistant or the family room (`family`), and only a JPEG or PNG of at most a megabyte.
-The face is an `avatar` entry in the family room, one per participant and one for the room, with the newest kept, so the relay carries it and its photo to the other gateway, and every page a phone reads lists each participant's face with the participants and the room's own photo as `familyAvatar`.
-The relay carries an entry only when the side it comes from may say it: its own person's and its own assistant's, and the room's photo, which either side may change.
+The face is an `avatar` entry in the family room, one per participant and one for the room, with the newest kept, so it and its photo cross to the other gateway, and every page a phone reads lists each participant's face with the participants and the room's own photo as `familyAvatar`.
+An entry crosses only when the side it comes from may say it: its own person's and its own assistant's, and the room's photo, which either side may change.
 
 Either person may also change the family room's look from its page: the color of the ring round its face, and its appearance, Auto, where each phone keeps its own, or Custom, one chat background for both phones.
 The phone sends each change with `household-app.look.set`, and a new room photo counts as one too.
-Each change is a `look` entry in the family room, written as the person who made it, so the relay carries it like that person's messages, and it holds only what it changed.
+Each change is a `look` entry in the family room, written as the person who made it, so it crosses like that person's messages, and it holds only what it changed.
 Every page a phone reads gives the look as `familyLook`, each field as its newest change left it, so two people changing different things at once both keep their change, and Custom keeps the latest custom background whoever chose it.
 A history page also lists the changes made among its messages as `looks`, which the app shows in the room as a line with its time, such as "Franco changed the group color".
 An app from before this ignores both.
@@ -1486,7 +1519,7 @@ Precise or approximate is their own switch in iOS, and every position carries it
   So neither an assistant nor a client holding a write-scoped token can plant a position.
   A report signed more than five minutes from the gateway's clock, or no newer than the last one, is refused, so a share played back after a stop cannot bring the position back.
 - The gateway keeps only the latest position, with its time and accuracy, and only in memory.
-  It is never in `room.sqlite` or the outbox, so the relay never carries it to the other gateway and no backup copies it.
+  It is never in `room.sqlite` or the outbox, so it never crosses to the other gateway and no backup copies it.
   It is forgotten when the phone says off, on a pause, a stop or a share whose time is up, at the share's end on the gateway's own clock, and when the channel stops or the gateway restarts, after which the phone says again when it next moves or opens.
 - `household_location` is the assistant's one tool for it, read-only.
   It is offered in the owner's own thread, whose turn starts only from a message the owner's phone signed and names the owner as `requesterSenderId`, the same proof PocketPiggies takes.
@@ -1494,7 +1527,7 @@ Precise or approximate is their own switch in iOS, and every position carries it
   Every other session, automations, sub-agents and a gateway client's `chat.send` get no tool.
   Its description tells the assistant to use the position only for what was asked, never to keep it or send it anywhere but the conversation, and to search by town or street rather than coordinates.
 - Nothing runs in the background on the gateway: the tool reads the latest position when a turn asks for it.
-- The relay carries no position, so Corey knows only Franco's and Denise only Gia's, and asking Denise where Franco is gets no answer.
+- No position crosses between the gateways, so Corey knows only Franco's and Denise only Gia's, and asking Denise where Franco is gets no answer.
   Sharing across gateways is left out until the household needs it.
 
 `apply` hands the tool to the model through `tools.alsoAllow`, ahead of the PocketPiggies tools so the finance guard finds nothing to move, and `check` reports a gateway without it.
@@ -1506,19 +1539,19 @@ The tool reads no file and reaches no key holder, and in the family room it answ
 ### Maps in a conversation
 
 A person can also show where they are to a conversation, as Messages does: from the composer's plus, once, or live for 15 minutes, an hour or until the end of the day.
-That is a message, unlike the sharing above, so it is kept and relayed like one, and both people and both assistants in the family room see it.
+That is a message, unlike the sharing above, so it is kept and crosses like one, and both people and both assistants in the family room see it.
 
 - The map is a message whose `location` holds the place in whole millionths of a degree, its accuracy, when it was measured and, for a live one, when it ends.
   The phone signs it under its own version line, `household-app/map/v1`, with the place in the signed text, so a message signed without a place can never be given one ([`signature.js`](../../deploy/openclaw/plugins/household-app/signature.js)).
 - While a live map lasts, the phone moves it with `household-app.location.live`, each update signed on its own, and a stop with no position ends it early ([`map-share.js`](../../deploy/openclaw/plugins/household-app/map-share.js)).
   The gateway keeps the newest update as one `live` entry per map, refuses one no newer than it, and takes none once the share has ended or stopped.
-  The relay carries it like a reaction, and the other gateway takes it only with the person's phone signature and only if it was signed before the end.
+  It crosses like a reaction, and the other gateway takes it only with the person's phone signature and only if it was signed before the end.
 - The assistant hears a map in its turn as OpenClaw writes any channel's shared location, `📍` or `🛰 Live location:` with the coordinates, and never its later moves.
   Nothing looks the place up on the gateway.
 - An assistant's own small map in an answer is a `map` card ([the steward-cards skill](../../deploy/openclaw/skills/steward-cards/SKILL.md)), drawn by MapKit on the phone with the way there from the phone's own position, so the gateway sends no picture and never sees the route.
 - A reminder by place is a `place-reminder` card.
   The person it is for taps Set on their own iPhone, which watches the place itself with `CLMonitor` and says it with a notification, so the place and the moment never come back to the gateway.
-  When it would watch somebody else, such as "when Gia leaves work", it is a request in the family room that only her iPhone can answer, with `household-app.place.answer`, signed like a message and relayed as a `place` entry ([`place-consent.js`](../../deploy/openclaw/plugins/household-app/place-consent.js)).
+  When it would watch somebody else, such as "when Gia leaves work", it is a request in the family room that only her iPhone can answer, with `household-app.place.answer`, signed like a message and crossing as a `place` entry ([`place-consent.js`](../../deploy/openclaw/plugins/household-app/place-consent.js)).
   Her iPhone watches the place only after her yes, and when it happens it replies to the card in the family room, which starts the asking assistant's turn there.
 
 ### The household cart
@@ -1530,7 +1563,7 @@ Amazon has no API to fill a personal cart or place an order, and Amazon Business
   An item is down for whoever asked, by the turn's signed sender, and no argument names a person.
   Automations, sub-agents and a gateway client's `chat.send` get no tool.
 - Each gateway keeps every step either assistant took, add, remove, quantity and an order's status, in `household-app/cart.sqlite`.
-  It publishes only its own steps in the outbox's `cart` section, the relay carries them to the other gateway when they change, and the receiving plugin checks each one before keeping it: the other assistant's own, a known kind, an item for Franco or Gia with a sensible name and quantity, and an amazon.com product link or none.
+  It publishes only its own steps in the outbox's `cart` section, they cross to the other gateway when they change, and the receiving plugin checks each one before keeping it: the other assistant's own, a known kind, an item for Franco or Gia with a sensible name and quantity, and an amazon.com product link or none.
   Both gateways replay the same steps in time order, so both show the same cart.
 - A link is kept only as an amazon.com product page, reduced to `https://www.amazon.com/dp/<id>`.
   Check out is Amazon's Add to Cart form with every item that has one, which opens in the Amazon app on the phone and asks the person to add them, and the person pays there.
@@ -1548,7 +1581,7 @@ Amazon has no API to fill a personal cart or place an order, and Amazon Business
   The first read, with no `household-app/order-mail-seen.json` yet, records the week it finds without posting. After that each step beyond where the order stood posts the order card in the owner's thread, and a delivery also posts one line in the family room, with no detail.
   No email text reaches an assistant or the log. A message that cannot be fetched three times is left.
   It is off on both gateways until an owner's Gmail with Amazon mail is connected. Once that is connected and a count shows Amazon mail in it, Denise's is turned on with `docker exec -i openclaw-denise node dist/index.js config patch --stdin`, given `{"channels":{"household":{"orderMail":{"account":"<her Gmail>"}}}}`.
-- A gateway's cart steps ride along with every relay delivery, so one that lost `cart.sqlite` gets the other's back with the next one, though not its own.
+- A gateway's cart steps ride along with every batch the other side reads, so one that lost `cart.sqlite` gets the other's back with the next one, though not its own.
 - The cart holds at most 40 open items, and an item's name at most 120 characters.
 
 The cards are the app's `cart` and `order` (`deploy/openclaw/skills/steward-cards/SKILL.md`).
@@ -1558,7 +1591,7 @@ The cards are the app's `cart` and `order` (`deploy/openclaw/skills/steward-card
 
 ```
 # 0. Back up the gateway's state and take the PocketPiggies baseline (docs/deploy/pocket-piggies.md).
-# 1. The plugins into the mount and the relay that carries cart steps. No gateway reloads yet.
+# 1. The plugins into the mount. No gateway reloads yet.
 bash scripts/household-app-install.sh
 # 2. PocketPiggies' safe list and the room's list together, which restarts Corey onto both plugins.
 #    The list must not name household_cart before finance's own list does, or finance turns off.
@@ -1600,7 +1633,7 @@ Something asked in passing that a turn does not finish is a line with who will d
 Every app turn on both gateways starts with the promises still open, this assistant's own first, and `done` closes one.
 
 - **Where it lives.** Each gateway keeps every step either assistant took, adding, correcting or removing a line, in `household-app/notes.sqlite` under its state, beside `cart.sqlite`.
-  It publishes only its own steps in the outbox's `notes` section, the relay carries them to the other gateway when they change and with every delivery after, and the receiving plugin checks each one: the other assistant's own, a known kind, a line for someone in the household, a topic of at most 60 characters and one line of words of at most 500, with no control or invisible characters, and a time at most five minutes ahead of its own clock, since a step from further ahead would sort after every correction made here.
+  It publishes only its own steps in the outbox's `notes` section, they cross to the other gateway when they change and with every batch after, and the receiving plugin checks each one: the other assistant's own, a known kind, a line for someone in the household, a topic of at most 60 characters and one line of words of at most 500, with no control or invisible characters, and a time at most five minutes ahead of its own clock, since a step from further ahead would sort after every correction made here.
   Both gateways replay the same steps in time order, so both notes agree, and a gateway that lost its file gets the other's steps back with the next delivery.
   The nightly backup carries it with the rest of each gateway's state.
 - **Who reads it.** Every app turn starts with it.
@@ -1640,9 +1673,9 @@ For "Handing a request to Denise", follow [the assistants' direct line](#the-ass
 
 #### Bringing it to the box, one gateway at a time
 
-The steps are the cart's, under the box's rollout lock: `household-app-install.sh` for the plugins and the relay, `pocket-piggies-install.py --restart` for the safe list and the room's list together, `openclaw-household-app.py apply` for the tool and the room's list, then the proof with `tools.effective`, Corey first and Denise only once Corey's checks pass.
+The steps are the cart's, under the box's rollout lock: `household-app-install.sh` for the plugins, `pocket-piggies-install.py --restart` for the safe list and the room's list together, `openclaw-household-app.py apply` for the tool and the room's list, then the proof with `tools.effective`, Corey first and Denise only once Corey's checks pass.
 `notes.sqlite` is made the first time the channel starts on the new plugin.
-While Denise still runs the old plugin, a line written on Corey reaches her file only with the relay's next delivery of anything after her restart, a message, a read or a typing, since the steps ride along with every delivery but are a delivery of their own only when they change.
+While Denise still runs the old plugin, a line written on Corey reaches her file only with the next batch she reads of anything after her restart, a message, a read or a typing, since the steps ride along with every batch but are a batch of their own only when they change.
 
 ### The assistants' direct line
 
@@ -1758,15 +1791,15 @@ A gift for one parent must never reach that parent, and both parents read the ho
 - `household_wish` (`wish-tool.js`) keeps a wish (`wish`: who and what, in their words) quietly, in the owner's own turns only: their thread and their own session of the family room.
   Its description tells the assistant never to say it kept one or for whom, and never to bring one up.
 - Each gateway keeps the wishes it hands to its own person in `household-app/wishes.sqlite` (`wishes.js`), and where a wish goes depends on whom it is for:
-  - A wish of the gateway's own person goes to the other gateway only, as a step of the relay's `wishes` log, and is kept there for the other parent.
+  - A wish of the gateway's own person goes to the other gateway only, as a step of the outbox's `wishes` log, and is kept there for the other parent.
     The other side answers with a `seen` step, and the sending side then deletes the wish's step, so its words leave that person's own side once delivered.
   - A wish of the other parent is kept on this side for this gateway's own person, and never crosses.
   - Anyone else's, such as a child's, is kept on this side and sent to the other, so both parents get it.
 - `birthday` keeps someone's birthday (MM-DD or YYYY-MM-DD) and it crosses to the other side, the later one winning; Christmas is 25 December for everyone.
 - Every hour, and as the channel starts, each gateway posts its own person, with no model, the wishes of the last year of each person whose birthday or Christmas is 21 days away or less, once a year for each occasion: "Gia's birthday is in 21 days, Thu, Nov 12. Things Gia said they wanted:" and a line for each, with when it was said.
 - `view` shows only the wishes kept for the owner, which are never the owner's own.
-- The host relay carries the `wishes` log beside the cart's and the note's (`STEP_LOGS` in `household-app-relay.py`), only the source assistant's own steps, and no phone is shown any of it.
-- A wish of a person's own waits in that gateway's outbox until the other side has it, so a relay that is down keeps it there longer; nothing in that gateway's turns, pages or line shows it.
+- The `wishes` log crosses beside the cart's and the note's (`STEP_LOGS` in `peer-link.js`), only the source assistant's own steps, and no phone is shown any of it.
+- A wish of a person's own waits in that gateway's outbox until the other side has it, so a gateway that is down keeps it there longer; nothing in that gateway's turns, pages or line shows it.
 
 ### Document and deadline vault
 
@@ -1822,7 +1855,7 @@ Each reaction shows as a small badge on the bubble's top corner, an assistant's 
   It takes a message id and one of the five, and reacts only to Franco's or Gia's message in the conversation its turn is in, never to an assistant's (`react-tool.js`, `room.js`).
   Its description tells the assistant to use it sparingly, only where a person naturally would, and never instead of answering.
 - The turn already names the messages it can react to: OpenClaw 2026.9.4 gives the message being answered as `message_id` in the turn's conversation info, and starts each line of the family room's history with its message's `#id`.
-- In the family room the tapback is an ordinary `reaction` entry by the assistant, which the relay carries like the owner's own.
+- In the family room the tapback is an ordinary `reaction` entry by the assistant, which crosses like the owner's own.
   The receiving gateway keeps the other assistant's reaction only when it is one of the five and on a person's message.
 - When Franco or Gia reacts to an assistant's message, or takes a reaction back, that assistant's gateway queues one line for its next turn in that conversation through OpenClaw's next-turn injection, as a checklist tick does: `Franco reacted ❤️ to your message: "<its first words>"`, and that it needs no answer.
   It never starts a turn, and a line not taken within a day is dropped (`tapbacks.js`).
@@ -1909,7 +1942,7 @@ docker exec openclaw-gateway cp /home/node/.openclaw/openclaw.json.pre-household
   /home/node/.openclaw/openclaw.json
 ```
 
-`systemctl disable --now household-app-relay.path household-app-relay.timer` stops the relay, and `systemctl disable --now household-spend.timer` stops the spend job.
+`systemctl disable --now household-spend.timer` stops the spend job.
 What was said in the app stays in each gateway's `household-app/` directory until it is deleted by hand.
 
 ### Scheduled messages in the app
@@ -2113,7 +2146,7 @@ scripts/openclaw-install.sh
 # 3. Every model route on both gateways to OpenRouter.
 python3 scripts/openclaw-openrouter.py apply
 
-# 4. The app's relay and spend job. Then memory, PocketPiggies, the app's channel and speech,
+# 4. The app's spend job. Then memory, PocketPiggies, the app's channel and speech,
 #    one gateway at a time, Corey first, in the order of docs/deploy/retiring-telegram.md, steps 2 to 5.
 bash scripts/household-app-install.sh
 

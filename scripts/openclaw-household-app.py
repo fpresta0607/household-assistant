@@ -100,17 +100,17 @@ PLUGIN = "household-app"
 PLUGIN_PATH = f"/opt/household-plugins/{PLUGIN}"
 PLUGIN_ON_HOST = Path(f"/opt/household-assistant/plugins/{PLUGIN}/openclaw.plugin.json")
 CHANNEL = "household"
-PEOPLE = {"franco": "Franco", "gia": "Gia"}
-# The household's identifiers, from the box's household file.
+# The household's members and identifiers, from the box's household file.
 IDENTIFIERS = load_household()
+PEOPLE = {member.person: member.name for member in IDENTIFIERS.members}
 # Where each person's phone reaches their assistant's gateway: the box's tailnet routes
-# (docs/deploy/openclaw.md). The /app setup code carries it, so nobody types an address.
+# (docs/deploy/openclaw.md). A setup code carries it, so nobody types an address.
 PHONE_URLS = {
-    "corey": f"wss://{IDENTIFIERS.gateway_host}:18789",
-    "denise": f"wss://{IDENTIFIERS.gateway_host}:18790",
+    member.assistant: f"wss://{IDENTIFIERS.gateway_host}:{member.port}"
+    for member in IDENTIFIERS.members
 }
-# Who lets a new phone in that signed in with Apple, from his own app, on both gateways.
-APPROVER = "franco"
+# Who lets a new phone in that signed in with Apple, from their own app, on both gateways.
+APPROVER = IDENTIFIERS.approver
 # The family room's tools: none reads the gateway's files or reaches the key holders.
 # Must equal GROUP_TOOLS in pocket-piggies-install.py, whose guard keeps the same list there
 # on a gateway with finance, and SAFE_GROUP_TOOLS in the PocketPiggies plugin.

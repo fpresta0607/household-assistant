@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -19,11 +20,14 @@ from household.identity import (
     register_route,
 )
 
-# The installers and the coordination relay read the household's identifiers from the
-# box's household file. The tests read the made-up ones in the example.
+# The installers read the household's members and identifiers from the box's household
+# file. The tests read the made-up ones in the example.
 os.environ["HOUSEHOLD_FILE"] = str(
     Path(__file__).resolve().parent.parent / "deploy" / "household.example.json"
 )
+# On the box each script runs from scripts/, which puts the household file's reader and
+# gateway_config on its import path; a test loading one by its path needs the same.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 CHANNEL = "telegram"
 

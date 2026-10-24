@@ -337,7 +337,7 @@ Getting the guess wrong in the cautious direction costs nothing; getting it wron
 Added 6 October 2026, at the Overlord's request that Corey and Denise be able to see each other's messages in The Fam.
 
 Once the plugin and relay are installed, each assistant's already-posted group messages become background for the other's addressed group turns.
-Capture, delivery and retention are documented in [Seeing each other in the group](../deploy/openclaw.md#seeing-each-other-in-the-group).
+Capture, delivery and retention are documented, as they are since the family room took the group's place, in [Reading the family room's earlier messages](../deploy/openclaw.md#reading-the-family-rooms-earlier-messages).
 
 It is visibility, not a conversation, and it keeps the property the rest of this section rests on:
 

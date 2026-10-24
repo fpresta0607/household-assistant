@@ -56,6 +56,7 @@ echo "==> the spend job into ${HOUSEHOLD_APP_TARGET}"
 install -d -m 0755 "${HOUSEHOLD_APP_TARGET}"
 install -m 0755 "${RELEASE}/scripts/household-spend.py" "${HOUSEHOLD_APP_TARGET}/household-spend.py"
 install -m 0644 "${RELEASE}/scripts/gateway_config.py" "${HOUSEHOLD_APP_TARGET}/gateway_config.py"
+install -m 0644 "${RELEASE}/scripts/household_file.py" "${HOUSEHOLD_APP_TARGET}/household_file.py"
 rm -f "${HOUSEHOLD_APP_TARGET}/household-app-relay.py"
 
 echo "==> its state directory"

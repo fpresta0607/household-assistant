@@ -42,13 +42,16 @@ import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 
+from household_file import load_household
+
 ROOT = Path(__file__).resolve().parents[1]
 CODE = Path("/opt/household-assistant/home")
 STATE_ROOT = Path("/var/lib/household-home")
 GATEWAY_STATE_ROOT = Path("/var/lib/household-assistant")
 SYSTEMD_UNITS = Path("/etc/systemd/system")
 UNIT = "household-home@.service"
-GATEWAYS = {"corey": "openclaw", "denise": "openclaw-denise"}
+# Each assistant's gateway state directory, from the household file's members.
+GATEWAYS = {member.assistant: member.state for member in load_household().members}
 SOCKET_DIRECTORY = "home"
 PAIR_DIRECTORY = Path("/run/household-home-pair")
 HOME_ASSISTANT_STATE = GATEWAY_STATE_ROOT / "homeassistant"
@@ -333,7 +336,7 @@ def install(
 ) -> str:
     """Everything one gateway's key holder needs, then restart it and read its state back."""
     if persona not in GATEWAYS:
-        raise ValueError("use corey or denise")
+        raise ValueError(f"use one of the household's assistants: {', '.join(GATEWAYS)}")
     user = key_holder_user(persona)
     if run(["id", "-u", user], capture_output=True, text=True, check=False).returncode != 0:
         run(

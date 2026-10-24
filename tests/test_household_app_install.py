@@ -77,6 +77,7 @@ def test_it_installs_the_spend_job_the_plugin_and_the_units_and_starts_them(
         ROOT / "scripts" / "household-spend.py"
     ).read_bytes()
     assert (target / "gateway_config.py").exists()
+    assert (target / "household_file.py").exists()
     plugin = paths["HOUSEHOLD_APP_PLUGINS"] / "household-app"
     for name in (
         "index.js",

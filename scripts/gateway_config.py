@@ -1,8 +1,8 @@
-"""Reading and patching the two OpenClaw gateways' config from the host, as root.
+"""Reading and patching the household's OpenClaw gateways' config from the host, as root.
 
-Shared by openclaw-family-group.py, openclaw-openrouter.py and openclaw-speech.py, which
-import it from the directory they run in, so copy the whole scripts/ directory to the box
-together.
+Shared by the openclaw-*.py scripts, which import it from the directory they run in, so
+copy the whole scripts/ directory to the box together. The gateways are the household
+file's members (household_file.py), one gateway for each.
 
 Every gateway setting the household depends on lives only on the box, in each
 gateway's openclaw.json. These helpers read that file without trusting the directory
@@ -22,7 +22,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-STATE_ROOT = Path("/var/lib/household-assistant")
+from household_file import (
+    HOUSEHOLD_FILE,
+    Household,
+    Member,
+    UnsupportedConfig,
+    load_household,
+)
+
+__all__ = ["HOUSEHOLD_FILE", "Household", "Member", "UnsupportedConfig", "load_household"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,52 +47,12 @@ class Gateway:
         return self.state / "openclaw.json"
 
 
-GATEWAYS = (
-    Gateway("corey", "openclaw-gateway", STATE_ROOT / "openclaw", "franco"),
-    Gateway("denise", "openclaw-denise", STATE_ROOT / "openclaw-denise", "gia"),
-)
-
-# The household's own identifiers live on the box, in a root-only file the repository
-# does not hold. deploy/household.example.json shows its shape, and HOUSEHOLD_FILE
-# points the test suite at its own.
-HOUSEHOLD_FILE = Path(os.environ.get("HOUSEHOLD_FILE", "/etc/household-assistant/household.json"))
+def gateway_of(member: Member) -> Gateway:
+    return Gateway(member.assistant, member.container, member.state_dir, member.person)
 
 
-@dataclass(frozen=True, slots=True)
-class Household:
-    """Where the phones reach the gateways, the app's Google client, the calendar the
-    planner reads and the Bible edition the household reads. The Telegram group and
-    accounts a file written before Telegram was retired still names are not read."""
-
-    gateway_host: str
-    google_client_id: str
-    shared_calendar: str
-    shared_calendar_apple_id: str
-    bible_version: str
-
-
-def _text(section: dict[str, Any], key: str, path: Path) -> str:
-    value = section.get(key)
-    if not isinstance(value, str) or not value:
-        raise UnsupportedConfig(f"{path} has no {key}")
-    return value
-
-
-def load_household(path: Path = HOUSEHOLD_FILE) -> Household:
-    loaded = json.loads(path.read_bytes())
-    if not isinstance(loaded, dict):
-        raise UnsupportedConfig(f"{path} is not a JSON object")
-    calendar = loaded.get("sharedCalendar")
-    if not isinstance(calendar, dict):
-        raise UnsupportedConfig(f"{path} has no sharedCalendar")
-    return Household(
-        gateway_host=_text(loaded, "gatewayHost", path),
-        google_client_id=_text(loaded, "googleClientId", path),
-        shared_calendar=_text(calendar, "name", path),
-        shared_calendar_apple_id=_text(calendar, "appleId", path),
-        bible_version=_text(loaded, "bibleVersion", path),
-    )
-
+# The household's gateways, one for each member of the household file.
+GATEWAYS = tuple(gateway_of(member) for member in load_household().members)
 
 # family_history, pictures and finance answer only in the family room or a person's own
 # thread, which they tell apart by session key. OpenClaw's default puts every DM in one
@@ -96,10 +64,6 @@ ISOLATED_DM_SCOPES = ("per-channel-peer", "per-account-channel-peer")
 GATEWAY_TIMEOUT_SECONDS = 120
 
 Runner = Callable[..., "subprocess.CompletedProcess[str]"]
-
-
-class UnsupportedConfig(ValueError):
-    """A config shape a script does not evaluate, rather than guess at."""
 
 
 def gateway_for(container: str, state: Path) -> Gateway | None:

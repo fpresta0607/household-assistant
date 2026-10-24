@@ -1,4 +1,25 @@
 {
+  "members": [
+    {
+      "person": "franco",
+      "name": "Franco",
+      "assistant": "corey",
+      "assistantName": "Corey",
+      "container": "openclaw-gateway",
+      "state": "openclaw",
+      "port": 18789
+    },
+    {
+      "person": "gia",
+      "name": "Gia",
+      "assistant": "denise",
+      "assistantName": "Denise",
+      "container": "openclaw-denise",
+      "state": "openclaw-denise",
+      "port": 18790
+    }
+  ],
+  "approver": "franco",
   "gatewayHost": "household.example.ts.net",
   "googleClientId": "123456789012-abcdefghijklmnopqrstuvwxyz012345.apps.googleusercontent.com",
   "sharedCalendar": {

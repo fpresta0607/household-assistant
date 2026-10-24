@@ -29,6 +29,7 @@ from gateway_config import (
     backup,
     config_patch,
     field,
+    load_household,
     patched,
     read_config,
 )
@@ -41,9 +42,10 @@ PLUGIN_ON_HOST = Path(f"/opt/household-assistant/plugins/{PLUGIN}/openclaw.plugi
 TOOLS = ["recall", "forget"]
 
 # Who is in the family, by household person id, and the name a request of theirs is kept
-# under: the ids and names openclaw-household-app.py gives the app's channel. A request
-# kept in the family room is kept under the sender's name, so the plugin needs both.
-NAMES = {"franco": "Franco", "gia": "Gia"}
+# under: the household file's members, whose ids and names openclaw-household-app.py gives
+# the app's channel. A request kept in the family room is kept under the sender's name, so
+# the plugin needs both.
+NAMES = {member.person: member.name for member in load_household().members}
 
 # What the plugin's config held while the family used Telegram. The plugin refuses a
 # config that still has any of them.

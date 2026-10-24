@@ -103,7 +103,7 @@ These rules do not bend.
 - **Memory has a budget.** Every container declares a memory limit, so a runaway assistant cannot starve the rest of the box.
 
 The Python service in [household/](household) is where these rules are written and tested, against mocked providers, with no credential from anyone.
-The deployed gateways follow the owner-authorized exception in [the family group](docs/deploy/openclaw.md#the-family-group).
+The deployed gateways follow the owner-authorized exception in [the family room](docs/deploy/openclaw.md#what-a-family-room-turn-may-use).
 
 ## How it runs
 

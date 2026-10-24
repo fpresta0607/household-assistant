@@ -37,6 +37,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from household_file import load_household
+
 PLUGIN_ID = "pocket-piggies"
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "deploy" / "openclaw" / "plugins" / PLUGIN_ID
@@ -69,9 +71,10 @@ APP_REDIRECT = "steward://pocketpiggies/linked"
 # The app's channel, and the keys beside the channels in `channels` that configure them all.
 CHANNEL = "household"
 CHANNEL_SETTINGS = {"defaults", "modelByChannel"}
+# Each assistant's gateway, its state directory and container, from the household file's
+# members. The guard reads the same file, beside it in the key holder's code directory.
 GATEWAYS = {
-    "corey": ("openclaw", "openclaw-gateway"),
-    "denise": ("openclaw-denise", "openclaw-denise"),
+    member.assistant: (member.state, member.container) for member in load_household().members
 }
 FINANCE_TOOLS = ["pocketpiggies_catalog", "pocketpiggies_read", "pocketpiggies_records"]
 # The family room's tools. Must equal SAFE_GROUP_TOOLS in the plugin, which refuses finance
@@ -116,7 +119,10 @@ def key_holder_user(persona: str) -> str:
 
 def _check_owner(persona: str, owner: str, telegram_id: str | None) -> None:
     if persona not in GATEWAYS or not PERSON.fullmatch(owner):
-        raise ValueError("use corey or denise and the owner's household person id")
+        raise ValueError(
+            f"use one of the household's assistants ({', '.join(GATEWAYS)}) and the owner's "
+            "household person id"
+        )
     if telegram_id is not None and not TELEGRAM_ID.fullmatch(telegram_id):
         raise ValueError("a Telegram id is a positive number")
 
@@ -441,7 +447,11 @@ def install_key_holder(
     for module in sorted((ROOT / "household" / "pocketpiggies").glob("*.py")):
         _copy_root_owned(module, package / module.name)
     # The guard runs this installer from here at any moment, so each script is swapped in
-    # with one rename: a run sees the old file or the new one, never none.
+    # with one rename: a run sees the old file or the new one, never none. The household
+    # file's reader goes first, since the installer imports it.
+    _replace_root_owned(
+        ROOT / "scripts" / "household_file.py", code_root / "household_file.py", 0o644
+    )
     for name in ("pocketpiggies-keyholder.py", "pocket-piggies-install.py"):
         _replace_root_owned(ROOT / "scripts" / name, code_root / name, 0o755)
 
