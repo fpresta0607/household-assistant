@@ -1,0 +1,9 @@
+# Whom a household's box trusts to sign a release: one line per key, a principal, the
+# namespace a release signature is made in, then the public key as ssh-keygen wrote it.
+# docs/deploy/updates.md says how the publisher makes the key and signs a release.
+#
+# Copy this to deploy/update/allowed_signers with the publisher's real public key in place
+# of the line below; `household-update.py install --signers` puts it on the box once, at
+# /etc/household-assistant/allowed_signers, and nothing a release ships changes it after.
+#
+# releases@example.com namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... household-assistant releases

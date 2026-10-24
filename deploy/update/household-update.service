@@ -1,0 +1,24 @@
+# Brings a household's box to the newest release its publisher signed, backing up first
+# and putting the box back when a release fails. scripts/household-update.py says what it
+# does, and docs/deploy/updates.md how a box is set up for it.
+#
+# Lives at /etc/systemd/system/household-update.service on a box that updates itself,
+# with the updater it runs in /opt/household-assistant/update. Franco's box has neither.
+
+[Unit]
+Description=Bring the household's box to the newest signed release
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/household-assistant/update/household-update.py run
+# Another rollout held the lock: the box is busy, not broken, and tomorrow's run tries again.
+SuccessExitStatus=75
+# A backup with its restore drill, a converge that may pull a new image and restart both
+# gateways, and, when that fails, a converge back. The backstop for a run that has
+# stopped, not the budget for one that is working.
+TimeoutStartSec=5400
+Nice=10
+IOSchedulingClass=idle
