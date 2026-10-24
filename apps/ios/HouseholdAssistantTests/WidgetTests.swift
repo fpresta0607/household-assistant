@@ -38,6 +38,13 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(AppLink(url: try url("steward://Family/Record/")), .record(.family))
     }
 
+    func testComingBackFromLinkingPocketPiggiesOpensThePersonsOwnConversation() throws {
+        XCTAssertEqual(AppLink(url: try url("steward://pocketpiggies/linked?request=req-1")), .conversation(.direct))
+        XCTAssertEqual(AppLink(url: try url("steward://PocketPiggies/Linked/")), .conversation(.direct))
+        XCTAssertNil(AppLink(url: try url("steward://pocketpiggies")))
+        XCTAssertNil(AppLink(url: try url("steward://pocketpiggies/unlinked")))
+    }
+
     func testAnythingElseIsNoPlaceInTheApp() throws {
         for text in [
             "steward://",

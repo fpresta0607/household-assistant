@@ -2,6 +2,9 @@
 // keyboard up to write in it or with a voice note already recording, or Talk. The
 // widgets and the Talk control open the app through these. A pairing link,
 // `steward://pair?code=`, is a setup code, which PairingCode reads before any of these.
+// PocketPiggies' consent page sends the person back with `steward://pocketpiggies/linked`
+// once the household's account is linked (docs/deploy/pocketpiggies-server.md), which opens
+// their own conversation, where their assistant answers from it.
 
 import Foundation
 
@@ -19,6 +22,8 @@ enum AppLink: Equatable, Sendable {
     private static let talkHost = "talk"
     private static let writePath = "/write"
     private static let recordPath = "/record"
+    private static let pocketPiggiesHost = "pocketpiggies"
+    private static let linkedPath = "/linked"
 
     /// Anything else, an unknown place or another app's link, is no place in the app.
     init?(url: URL) {
@@ -39,6 +44,8 @@ enum AppLink: Equatable, Sendable {
             self = .write(conversation)
         } else if let conversation = RoomConversation(rawValue: host), Self.isPath(path, Self.recordPath) {
             self = .record(conversation)
+        } else if host == Self.pocketPiggiesHost, Self.isPath(path, Self.linkedPath) {
+            self = .conversation(.direct)
         } else {
             return nil
         }

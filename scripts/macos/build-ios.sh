@@ -36,7 +36,10 @@
 #   HOUSEHOLD_GATEWAY_HOST
 #                       required to sign. The box's tailnet name, which the
 #                       repository holds only as a placeholder
-#                       (apps/ios/Household.xcconfig).
+#                       (apps/ios/Household.xcconfig), for a build made for the
+#                       first household; or `every-household` for a build any
+#                       household pairs with a setup link, which names nobody
+#                       and keeps the placeholder (HouseholdMember.isBuiltIn).
 #   GOOGLE_IOS_CLIENT_ID
 #                       required to sign. Google's iOS client id, the part
 #                       before .apps.googleusercontent.com, likewise.
@@ -108,12 +111,22 @@ root="$(ha_repo_root)"
 ios="${root}/apps/ios"
 # A signed archive with Household.xcconfig's placeholders would send every phone to a
 # gateway that does not exist, so it needs the real values. A rehearsal keeps them.
+# A build for every household knows no box, so its host stays the placeholder on purpose;
+# its Google client is the app's own, as any build's is.
+gateway_host="${HOUSEHOLD_GATEWAY_HOST:-}"
+if [ "${gateway_host}" = "every-household" ]; then
+  gateway_host="household.example.ts.net"
+fi
 if [ "${rehearse}" = "0" ]; then
   for var in HOUSEHOLD_GATEWAY_HOST GOOGLE_IOS_CLIENT_ID; do
     [ -n "${!var:-}" ] ||
       ha_die "${var} is not set. The release workflow sets it from the testflight environment; see apps/ios/Household.xcconfig."
   done
-  if grep -qF -e "${HOUSEHOLD_GATEWAY_HOST}" -e "${GOOGLE_IOS_CLIENT_ID}" "${ios}/Household.xcconfig"; then
+  placeholders=(-e "${GOOGLE_IOS_CLIENT_ID}")
+  if [ "${HOUSEHOLD_GATEWAY_HOST}" != "every-household" ]; then
+    placeholders+=(-e "${HOUSEHOLD_GATEWAY_HOST}")
+  fi
+  if grep -qF "${placeholders[@]}" "${ios}/Household.xcconfig"; then
     ha_die "HOUSEHOLD_GATEWAY_HOST or GOOGLE_IOS_CLIENT_ID is still the placeholder in apps/ios/Household.xcconfig."
   fi
 fi
@@ -148,7 +161,7 @@ XCCONFIG
 # An xcconfig on the command line outranks Household.xcconfig and Local.xcconfig.
 if [ "${rehearse}" = "0" ]; then
   printf 'HOUSEHOLD_GATEWAY_HOST = %s\nGOOGLE_IOS_CLIENT_ID = %s\n' \
-    "${HOUSEHOLD_GATEWAY_HOST}" "${GOOGLE_IOS_CLIENT_ID}" >> "${xcconfig}"
+    "${gateway_host}" "${GOOGLE_IOS_CLIENT_ID}" >> "${xcconfig}"
 fi
 
 ha_head "archiving"

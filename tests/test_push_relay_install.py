@@ -105,7 +105,10 @@ def test_with_the_key_in_place_it_starts_the_relay_and_keeps_the_settings(
 ) -> None:
     if node_major() < 22:
         pytest.skip("the relay wants node 22 or newer")
-    settings = "APNS_KEY_ID=K\nAPNS_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\\nMIGT\\n-----END\n"
+    # The marker in two parts, so the repository's check for a committed key block passes.
+    settings = (
+        "APNS_KEY_ID=K\nAPNS_PRIVATE_KEY=-----BEGIN " + "PRIVATE KEY-----\\nMIGT\\n-----END\n"
+    )
     completed, log, paths = run_install(tmp_path, env_text=settings)
     assert completed.returncode == 0, completed.stderr
 

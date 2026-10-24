@@ -6,7 +6,10 @@
 // secrets, refusing a placeholder (scripts/macos/build-ios.sh).
 //
 // HOUSEHOLD_GATEWAY_HOST is the box's tailnet name, where each phone reaches its
-// assistant's gateway. GOOGLE_IOS_CLIENT_ID is Google's iOS OAuth client for
+// assistant's gateway, for a build made for the first household. A build for every
+// household keeps the placeholder (the release job's `every-household`): its onboarding
+// names nobody, offers no Sign in with Apple, and pairs each phone with the setup link its
+// own household's server makes (HouseholdMember.isBuiltIn). GOOGLE_IOS_CLIENT_ID is Google's iOS OAuth client for
 // com.siqstack.stewardai, which Connect Google in Settings signs in with: PKCE and no
 // secret. It is only the part before `.apps.googleusercontent.com`, digits, a hyphen, then
 // lowercase letters and digits. The app adds the ending, its redirect scheme is this part

@@ -216,6 +216,26 @@ def test_a_signed_archive_is_refused_with_a_placeholder(
     assert "still the placeholder" in result.stderr
 
 
+def test_a_build_for_every_household_keeps_the_placeholder_host_on_purpose(
+    tmp_path: Path,
+) -> None:
+    result = run_mac_script(
+        tmp_path,
+        BUILD,
+        "--dry-run",
+        env={
+            "DEVELOPMENT_TEAM": TEAM_ID,
+            "HA_APP_PROFILE": APP_PROFILE,
+            "HA_WIDGET_PROFILE": WIDGET_PROFILE,
+            **HOUSEHOLD,
+            "HOUSEHOLD_GATEWAY_HOST": "every-household",
+        },
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "would run  xcodebuild archive" in result.stderr
+
+
 def test_a_signed_archive_keys_each_profile_to_its_target(tmp_path: Path) -> None:
     result = run_mac_script(
         tmp_path,

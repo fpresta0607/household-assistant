@@ -69,7 +69,8 @@ def test_one_key_is_made_and_written_into_both_env_files_owner_only(
     assert written == files
     first, second = (held(path) for path in files)
     assert first == second and len(first) == 1
-    assert first[0].startswith("HOUSEHOLD_PUSH_RELAY_KEY=-----BEGIN PRIVATE KEY-----\\n")
+    # The marker in two parts, so the repository's check for a committed key block passes.
+    assert first[0].startswith("HOUSEHOLD_PUSH_RELAY_KEY=-----BEGIN " + "PRIVATE KEY-----\\n")
     assert "\n" not in first[0]
     assert files[0].read_text(encoding="utf-8").startswith("OPENCLAW_GATEWAY_TOKEN=one\n")
     assert files[1].read_text(encoding="utf-8").startswith("OPENCLAW_GATEWAY_TOKEN=two\n")

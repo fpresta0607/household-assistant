@@ -72,7 +72,7 @@ echo "==> the systemd unit"
 install -d -m 0755 "${PUSH_RELAY_UNITS}"
 install -m 0644 "${RELEASE}/deploy/push-relay/push-relay.service" "${PUSH_RELAY_UNITS}/push-relay.service"
 systemctl daemon-reload
-if grep -q '^APNS_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\\n\.\.\.' "${PUSH_RELAY_ETC}/push-relay.env"; then
+if grep -q '^APNS_PRIVATE_KEY=<' "${PUSH_RELAY_ETC}/push-relay.env"; then
   echo
   echo "The relay is installed but not started: ${PUSH_RELAY_ETC}/push-relay.env still holds"
   echo "the example's placeholder key. Write the real one, then: systemctl enable --now push-relay"

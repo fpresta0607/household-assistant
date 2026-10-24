@@ -1,9 +1,11 @@
 // The first run, until this phone is paired: what Steward AI is, three things worth
 // knowing, whose phone it is, and the code that pairs it. Nothing is typed: the setup
 // link whoever runs the household's server gives, or a paired iPhone shows on Account,
-// is opened here, or its code pasted. Or the person signs in with Apple, and an iPhone
-// nobody linked yet waits for Franco to let it in. Once paired, PermissionStepsView
-// offers what is worth turning on.
+// is opened here, or its code pasted. In a build made for the first household
+// (HouseholdMember.isBuiltIn), the person picks themselves and may sign in with Apple
+// instead, and an iPhone nobody linked yet waits for Franco to let it in; anyone else
+// picks Someone else. A build for every household names nobody and goes straight to the
+// code. Once paired, PermissionStepsView offers what is worth turning on.
 //
 // The welcome shows the app's own icon and the family's faces floating in under it,
 // one after another, and a light glides once across Get started when they have. With
@@ -103,21 +105,35 @@ struct OnboardingView: View {
                     .clipShape(Capsule())
             }
             Button("I already have a code") {
-                step = .who
+                step = Self.choosingStep
             }
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(Palette.highlight)
         }
     }
 
-    /// The four in the family room, floating in one after another.
+    /// The four in the family room, floating in one after another: the first household's
+    /// own in a build made for it, and anyone's in a build for every household.
     private var family: some View {
-        let faces: [(name: String, look: FaceTile.Look)] = [
-            (memberName(.franco), face(of: .franco)),
-            (memberName(.gia), face(of: .gia)),
-            (HouseholdMember.franco.assistantName, .assistant(emoji: HouseholdMember.franco.assistantEmoji)),
-            (HouseholdMember.gia.assistantName, .assistant(emoji: HouseholdMember.gia.assistantEmoji)),
-        ]
+        let faces: [(name: String, look: FaceTile.Look)]
+        let label: String
+        if HouseholdMember.isBuiltIn {
+            faces = [
+                (memberName(.franco), face(of: .franco)),
+                (memberName(.gia), face(of: .gia)),
+                (HouseholdMember.franco.assistantName, .assistant(emoji: HouseholdMember.franco.assistantEmoji)),
+                (HouseholdMember.gia.assistantName, .assistant(emoji: HouseholdMember.gia.assistantEmoji)),
+            ]
+            label = "\(memberName(.franco)), \(memberName(.gia)), Corey and Denise"
+        } else {
+            faces = [
+                ("You", .ownPerson(initial: "Y")),
+                ("Family", .otherPerson(initial: "F")),
+                ("Assistant", .assistant(emoji: "\u{1F989}")),
+                ("Assistant", .assistant(emoji: "\u{1F338}")),
+            ]
+            label = "You, your family and your assistants"
+        }
         return HStack(spacing: 16) {
             ForEach(Array(faces.enumerated()), id: \.offset) { index, face in
                 VStack(spacing: 6) {
@@ -137,7 +153,7 @@ struct OnboardingView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(memberName(.franco)), \(memberName(.gia)), Corey and Denise")
+        .accessibilityLabel(label)
         .onAppear {
             isWelcomed = true
         }
@@ -146,12 +162,17 @@ struct OnboardingView: View {
     private var facts: some View {
         VStack(alignment: .leading, spacing: 24) {
             Spacer()
-            fact("link", "Pair right here, with a setup link from whoever runs your household's server, or by signing in with Apple.")
+            fact(
+                "link",
+                HouseholdMember.isBuiltIn
+                    ? "Pair right here, with a setup link from whoever runs your household's server, or by signing in with Apple."
+                    : "Pair right here, with a setup link from whoever runs your household's server."
+            )
             fact("arrow.down.app", "Updates come through TestFlight. Turn on Automatic Updates for Steward AI there.")
             fact("lock.shield", "Your assistants run on your household's own server, and only your family can reach them.")
             Spacer()
             next("Continue") {
-                step = .who
+                step = Self.choosingStep
             }
         }
     }
@@ -198,19 +219,51 @@ struct OnboardingView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(memberName(person)), with \(person.assistantName)")
             }
+            // Anyone in another household pairs with the setup link their own server makes.
+            Button {
+                member = nil
+                refusal = nil
+                step = .code
+            } label: {
+                HStack(spacing: 12) {
+                    StewardMark(size: 52)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Someone else")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(Palette.text)
+                        Text("in another household")
+                            .font(.subheadline)
+                            .foregroundStyle(Palette.secondaryText)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.forward")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Palette.secondaryText)
+                }
+                .padding(16)
+                .rainbowGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous), isInteractive: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Someone else, in another household")
             Spacer()
             Spacer()
         }
     }
 
     private var code: some View {
-        let person = member ?? .franco
-        return VStack(spacing: 24) {
+        VStack(spacing: 24) {
             Spacer()
-            AssistantAvatar(emoji: person.assistantEmoji, size: 72, ring: nil)
-            Text("Pair with \(person.assistantName)")
-                .font(.title2.weight(.bold))
-                .multilineTextAlignment(.center)
+            if let person = member {
+                AssistantAvatar(emoji: person.assistantEmoji, size: 72, ring: nil)
+                Text("Pair with \(person.assistantName)")
+                    .font(.title2.weight(.bold))
+                    .multilineTextAlignment(.center)
+            } else {
+                StewardMark(size: 72)
+                Text("Pair this iPhone")
+                    .font(.title2.weight(.bold))
+                    .multilineTextAlignment(.center)
+            }
             Text("Open your setup link on this iPhone, or copy its code and paste it here.")
                 .font(.subheadline)
                 .foregroundStyle(Palette.secondaryText)
@@ -230,13 +283,17 @@ struct OnboardingView: View {
                     .padding(12)
                     .background(Palette.errorSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            Text("or")
-                .font(.subheadline)
-                .foregroundStyle(Palette.secondaryText)
-            AppleSignInPanel(member: person)
+            // Signing in with Apple needs to know the person's box before it is paired, which
+            // only a build made for the first household does.
+            if let person = member {
+                Text("or")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.secondaryText)
+                AppleSignInPanel(member: person)
+            }
             Spacer()
             Button("Back") {
-                step = .who
+                step = Self.choosingStep == .who ? .who : .welcome
             }
             .foregroundStyle(Palette.secondaryText)
         }
@@ -256,7 +313,7 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
                 next("Get a new code") {
                     refusal = nil
-                    step = member == nil ? .who : .code
+                    step = member == nil ? Self.choosingStep : .code
                 }
             case .pairingPending:
                 ProgressView()
@@ -275,6 +332,12 @@ struct OnboardingView: View {
     }
 
     // MARK: - Pieces
+
+    /// Where pairing starts: whose phone it is, in a build made for the first household,
+    /// and otherwise the code itself.
+    private static var choosingStep: Step {
+        HouseholdMember.isBuiltIn ? .who : .code
+    }
 
     /// Franco in royal and Gia in rose, the way the welcome draws them.
     private func face(of person: HouseholdMember) -> FaceTile.Look {
