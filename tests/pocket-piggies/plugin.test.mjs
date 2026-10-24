@@ -6,32 +6,14 @@ import { join } from "node:path";
 import test from "node:test";
 import { OWNER_META, callKeyHolder } from "../../deploy/openclaw/plugins/pocket-piggies/client.mjs";
 import { register } from "../../deploy/openclaw/plugins/pocket-piggies/index.mjs";
-import { FAMILY_GROUP, FINANCE_SAFE_GATEWAY_CONFIG, OWNER } from "./fixtures/gateway.mjs";
+import { FINANCE_SAFE_GATEWAY_CONFIG, OWNER } from "./fixtures/gateway.mjs";
 
-const CONFIG = { ownerTelegramId: OWNER, accountLabel: "corey" };
 const REQUEST = "0b4d3c1e-5f6a-4b7c-8d9e-0f1a2b3c4d5e";
 const SECRET = `ppa_ro_${"S".repeat(43)}`;
-const PRIVATE_TURN = {
-  agentId: "main",
-  agentAccountId: "default",
-  messageChannel: "telegram",
-  requesterSenderId: OWNER,
-  nativeChannelId: `telegram:${OWNER}`,
-  sessionKey: `agent:main:telegram:direct:${OWNER}`,
-  deliveryContext: { channel: "telegram", accountId: "default", to: `telegram:${OWNER}` },
-};
-const PRIVATE_COMMAND = {
-  channel: "telegram",
-  senderId: OWNER,
-  from: `telegram:${OWNER}`,
-  to: `telegram:${OWNER}`,
-  isAuthorizedSender: true,
-  sessionKey: `agent:main:telegram:direct:${OWNER}`,
-};
 // The owner's own thread in the Steward AI app, as household-app starts it for a message one
 // of the owner's paired phones signed: the household channel names the owner as the sender.
-const APP_OWNER = "franco";
-const APP_CONFIG = { ...CONFIG, ownerHouseholdPersonId: APP_OWNER };
+const APP_OWNER = OWNER;
+const APP_CONFIG = { ownerHouseholdPersonId: APP_OWNER, accountLabel: "corey" };
 const APP_TURN = {
   agentId: "main",
   agentAccountId: "default",
@@ -41,6 +23,14 @@ const APP_TURN = {
   sessionKey: `agent:main:household:direct:${APP_OWNER}`,
   deliveryContext: { channel: "household", accountId: "default", to: `household:${APP_OWNER}` },
 };
+const APP_COMMAND = {
+  channel: "household",
+  senderId: APP_OWNER,
+  from: `household:${APP_OWNER}`,
+  to: `household:${APP_OWNER}`,
+  isAuthorizedSender: true,
+  sessionKey: `agent:main:household:direct:${APP_OWNER}`,
+};
 
 function socketPath() {
   return process.platform === "win32"
@@ -49,7 +39,7 @@ function socketPath() {
 }
 
 /** A fake key holder speaking MCP over a real socket, answering from `answer`. */
-async function keyHolder(t, answer, { protocolVersion = "2025-11-25", raw, owner = OWNER } = {}) {
+async function keyHolder(t, answer, { protocolVersion = "2025-11-25", raw, owner = APP_OWNER } = {}) {
   const path = socketPath();
   const calls = [];
   const server = createServer((socket) => {
@@ -86,7 +76,7 @@ async function keyHolder(t, answer, { protocolVersion = "2025-11-25", raw, owner
   return { path, calls };
 }
 
-function plugin({ path, config = FINANCE_SAFE_GATEWAY_CONFIG, pluginConfig = CONFIG }) {
+function plugin({ path, config = FINANCE_SAFE_GATEWAY_CONFIG, pluginConfig = APP_CONFIG }) {
   const registered = { commands: {}, tools: null, warnings: [] };
   const api = {
     pluginConfig: { ...pluginConfig },
@@ -103,54 +93,19 @@ const readAnswer = (name, args) => name === "pocketpiggies_read"
   ? [{ source: "PocketPiggies", read: args.read, data: { safeCents: 12345, note: `echo ${SECRET}` } }, false]
   : [{ code: "unknown_tool", message: "no" }, true];
 
-test("only the owner's isolated private Telegram turn discovers the three finance tools", async (t) => {
+test("only the owner's own thread in the app discovers the three finance tools", async (t) => {
   const { path } = await keyHolder(t, readAnswer);
   const { registered } = plugin({ path });
-  assert.deepEqual(registered.tools(PRIVATE_TURN).map((tool) => tool.name),
-    ["pocketpiggies_catalog", "pocketpiggies_read", "pocketpiggies_records"]);
-  const queued = { ...PRIVATE_TURN, nativeChannelId: undefined };
-  assert.equal(registered.tools(queued).length, 3, "a queued turn uses the trusted delivery destination");
-  for (const change of [
-    { nativeChannelId: undefined, deliveryContext: { ...PRIVATE_TURN.deliveryContext, to: `telegram:${FAMILY_GROUP}` } },
-    { deliveryContext: { ...PRIVATE_TURN.deliveryContext, to: `telegram:${FAMILY_GROUP}` } },
-    { deliveryContext: { ...PRIVATE_TURN.deliveryContext, to: "telegram:654321" } },
-    { deliveryContext: { ...PRIVATE_TURN.deliveryContext, channel: "webchat" } },
-    { deliveryContext: { ...PRIVATE_TURN.deliveryContext, accountId: "second" } },
-    { deliveryContext: { ...PRIVATE_TURN.deliveryContext, threadId: 7 } },
-    { deliveryContext: undefined },
-    { nativeChannelId: undefined, deliveryContext: undefined },
-    { requesterSenderId: "654321" },
-    { nativeChannelId: `telegram:${FAMILY_GROUP}` },
-    { sessionKey: `agent:main:telegram:group:${FAMILY_GROUP}` },
-    { sessionKey: "agent:main:main" },
-    { sessionKey: "agent:main:cron:job" },
-    { sessionKey: `agent:main:subagent:${OWNER}` },
-    { messageChannel: "webchat" },
-    { agentId: "other" },
-    { agentAccountId: "second" },
-    { oneShotCliRun: true },
-    { sessionKey: `agent:other:telegram:direct:${OWNER}` },
-    { sessionKey: `agent:main:telegram:default:direct:${OWNER}` },
-  ]) {
-    assert.equal(registered.tools({ ...PRIVATE_TURN, ...change }), null, JSON.stringify(change));
-  }
-  const unsafe = plugin({ path, config: { ...FINANCE_SAFE_GATEWAY_CONFIG, channels: { telegram: {
-    ...FINANCE_SAFE_GATEWAY_CONFIG.channels.telegram, dmPolicy: "pairing" } } } });
-  assert.equal(unsafe.registered.tools(PRIVATE_TURN), null);
-});
-
-test("the owner's own thread in the app discovers the finance tools only where the config names its owner", async (t) => {
-  const { path } = await keyHolder(t, readAnswer);
-  const { registered } = plugin({ path, pluginConfig: APP_CONFIG });
   assert.deepEqual(registered.tools(APP_TURN).map((tool) => tool.name),
     ["pocketpiggies_catalog", "pocketpiggies_read", "pocketpiggies_records"]);
   assert.equal(registered.tools({ ...APP_TURN, nativeChannelId: undefined }).length, 3, "a queued turn has no native chat");
   assert.equal(registered.tools({ ...APP_TURN, requesterSenderId: `household:${APP_OWNER}` }).length, 3);
-  assert.equal(registered.tools(PRIVATE_TURN).length, 3, "the owner's Telegram chat keeps them");
-  const telegramOnly = plugin({ path });
-  assert.equal(telegramOnly.registered.tools(APP_TURN), null, "a gateway whose config names no app owner keeps finance on Telegram");
+  const unsafe = plugin({ path, config: { ...FINANCE_SAFE_GATEWAY_CONFIG, channels: {
+    ...FINANCE_SAFE_GATEWAY_CONFIG.channels, telegram: { enabled: true } } } });
+  assert.equal(unsafe.registered.tools(APP_TURN), null, "a chat channel switched back on turns finance off");
+  const unnamed = plugin({ path, pluginConfig: { accountLabel: "corey" } });
+  assert.equal(unnamed.registered.tools(APP_TURN), null, "a config that names no owner reads nobody's finance");
 });
-
 test("the owner's own words in the app's family room, in their own session of it, discover the finance tools, as in their thread", async (t) => {
   const { path } = await keyHolder(t, readAnswer);
   const { registered } = plugin({ path, pluginConfig: APP_CONFIG });
@@ -211,7 +166,7 @@ test("the app's finance refuses anyone else in the family room, other people, ot
     ["web chat", { messageChannel: "webchat" }],
     ["Telegram", { messageChannel: "telegram" }],
     ["a reply routed to web chat", { deliveryContext: { ...APP_TURN.deliveryContext, channel: "webchat" } }],
-    ["a reply routed to Telegram", { deliveryContext: { channel: "telegram", accountId: "default", to: `telegram:${OWNER}` } }],
+    ["a reply routed to Telegram", { deliveryContext: { channel: "telegram", accountId: "default", to: "telegram:7000000001" } }],
     ["a reply routed to another person", { deliveryContext: { ...APP_TURN.deliveryContext, to: "household:gia" } }],
     ["a second account", { deliveryContext: { ...APP_TURN.deliveryContext, accountId: "second" } }],
     ["a thread", { deliveryContext: { ...APP_TURN.deliveryContext, threadId: 7 } }],
@@ -228,7 +183,7 @@ test("the app's finance refuses anyone else in the family room, other people, ot
 test("an owner the config cannot name safely turns the app's finance off", async (t) => {
   const { path } = await keyHolder(t, readAnswer);
   for (const person of ["cli", "openclaw-ios", "webchat", "Franco", "", 7]) {
-    const { registered } = plugin({ path, pluginConfig: { ...CONFIG, ownerHouseholdPersonId: person } });
+    const { registered } = plugin({ path, pluginConfig: { ...APP_CONFIG, ownerHouseholdPersonId: person } });
     const turn = {
       ...APP_TURN,
       requesterSenderId: person,
@@ -237,11 +192,10 @@ test("an owner the config cannot name safely turns the app's finance off", async
       deliveryContext: { ...APP_TURN.deliveryContext, to: `household:${person}` },
     };
     assert.equal(registered.tools(turn), null, String(person));
-    assert.equal(registered.tools(PRIVATE_TURN).length, 3, "Telegram is unaffected");
   }
 });
 
-test("an app read reaches the key holder as the Telegram owner the config maps the household person to", async (t) => {
+test("an app read reaches only a key holder that names the same household owner", async (t) => {
   const { path, calls } = await keyHolder(t, readAnswer);
   const { registered } = plugin({ path, pluginConfig: APP_CONFIG });
   const read = registered.tools(APP_TURN).find((tool) => tool.name === "pocketpiggies_read");
@@ -249,7 +203,7 @@ test("an app read reaches the key holder as the Telegram owner the config maps t
   assert.equal(result.isError, undefined);
   assert.equal(result.details.data.safeCents, 12345);
   assert.deepEqual(calls, [{ name: "pocketpiggies_read", arguments: { read: "account.safe_to_transfer", params: {} } }]);
-  const someoneElses = await keyHolder(t, readAnswer, { owner: "654321" });
+  const someoneElses = await keyHolder(t, readAnswer, { owner: "gia" });
   const elsewhere = plugin({ path: someoneElses.path, pluginConfig: APP_CONFIG });
   const refused = await elsewhere.registered.tools(APP_TURN).find((tool) => tool.name === "pocketpiggies_read")
     .execute("call-app-2", { read: "account.safe_to_transfer" });
@@ -274,7 +228,7 @@ test("an app tool rechecks its owner before any key holder call", async (t) => {
 test("a read reaches the key holder over MCP and returns its figures with credentials removed", async (t) => {
   const { path, calls } = await keyHolder(t, readAnswer);
   const { registered } = plugin({ path });
-  const read = registered.tools(PRIVATE_TURN).find((tool) => tool.name === "pocketpiggies_read");
+  const read = registered.tools(APP_TURN).find((tool) => tool.name === "pocketpiggies_read");
   const result = await read.execute("call-1", { read: "account.safe_to_transfer", params: {} });
   assert.equal(result.isError, undefined);
   assert.deepEqual(calls, [{ name: "pocketpiggies_read", arguments: { read: "account.safe_to_transfer", params: {} } }]);
@@ -285,7 +239,7 @@ test("a read reaches the key holder over MCP and returns its figures with creden
 test("the read tools offer a sync the key holder decides on, and the catalog offers none", async (t) => {
   const { path, calls } = await keyHolder(t, (name, args) => [{ source: "PocketPiggies", [name]: args }, false]);
   const { registered } = plugin({ path });
-  const byName = Object.fromEntries(registered.tools(PRIVATE_TURN).map((tool) => [tool.name, tool]));
+  const byName = Object.fromEntries(registered.tools(APP_TURN).map((tool) => [tool.name, tool]));
   for (const name of ["pocketpiggies_read", "pocketpiggies_records"]) {
     assert.deepEqual(byName[name].parameters.properties.sync.enum, ["if_stale", "now"], name);
     assert.match(byName[name].description, /freshness/);
@@ -306,28 +260,27 @@ test("the read tools offer a sync the key holder decides on, and the catalog off
 test("a stale tool rechecks the owner and the gateway policy before any key holder call", async (t) => {
   const { path, calls } = await keyHolder(t, readAnswer);
   const { api, registered } = plugin({ path });
-  const read = registered.tools(PRIVATE_TURN).find((tool) => tool.name === "pocketpiggies_read");
-  api.config = { ...FINANCE_SAFE_GATEWAY_CONFIG, channels: { telegram: {
-    ...FINANCE_SAFE_GATEWAY_CONFIG.channels.telegram,
-    groups: { [FAMILY_GROUP]: { tools: { allow: ["web_search", "exec"] } } } } } };
+  const read = registered.tools(APP_TURN).find((tool) => tool.name === "pocketpiggies_read");
+  api.config = { ...FINANCE_SAFE_GATEWAY_CONFIG, channels: { ...FINANCE_SAFE_GATEWAY_CONFIG.channels,
+    household: { ...FINANCE_SAFE_GATEWAY_CONFIG.channels.household, familyTools: ["web_search", "exec"] } } };
   const drifted = await read.execute("call-2", { read: "account.safe_to_transfer" });
   assert.equal(drifted.isError, true);
   assert.match(drifted.content[0].text, /private_chat_required/);
   api.config = FINANCE_SAFE_GATEWAY_CONFIG;
-  api.pluginConfig = { ...CONFIG, ownerTelegramId: "654321" };
+  api.pluginConfig = { ...APP_CONFIG, accountLabel: "denise" };
   const swapped = await read.execute("call-3", { read: "account.safe_to_transfer" });
   assert.equal(swapped.isError, true);
   assert.deepEqual(calls, []);
 });
 
 test("a key holder pinned to someone else is refused before any call", async (t) => {
-  const { path, calls } = await keyHolder(t, readAnswer, { owner: "654321" });
+  const { path, calls } = await keyHolder(t, readAnswer, { owner: "gia" });
   const { registered } = plugin({ path });
-  const read = registered.tools(PRIVATE_TURN).find((tool) => tool.name === "pocketpiggies_read");
+  const read = registered.tools(APP_TURN).find((tool) => tool.name === "pocketpiggies_read");
   const result = await read.execute("call-5", { read: "account.safe_to_transfer" });
   assert.equal(result.isError, true);
   assert.match(result.content[0].text, /belongs to someone else/);
-  const connect = await registered.commands.pocketpiggies.handler({ ...PRIVATE_COMMAND, args: "connect" });
+  const connect = await registered.commands.pocketpiggies.handler({ ...APP_COMMAND, args: "connect" });
   assert.equal(connect.isError, true);
   assert.deepEqual(calls, []);
 });
@@ -336,60 +289,53 @@ test("drift turns finance off and is reported once until it is repaired", async 
   const { path } = await keyHolder(t, readAnswer);
   const { api, registered } = plugin({ path });
   api.config = { ...FINANCE_SAFE_GATEWAY_CONFIG, session: { ...FINANCE_SAFE_GATEWAY_CONFIG.session, scope: "global" } };
-  assert.equal(registered.tools(PRIVATE_TURN), null);
-  assert.equal(registered.tools(PRIVATE_TURN), null);
+  assert.equal(registered.tools(APP_TURN), null);
+  assert.equal(registered.tools(APP_TURN), null);
   assert.equal(registered.warnings.length, 1);
   assert.match(registered.warnings[0], /finance is off/);
   api.config = FINANCE_SAFE_GATEWAY_CONFIG;
-  assert.equal(registered.tools(PRIVATE_TURN).length, 3);
+  assert.equal(registered.tools(APP_TURN).length, 3);
 });
 
 test("key holder refusals reach the model as their code and message, never as figures", async (t) => {
   const { path } = await keyHolder(t, () => [{ code: "connection_required", message: `Connect first ${SECRET}` }, true]);
   const { registered } = plugin({ path });
-  const records = registered.tools(PRIVATE_TURN).find((tool) => tool.name === "pocketpiggies_records");
+  const records = registered.tools(APP_TURN).find((tool) => tool.name === "pocketpiggies_records");
   const result = await records.execute("call-4", { table: "transactions" });
   assert.equal(result.isError, true);
   assert.deepEqual(JSON.parse(result.content[0].text), { code: "connection_required", message: "Connect first [redacted]" });
 });
 
-test("connect shows a PocketPiggies button and the deep link finishes the same request", async (t) => {
+test("connect shows PocketPiggies' consent link, and status finishes the same request", async (t) => {
   const { path, calls } = await keyHolder(t, (name) => ({
     link_start: [{ text: "Connect your account.", url: `https://pocketpiggies.app/assistant/connect?request=${REQUEST}` }, false],
-    link_complete: [{ text: "Connected." }, false],
-    link_status: [{ text: "Saved connection." }, false],
+    link_status: [{ text: "Connected." }, false],
     link_disconnect: [{ text: "Disconnected." }, false],
   })[name]);
   const { registered } = plugin({ path });
-  const connect = await registered.commands.pocketpiggies.handler({ ...PRIVATE_COMMAND, args: "connect" });
-  assert.deepEqual(connect.channelData.telegram.buttons, [[{
-    text: "Connect PocketPiggies", url: `https://pocketpiggies.app/assistant/connect?request=${REQUEST}`,
-  }]]);
-  const fromDeepLink = await registered.commands.start.handler({ ...PRIVATE_COMMAND, args: "pp_connect" });
-  assert.equal(fromDeepLink.channelData.telegram.buttons.length, 1);
-  assert.deepEqual(await registered.commands.start.handler({ ...PRIVATE_COMMAND, args: `pp_${REQUEST}` }), { text: "Connected." });
-  assert.deepEqual(await registered.commands.pocketpiggies.handler({ ...PRIVATE_COMMAND, args: "status" }), { text: "Saved connection." });
-  assert.deepEqual(await registered.commands.pocketpiggies.handler({ ...PRIVATE_COMMAND, args: "disconnect" }), { text: "Disconnected." });
-  assert.deepEqual(calls.map((call) => call.name), ["link_start", "link_start", "link_complete", "link_status", "link_disconnect"]);
-  assert.deepEqual(calls[2].arguments, { requestId: REQUEST });
+  assert.deepEqual(Object.keys(registered.commands), ["pocketpiggies"]);
+  assert.deepEqual(registered.commands.pocketpiggies.channels, ["household"]);
+  const connect = await registered.commands.pocketpiggies.handler({ ...APP_COMMAND, args: "connect" });
+  assert.deepEqual(connect, { text: `Connect your account.\n\nhttps://pocketpiggies.app/assistant/connect?request=${REQUEST}` });
+  assert.deepEqual(await registered.commands.pocketpiggies.handler({ ...APP_COMMAND, args: "status" }), { text: "Connected." });
+  assert.deepEqual(await registered.commands.pocketpiggies.handler({ ...APP_COMMAND, args: "disconnect" }), { text: "Disconnected." });
+  assert.deepEqual(calls.map((call) => call.name), ["link_start", "link_status", "link_disconnect"]);
 });
-
-test("connection commands outside the owner's private chat never reach the key holder", async (t) => {
+test("connection commands outside the owner's own thread never reach the key holder", async (t) => {
   const { path, calls } = await keyHolder(t, () => [{ text: "no" }, false]);
   const { registered } = plugin({ path });
   for (const change of [
-    { senderId: "654321", from: "telegram:654321" },
-    { to: `telegram:${FAMILY_GROUP}`, sessionKey: `agent:main:telegram:group:${FAMILY_GROUP}` },
+    { senderId: "gia", from: "household:gia" },
+    { to: "household:family", sessionKey: `agent:main:household:group:family:sender:${APP_OWNER}` },
     { isAuthorizedSender: false },
     { sessionKey: "agent:main:main" },
   ]) {
-    const result = await registered.commands.pocketpiggies.handler({ ...PRIVATE_COMMAND, ...change, args: "connect" });
+    const result = await registered.commands.pocketpiggies.handler({ ...APP_COMMAND, ...change, args: "connect" });
     assert.equal(result.isError, true, JSON.stringify(change));
-    assert.match(result.text, /private Telegram chat/);
+    assert.match(result.text, /your own thread/);
   }
   assert.deepEqual(calls, []);
 });
-
 test("a connect link that is not PocketPiggies' own consent page is refused", async (t) => {
   for (const url of [
     "https://evil.example/assistant/connect?request=" + REQUEST,
@@ -399,29 +345,29 @@ test("a connect link that is not PocketPiggies' own consent page is refused", as
   ]) {
     const { path } = await keyHolder(t, () => [{ text: "Connect.", url }, false]);
     const { registered } = plugin({ path });
-    const result = await registered.commands.pocketpiggies.handler({ ...PRIVATE_COMMAND, args: "connect" });
+    const result = await registered.commands.pocketpiggies.handler({ ...APP_COMMAND, args: "connect" });
     assert.equal(result.isError, true, String(url));
-    assert.equal(result.channelData, undefined);
+    assert.doesNotMatch(result.text, /https?:/);
   }
 });
 
 test("a missing, silent or malformed key holder fails closed with no figure", async (t) => {
-  const missing = await callKeyHolder("pocketpiggies_catalog", {}, { owner: OWNER, socketPath: socketPath() }).catch((error) => error);
+  const missing = await callKeyHolder("pocketpiggies_catalog", {}, { owner: APP_OWNER, socketPath: socketPath() }).catch((error) => error);
   assert.equal(missing.code, "key_holder_unavailable");
   const wrongProtocol = await keyHolder(t, readAnswer, { protocolVersion: "2024-11-05" });
-  assert.equal((await callKeyHolder("pocketpiggies_catalog", {}, { owner: OWNER, socketPath: wrongProtocol.path }).catch((error) => error)).code,
+  assert.equal((await callKeyHolder("pocketpiggies_catalog", {}, { owner: APP_OWNER, socketPath: wrongProtocol.path }).catch((error) => error)).code,
     "mcp_transport_error");
   const garbage = await keyHolder(t, readAnswer, { raw: "not json\n" });
-  assert.equal((await callKeyHolder("pocketpiggies_catalog", {}, { owner: OWNER, socketPath: garbage.path }).catch((error) => error)).code,
+  assert.equal((await callKeyHolder("pocketpiggies_catalog", {}, { owner: APP_OWNER, socketPath: garbage.path }).catch((error) => error)).code,
     "mcp_transport_error");
   const silent = await keyHolder(t, readAnswer, { raw: " " });
-  assert.equal((await callKeyHolder("pocketpiggies_catalog", {}, { owner: OWNER, socketPath: silent.path, timeoutMs: 200 }).catch((error) => error)).code,
+  assert.equal((await callKeyHolder("pocketpiggies_catalog", {}, { owner: APP_OWNER, socketPath: silent.path, timeoutMs: 200 }).catch((error) => error)).code,
     "request_timeout");
   const huge = await keyHolder(t, readAnswer, { raw: "x".repeat(4 * 1024 * 1024) });
-  assert.equal((await callKeyHolder("pocketpiggies_catalog", {}, { owner: OWNER, socketPath: huge.path }).catch((error) => error)).code,
+  assert.equal((await callKeyHolder("pocketpiggies_catalog", {}, { owner: APP_OWNER, socketPath: huge.path }).catch((error) => error)).code,
     "response_too_large");
   const aborted = new AbortController();
   aborted.abort();
-  assert.equal((await callKeyHolder("pocketpiggies_catalog", {}, { owner: OWNER, socketPath: silent.path, signal: aborted.signal }).catch((error) => error)).code,
+  assert.equal((await callKeyHolder("pocketpiggies_catalog", {}, { owner: APP_OWNER, socketPath: silent.path, signal: aborted.signal }).catch((error) => error)).code,
     "request_cancelled");
 });

@@ -100,12 +100,12 @@ def _client_credential(value: object) -> str | None:
     return None if value is None else _text(value, CLIENT_CREDENTIAL)
 
 
-def _serialize(owner_telegram_id: str, state: LinkState) -> bytes:
+def _serialize(identity: dict[str, str], state: LinkState) -> bytes:
     pending = state.pending
     grant = state.grant
     document = {
         "version": STORE_VERSION,
-        "ownerTelegramId": owner_telegram_id,
+        **identity,
         "clientCredential": state.client_credential,
         "pending": None
         if pending is None
@@ -136,9 +136,10 @@ class CredentialStore:
     either the old state or the new one and never a partial credential.
     """
 
-    def __init__(self, directory: Path, owner_telegram_id: str) -> None:
+    def __init__(self, directory: Path, identity: dict[str, str]) -> None:
+        """`identity` is what the file names its owner by (binding.py stored_identity)."""
         self.directory = directory
-        self.owner_telegram_id = owner_telegram_id
+        self.identity = dict(identity)
         self.name = "connection.json"
 
     def _open_directory(self) -> int | None:
@@ -187,7 +188,7 @@ class CredentialStore:
         if (
             not isinstance(stored, dict)
             or stored.get("version") != STORE_VERSION
-            or stored.get("ownerTelegramId") != self.owner_telegram_id
+            or any(stored.get(key) != value for key, value in self.identity.items())
             or not {"clientCredential", "pending", "grant"} <= stored.keys()
         ):
             raise invalid_store()
@@ -201,7 +202,7 @@ class CredentialStore:
         # Whatever is there must still be this owner's own private file; anything else
         # was changed behind the key holder's back and is left for an administrator.
         self.load()
-        serialized = _serialize(self.owner_telegram_id, state)
+        serialized = _serialize(self.identity, state)
         if len(serialized) > MAX_STORE_BYTES:
             raise invalid_store()
         directory = self._open_directory()

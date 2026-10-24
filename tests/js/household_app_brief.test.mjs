@@ -25,7 +25,7 @@ const LATE = new Date(2026, 9, 15, 23, 59).getTime();
 const MIDNIGHT = new Date(2026, 9, 16, 0, 0).getTime();
 const FRANCO_TELEGRAM = "7100000001";
 const GIA_TELEGRAM = "7100000002";
-const OWNERS = [`telegram:${FRANCO_TELEGRAM}`, "household:franco"];
+const OWNERS = ["household:franco"];
 
 async function setup() {
   const directory = await mkdtemp(path.join(tmpdir(), "household-app-brief-"));
@@ -120,8 +120,8 @@ const THE_FAM = {
 // An isolated scheduled run of the main agent names no sender.
 const SCHEDULED_RUN = { agentId: "main", sessionKey: "agent:main:cron:6f1c2a:run:91b0" };
 
-function toolFor(context, brief, { owners = OWNERS } = {}) {
-  return createBriefTool({ context, owner: "franco", owners, write: (text) => brief.write(text) });
+function toolFor(context, brief) {
+  return createBriefTool({ context, owner: "franco", write: (text) => brief.write(text) });
 }
 
 async function answer(found, args) {
@@ -187,14 +187,12 @@ test("the tool asks for the words alone and says what they are for", async () =>
 
 // MARK: - Where it is offered
 
-test("the tool is offered in the owner's own turns in the app, the owner's Telegram chat and a scheduled run", async () => {
+test("the tool is offered in the owner's own turns in the app and a scheduled run", async () => {
   const { brief } = await setup();
   for (const [label, turn] of [
     ["the owner's own thread in the app", OWN_THREAD],
     ["a queued turn in the owner's thread with no native chat", { ...OWN_THREAD, nativeChannelId: undefined }],
     ["the family room, the owner speaking, in the owner's own session of it", OWNERS_FAMILY_TURN],
-    ["the owner's private chat on Telegram", OWNERS_TELEGRAM],
-    ["a queued Telegram turn with no native chat", { ...OWNERS_TELEGRAM, nativeChannelId: undefined }],
     ["a scheduled run of the main agent", SCHEDULED_RUN],
     ["a scheduled run by its job's own session", { ...SCHEDULED_RUN, sessionKey: "agent:main:cron:6f1c2a" }],
     ["a scheduled run on the default account", { ...SCHEDULED_RUN, agentAccountId: "default" }],
@@ -203,9 +201,9 @@ test("the tool is offered in the owner's own turns in the app, the owner's Teleg
   }
 });
 
-test("the tool is not offered in anyone else's family-room turn, a Telegram group or any turn that is not the main agent's own", async () => {
+test("the tool is not offered in anyone else's family-room turn, on Telegram or in any turn that is not the main agent's own", async () => {
   const { brief } = await setup();
-  for (const [label, turn, owners] of [
+  for (const [label, turn] of [
     ["the family room, the other person speaking", FAMILY_ROOM],
     ["the family room, the other assistant handing over", { ...FAMILY_ROOM, requesterSenderId: "denise" }],
     ["the owner in the room's shared session", { ...FAMILY_ROOM, requesterSenderId: "franco" }],
@@ -217,8 +215,8 @@ test("the tool is not offered in anyone else's family-room turn, a Telegram grou
       sessionKey: `agent:main:telegram:direct:${GIA_TELEGRAM}`,
       deliveryContext: { ...OWNERS_TELEGRAM.deliveryContext, to: `telegram:${GIA_TELEGRAM}` },
     }],
-    ["the owner's Telegram chat on a gateway that names no Telegram owner", OWNERS_TELEGRAM, ["household:franco"]],
-    ["the owner's Telegram chat with no owner list", OWNERS_TELEGRAM, null],
+    ["the owner's private chat on Telegram, which the household retired", OWNERS_TELEGRAM],
+    ["a queued Telegram turn with no native chat", { ...OWNERS_TELEGRAM, nativeChannelId: undefined }],
     ["someone else in the owner's Telegram chat", { ...OWNERS_TELEGRAM, requesterSenderId: GIA_TELEGRAM }],
     ["the owner's Telegram id in a shared session", { ...OWNERS_TELEGRAM, sessionKey: "agent:main:main" }],
     ["a Telegram topic", { ...OWNERS_TELEGRAM, deliveryContext: { ...OWNERS_TELEGRAM.deliveryContext, threadId: 7 } }],
@@ -240,7 +238,7 @@ test("the tool is not offered in anyone else's family-room turn, a Telegram grou
     ["a one-shot run in the owner's thread", { ...OWN_THREAD, oneShotCliRun: true }],
     ["no context at all", undefined],
   ]) {
-    assert.equal(toolFor(turn, brief, { owners: owners === undefined ? OWNERS : owners }), null, label);
+    assert.equal(toolFor(turn, brief), null, label);
   }
 });
 
@@ -308,7 +306,7 @@ test("a brief the assistant writes reaches the phones that follow as an event, w
   const plugin = await registered(ON_THE_BOX);
   try {
     assert.deepEqual(plugin.briefTool.options, { names: [BRIEF_TOOL], optional: true });
-    const found = plugin.briefTool.factory(OWNERS_TELEGRAM);
+    const found = plugin.briefTool.factory(OWN_THREAD);
     const { payload } = await answer(found, { text: "Gia lands at 4:10. Soccer pickup at 5:45." });
     assert.deepEqual(plugin.events, [
       { name: "brief", payload: { brief: payload.brief }, options: { scope: "operator.read" } },

@@ -41,7 +41,6 @@ FINANCE = ["pocketpiggies_catalog", "pocketpiggies_read", "pocketpiggies_records
 GROUP_TOOLS = [
     "web_search",
     "web_fetch",
-    "speak",
     "family_history",
     "picture",
     "video",
@@ -114,10 +113,8 @@ def as_on_the_box(owner: str = FRANCO, persona: str = "corey") -> dict[str, Any]
                 "pocket-piggies": {
                     "enabled": True,
                     "config": {
-                        "ownerTelegramId": owner,
-                        "accountLabel": persona,
-                        # The installer maps each gateway's owner to their own app thread.
                         "ownerHouseholdPersonId": "franco" if persona == "corey" else "gia",
+                        "accountLabel": persona,
                     },
                 },
             },
@@ -197,15 +194,19 @@ def test_the_patch_leaves_nothing_and_keeps_what_was_there(
     assert result["tools"]["alsoAllow"] == ["speak", "family_history", "recall", "forget", *FINANCE]
 
 
-@pytest.mark.parametrize(("persona", "owner"), [("corey", FRANCO), ("denise", GIA)])
+@pytest.mark.parametrize(
+    ("persona", "owner", "person"), [("corey", FRANCO, "franco"), ("denise", GIA, "gia")]
+)
 def test_the_pocketpiggies_guard_finds_nothing_to_put_back(
-    memory: ModuleType, installer: ModuleType, persona: str, owner: str
+    memory: ModuleType, installer: ModuleType, persona: str, owner: str, person: str
 ) -> None:
-    config = as_on_the_box(owner, persona)
-    assert installer.configured(config, persona, owner) == config
+    before = as_on_the_box(owner, persona)
+    before["commands"]["ownerAllowFrom"].append(f"household:{person}")
+    before["channels"]["household"] = {"owner": {"id": person}}
+    config = installer.configured(before, persona, person)
     result = memory.patched(config, memory.memory_patch(config, persona))
 
-    assert installer.configured(result, persona, owner) == result
+    assert installer.configured(result, persona, person) == result
     assert result["channels"] == config["channels"]
     assert result["session"] == config["session"]
 

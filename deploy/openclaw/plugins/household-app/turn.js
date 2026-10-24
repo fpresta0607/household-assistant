@@ -14,7 +14,7 @@
 //   tools return there never reaches the other person's turn or the other assistant's, and
 //   nobody else's message can be steered into a run of it.
 //
-// Everything else is no turn: Telegram, other sessions, automations and sub-agents, which
+// Everything else is no turn: other channels, other sessions, automations and sub-agents, which
 // name no sender, and a gateway client's chat.send, which names its own client id.
 
 export const FAMILY = "family";

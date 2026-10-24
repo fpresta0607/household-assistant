@@ -1,8 +1,9 @@
 """Linking one owner's PocketPiggies account: PKCE consent, exchange, status and revoke.
 
-The protocol is PocketPiggies' (docs/ASSISTANT_API_SPEC.md section 7, PR 140). This side
-holds the client credential and the verifier, so the request id that travels through
-Telegram is never enough to finish a link on its own.
+The protocol is PocketPiggies' (docs/ASSISTANT_API_SPEC.md section 7, PR 140), with the
+household binding in docs/deploy/pocketpiggies-server.md. This side holds the client
+credential and the verifier, so the request id that travels through the owner's browser
+is never enough to finish a link on its own.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from datetime import datetime
 from typing import Any
 
 from .api import PocketPiggiesApi
+from .binding import Binding
 from .errors import PocketPiggiesError
 from .store import (
     GRANT_TOKEN,
@@ -27,7 +29,6 @@ from .store import (
     PendingLink,
 )
 
-BOT_NAMES = {"corey": "Corey_the_man_bot", "denise": "Denise_the_woman_bot"}
 SCOPE = "household:read"
 REQUEST_LIFETIME_MS = 600_000
 RETRY_SPACING_MS = 5_000
@@ -41,10 +42,11 @@ MESSAGES = {
         "This connection request is unavailable. Use /pocketpiggies connect to try again."
     ),
     "invalid_binding": (
-        "This connection does not belong to your account and private chat. Start again here."
+        "This connection does not belong to your account and your own thread. Start again here."
     ),
     "authorization_pending": (
-        "Finish signing in and allowing access in PocketPiggies, then return here."
+        "Finish signing in and allowing access in PocketPiggies, then come back here and send "
+        "/pocketpiggies status."
     ),
     "access_denied": (
         "PocketPiggies connection was cancelled. Use /pocketpiggies connect to try again."
@@ -93,17 +95,15 @@ class AccountLink:
         *,
         store: CredentialStore,
         api: PocketPiggiesApi,
-        client_id: str,
-        telegram_user_id: str,
+        binding: Binding,
         now: Callable[[], int] = _now_ms,
     ) -> None:
-        if client_id not in BOT_NAMES:
-            raise ValueError("client_id must be corey or denise")
         self.store = store
         self.api = api
-        self.client_id = client_id
-        self.telegram_user_id = telegram_user_id
-        self.redirect_uri = f"https://t.me/{BOT_NAMES[client_id]}"
+        self.binding = binding
+        self.client_id = binding.client_id
+        self.owner = binding.owner
+        self.redirect_uri = binding.redirect_uri
         self.now = now
 
     def _request(self, operation: str, state: LinkState, **fields: str) -> dict[str, Any]:
@@ -114,12 +114,7 @@ class AccountLink:
                 "POST",
                 f"/api/assistant/link/{operation}",
                 bearer=state.client_credential,
-                body={
-                    "telegramUserId": self.telegram_user_id,
-                    "chatId": self.telegram_user_id,
-                    "chatType": "private",
-                    **fields,
-                },
+                body={**self.binding.link_fields(), **fields},
                 limit=MAX_LINK_RESPONSE_BYTES,
             )
         except PocketPiggiesError as error:
@@ -170,8 +165,9 @@ class AccountLink:
         self.store.save(state)
         return {
             "text": (
-                "Connect your PocketPiggies account. Sign in if needed, allow read-only access, "
-                "then return to this chat. This link expires in 10 minutes."
+                "Connect your PocketPiggies account. Sign in if needed and allow read-only access, "
+                "then come back here and send /pocketpiggies status. This link expires in "
+                "10 minutes."
             ),
             "url": f"{self.api.base_url}/assistant/connect?request={request_id}",
         }
@@ -229,7 +225,7 @@ class AccountLink:
         return {
             "text": (
                 "PocketPiggies is connected with read-only access. "
-                "You can now ask about your finances in this private chat."
+                "You can now ask about your finances in your own thread."
             )
         }
 
@@ -286,7 +282,7 @@ class AccountLink:
         if grant is None or grant.expires_at <= self.now():
             raise PocketPiggiesError(
                 "connection_required",
-                "Connect your account using /pocketpiggies connect in your private chat.",
+                "Connect your account by sending /pocketpiggies connect in your own thread.",
             )
         return grant
 

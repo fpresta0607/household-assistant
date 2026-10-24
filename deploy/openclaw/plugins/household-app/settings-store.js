@@ -4,7 +4,7 @@
 // cost each day. The assistant's brief for today is kept here too (brief.js).
 //
 // Its own SQLite file beside room.sqlite, opened for the plugin rather than for the
-// channel: the standing instruction reaches every turn, Telegram's included, whether the
+// channel: the standing instruction reaches every turn, a scheduled run's included, whether the
 // app's channel is running or not, and a rename restarts the channel in the middle of the
 // request that made it. The newest accepted change is here so a restart cannot reopen a
 // replay.

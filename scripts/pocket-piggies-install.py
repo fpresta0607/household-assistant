@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """Install PocketPiggies into ONE existing OpenClaw gateway and start its key holder.
 
-The gateway gets the plugin, the three read-only finance tools for its owner's private
-chat, owner-only private messages and a family-group tool allowlist. The key holder,
-a host service under its own user, holds the client credential and the owner's grant.
-Client provisioning is separate and follows restart and verification; it prints only
-a non-secret registration digest, and owner consent creates the grant.
+The gateway gets the plugin, the three read-only finance tools for its owner's own turns
+in the Steward app, every other chat channel switched off and the family room's tool
+allowlist. The key holder, a host service under its own user, holds the client
+credential and the owner's grant. Client provisioning is separate and follows restart
+and verification; it prints only a non-secret registration digest, and owner consent
+creates the grant.
+
+The owner is the household person the gateway's app belongs to. A grant made before
+Telegram was retired is bound at PocketPiggies to the owner's Telegram chat, so that
+owner's key holder is also given `--telegram-id`, and keeps speaking for it until the
+owner links again under the household binding (docs/deploy/pocketpiggies-server.md).
 
 `--guard` is what household-pocketpiggies-guard runs as root whenever a gateway's
 config changes: the gateway's own uid can rewrite that config, so the policy is put
@@ -52,21 +58,29 @@ KEY_HOLDER_STATE = Path("/var/lib/household-pocketpiggies")
 SYSTEMD_UNITS = Path("/etc/systemd/system")
 UNIT = "household-pocketpiggies@.service"
 SOCKET_DIRECTORY = "pocketpiggies"
+# A household person, as the app names them, and the clients a Telegram-bound grant was
+# made with, by the bot PocketPiggies returned its owner to. binding.py in the key holder
+# says the same.
+PERSON = re.compile(r"[a-z][a-z0-9-]{0,31}")
+CLIENT_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}")
+TELEGRAM_ID = re.compile(r"[1-9][0-9]*")
 BOT_NAMES = {"corey": "Corey_the_man_bot", "denise": "Denise_the_woman_bot"}
-# Whose own thread in the Steward AI app may read finance, by household person id: the
-# owner of that gateway's app channel. Both gateways, by the household's decision of
-# 15 October, so finance is not lost when Telegram is turned off.
-APP_OWNERS = {"corey": "franco", "denise": "gia"}
+APP_REDIRECT = "steward://pocketpiggies/linked"
+# The app's channel, and the keys beside the channels in `channels` that configure them all.
+CHANNEL = "household"
+CHANNEL_SETTINGS = {"defaults", "modelByChannel"}
 GATEWAYS = {
     "corey": ("openclaw", "openclaw-gateway"),
     "denise": ("openclaw-denise", "openclaw-denise"),
 }
 FINANCE_TOOLS = ["pocketpiggies_catalog", "pocketpiggies_read", "pocketpiggies_records"]
-# Must equal SAFE_GROUP_TOOLS in the plugin, which refuses finance when a group has more.
+# The family room's tools. Must equal SAFE_GROUP_TOOLS in the plugin, which refuses finance
+# when the room has more, and FAMILY_TOOLS in openclaw-household-app.py, which writes the
+# same list where PocketPiggies is not installed.
 GROUP_TOOLS = [
     "web_search",
     "web_fetch",
-    "speak",
+    # Only the family room's own messages, read-only (household-app).
     "family_history",
     # Only a picture or a short video through OpenRouter, sent to the chat it was asked in,
     # under each person's daily limit (household-pictures).
@@ -100,15 +114,28 @@ def key_holder_user(persona: str) -> str:
     return f"household-pp-{persona}"
 
 
+def _check_owner(persona: str, owner: str, telegram_id: str | None) -> None:
+    if persona not in GATEWAYS or not PERSON.fullmatch(owner):
+        raise ValueError("use corey or denise and the owner's household person id")
+    if telegram_id is not None and not TELEGRAM_ID.fullmatch(telegram_id):
+        raise ValueError("a Telegram id is a positive number")
+
+
 def configured(
-    original: dict[str, Any], persona: str, telegram_id: str, *, is_enabled: bool = True
+    original: dict[str, Any],
+    persona: str,
+    owner: str,
+    *,
+    is_enabled: bool = True,
 ) -> dict[str, Any]:
     """Keep the owner's tools and keep everyone else's turns away from finance."""
-    if persona not in GATEWAYS or not re.fullmatch(r"[1-9][0-9]*", telegram_id):
-        raise ValueError("use corey or denise and a positive numeric Telegram user id")
+    _check_owner(persona, owner, None)
     owners = original.get("commands", {}).get("ownerAllowFrom", [])
-    if f"telegram:{telegram_id}" not in owners:
-        raise ValueError("the Telegram id must match the gateway's existing trusted owner")
+    if f"{CHANNEL}:{owner}" not in owners:
+        raise ValueError(
+            "the owner must be the gateway's app owner; run scripts/openclaw-household-app.py "
+            "apply first"
+        )
     result = copy.deepcopy(original)
     session = result.setdefault("session", {})
     if session.get("scope") == "global":
@@ -118,27 +145,27 @@ def configured(
             raise ValueError(
                 "a group binding joins the private main session; fix that binding first"
             )
-    # The owner's finance transcript is never the family group's or another sender's.
+    # The owner's finance transcript is never the family room's or another sender's.
     session["dmScope"] = "per-channel-peer"
     session["groupScope"] = "per-group"
-    telegram = result.get("channels", {}).get("telegram")
-    if not isinstance(telegram, dict):
-        raise ValueError("the gateway has no Telegram channel")
-    if "accounts" in telegram or "direct" in telegram:
-        raise ValueError("per-account or per-chat Telegram settings need a reviewed finance policy")
-    # Only the owner reaches a full-tool private turn; every group the bot admits runs
-    # with tools that can neither read gateway files nor reach the key holder.
-    telegram["dmPolicy"] = "allowlist"
-    telegram["allowFrom"] = [telegram_id]
-    if telegram.get("groupPolicy") != "disabled":
-        telegram["groupPolicy"] = "allowlist"
-    groups = telegram.get("groups", {})
-    for group in groups.values():
-        if not isinstance(group, dict) or "toolsBySender" in group or "topics" in group:
-            raise ValueError(
-                "a group with per-sender or per-topic settings needs a reviewed policy"
-            )
-        group["tools"] = {"allow": list(GROUP_TOOLS)}
+    channels = result.get("channels", {})
+    if not isinstance(channels, dict):
+        raise ValueError("channels is not an object")
+    household = channels.get(CHANNEL)
+    if household is not None:
+        if not isinstance(household, dict) or household.get("owner", {}).get("id") != owner:
+            raise ValueError("the gateway's app channel belongs to someone else")
+        # Everyone else's family-room turns run with tools that can neither read gateway
+        # files nor reach the key holder.
+        household["familyTools"] = list(GROUP_TOOLS)
+    # The app is the household's only channel. Any other would admit senders this policy
+    # never reviewed into a turn with every tool, so each is switched off.
+    for name, channel in channels.items():
+        if name in (CHANNEL, *CHANNEL_SETTINGS):
+            continue
+        if not isinstance(channel, dict):
+            raise ValueError(f"channels.{name} is not an object")
+        channel["enabled"] = False
     plugins = result.setdefault("plugins", {})
     if is_enabled and plugins.get("enabled") is False:
         raise ValueError("plugins are explicitly disabled; enable plugins before installing")
@@ -153,14 +180,12 @@ def configured(
     entry = plugins.setdefault("entries", {}).setdefault(PLUGIN_ID, {})
     entry["enabled"] = is_enabled
     if is_enabled:
-        entry["config"] = {"ownerTelegramId": telegram_id, "accountLabel": persona}
-        if persona in APP_OWNERS:
-            entry["config"]["ownerHouseholdPersonId"] = APP_OWNERS[persona]
+        entry["config"] = {"ownerHouseholdPersonId": owner, "accountLabel": persona}
     else:
         entry.pop("config", None)
     paths = plugins.setdefault("load", {}).setdefault("paths", [])
     # Plugin code runs inside the gateway and can offer tools under any name, including
-    # one on the group allowlist, so it may come only from the root-owned read-only mount.
+    # one on the family room's allowlist, so it may come only from the root-owned mount.
     if any(not isinstance(path, str) or not PLUGIN_PATH.fullmatch(path) for path in paths):
         raise ValueError("a plugin loads from outside /opt/household-plugins")
     plugin_path = f"/opt/household-plugins/{PLUGIN_ID}-{persona}"
@@ -258,7 +283,7 @@ def _write_config(state_descriptor: int, updated: dict[str, Any], uid: int, gid:
 def install_into(
     state: Path,
     persona: str,
-    telegram_id: str,
+    owner: str,
     plugins_root: Path = PLUGINS_ROOT,
     *,
     is_enabled: bool = True,
@@ -266,16 +291,16 @@ def install_into(
     """Back up the config and any installed plugin, then write the plugin and the policy."""
     state_descriptor = _open_state(state)
     try:
-        return _install_into(state_descriptor, persona, telegram_id, plugins_root, is_enabled)
+        return _install_into(state_descriptor, persona, owner, plugins_root, is_enabled)
     finally:
         os.close(state_descriptor)
 
 
 def _install_into(
-    state_descriptor: int, persona: str, telegram_id: str, plugins_root: Path, is_enabled: bool
+    state_descriptor: int, persona: str, owner: str, plugins_root: Path, is_enabled: bool
 ) -> Path:
     original, metadata = _read_config(state_descriptor)
-    updated = configured(original, persona, telegram_id, is_enabled=is_enabled)
+    updated = configured(original, persona, owner, is_enabled=is_enabled)
     destination = plugins_root / f"{PLUGIN_ID}-{persona}"
     if plugins_root.is_symlink() or not plugins_root.is_dir() or destination.is_symlink():
         raise ValueError("refusing a symlinked plugin installation directory")
@@ -341,11 +366,28 @@ def _write_root_owned(target: Path, content: bytes, mode: int) -> None:
         staged.unlink(missing_ok=True)
 
 
+def drop_in(state: Path, owner: str, client_id: str, telegram_id: str | None) -> bytes:
+    """The key holder's instance settings: whom it speaks for, and the gateway it binds."""
+    lines = [
+        "# Written by scripts/pocket-piggies-install.py for this owner and gateway.",
+        "[Service]",
+        f"Environment=POCKETPIGGIES_OWNER={owner}",
+        f"Environment=POCKETPIGGIES_CLIENT_ID={client_id}",
+    ]
+    if telegram_id is not None:
+        # The Telegram chat the owner's grant was made under, before Telegram was retired.
+        lines.append(f"Environment=POCKETPIGGIES_TELEGRAM_ID={telegram_id}")
+    lines.append(f"BindPaths={state / 'pocketpiggies'}:/run/household-pocketpiggies")
+    return ("\n".join(lines) + "\n").encode()
+
+
 def install_key_holder(
     state: Path,
     persona: str,
-    telegram_id: str,
+    owner: str,
     *,
+    telegram_id: str | None = None,
+    client_id: str | None = None,
     code_root: Path = KEY_HOLDER_CODE,
     units: Path = SYSTEMD_UNITS,
     run: Runner = subprocess.run,
@@ -356,8 +398,10 @@ def install_key_holder(
     setgid to the gateway's group: the gateway can connect, and cannot plant, rename or
     remove anything inside it. The other gateway does not mount this state at all.
     """
-    if not re.fullmatch(r"[1-9][0-9]*", telegram_id) or persona not in GATEWAYS:
-        raise ValueError("use corey or denise and a positive numeric Telegram user id")
+    _check_owner(persona, owner, telegram_id)
+    client = client_id or persona
+    if not CLIENT_ID.fullmatch(client) or (telegram_id is not None and client not in BOT_NAMES):
+        raise ValueError("a Telegram-bound grant was made with the corey or denise client")
     user = key_holder_user(persona)
     if run(["id", "-u", user], capture_output=True, text=True, check=False).returncode != 0:
         run(
@@ -403,18 +447,9 @@ def install_key_holder(
 
     for name in (UNIT, *GUARD_UNITS):
         _replace_root_owned(ROOT / "deploy" / "pocketpiggies" / name, units / name, 0o644)
-    drop_in = units / f"household-pocketpiggies@{persona}.service.d"
-    drop_in.mkdir(mode=0o755, exist_ok=True)
-    _write_root_owned(
-        drop_in / "gateway.conf",
-        (
-            "# Written by scripts/pocket-piggies-install.py for this owner and gateway.\n"
-            "[Service]\n"
-            f"Environment=POCKETPIGGIES_OWNER_TELEGRAM_ID={telegram_id}\n"
-            f"BindPaths={state / 'pocketpiggies'}:/run/household-pocketpiggies\n"
-        ).encode(),
-        0o644,
-    )
+    instance = units / f"household-pocketpiggies@{persona}.service.d"
+    instance.mkdir(mode=0o755, exist_ok=True)
+    _write_root_owned(instance / "gateway.conf", drop_in(state, owner, client, telegram_id), 0o644)
 
     _prepare_socket_directory(state, uid)
 
@@ -480,7 +515,7 @@ def installed_owner(units: Path, persona: str) -> str | None:
     except FileNotFoundError:
         return None
     match = re.search(
-        r"^Environment=POCKETPIGGIES_OWNER_TELEGRAM_ID=([1-9][0-9]*)$", text, re.MULTILINE
+        r"^Environment=POCKETPIGGIES_OWNER=([a-z][a-z0-9-]{0,31})$", text, re.MULTILINE
     )
     if match is None:
         raise ValueError(f"the {persona} drop-in names no owner")
@@ -499,8 +534,8 @@ def guard(
 ) -> None:
     """Put each installed gateway's finance policy back, or stop its finance.
 
-    A drifted key, such as exec handed back to the family group or private messages
-    opened to another sender, is rewritten to what the installer set. A config the
+    A drifted key, such as exec handed back to the family room or another chat channel
+    switched on, is rewritten to what the installer set. A config the
     installer cannot make safe, or one that keeps drifting back, stops that gateway's
     key holder instead. A failure of the guard itself, including a stop systemd did not
     carry out, is caught by the unit, which then stops every key holder.
@@ -645,8 +680,22 @@ def doctor_failures(output: str) -> list[str]:
     return failures
 
 
-def provision_client(state_root: Path, persona: str, telegram_id: str) -> dict[str, str]:
+def _identity(owner: str, telegram_id: str | None) -> dict[str, str]:
+    """What the key holder's state file names its owner by, as binding.py writes it."""
+    return {"ownerTelegramId": telegram_id} if telegram_id is not None else {"owner": owner}
+
+
+def provision_client(
+    state_root: Path,
+    persona: str,
+    owner: str,
+    *,
+    telegram_id: str | None = None,
+    client_id: str | None = None,
+) -> dict[str, str]:
     """Generate once in the key holder's state; never rotate an existing client."""
+    client = client_id or persona
+    identity = _identity(owner, telegram_id)
     directory = state_root / persona
     if directory.is_symlink() or not directory.is_dir():
         raise ValueError("start the key holder first; its state directory does not exist")
@@ -667,7 +716,9 @@ def provision_client(state_root: Path, persona: str, telegram_id: str) -> dict[s
         descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         with os.fdopen(descriptor, "rb") as stream:
             stored = json.loads(stream.read(MAX_CONFIG_BYTES))
-        if stored.get("version") != 1 or stored.get("ownerTelegramId") != telegram_id:
+        if stored.get("version") != 1 or any(
+            stored.get(key) != value for key, value in identity.items()
+        ):
             raise ValueError("existing credentials belong to a different owner or format")
         credential = stored.get("clientCredential")
         if not isinstance(credential, str) or not re.fullmatch(
@@ -682,7 +733,7 @@ def provision_client(state_root: Path, persona: str, telegram_id: str) -> dict[s
             json.dump(
                 {
                     "version": 1,
-                    "ownerTelegramId": telegram_id,
+                    **identity,
                     "clientCredential": credential,
                     "pending": None,
                     "grant": None,
@@ -691,18 +742,34 @@ def provision_client(state_root: Path, persona: str, telegram_id: str) -> dict[s
             )
             output.flush()
             os.fsync(output.fileno())
-    return {
-        "clientId": persona,
+    digest = {
+        "clientId": client,
         "credentialSha256": hashlib.sha256(credential.encode()).hexdigest(),
-        "telegramUserId": telegram_id,
-        "botUsername": BOT_NAMES[persona],
+    }
+    if telegram_id is not None:
+        return {**digest, "telegramUserId": telegram_id, "botUsername": BOT_NAMES[client]}
+    return {
+        **digest,
+        "subjectType": "household_person",
+        "subject": owner,
+        "redirectUri": APP_REDIRECT,
     }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("persona", nargs="?", choices=GATEWAYS)
-    parser.add_argument("--telegram-id", help="the account owner's numeric Telegram id")
+    parser.add_argument(
+        "--owner", help="the account owner's household person id, as the app names them"
+    )
+    parser.add_argument(
+        "--telegram-id",
+        help="for a grant made before Telegram was retired: the owner's numeric Telegram id",
+    )
+    parser.add_argument(
+        "--client-id",
+        help="the PocketPiggies client this key holder was registered as (default: the persona)",
+    )
     parser.add_argument(
         "--restart", action="store_true", help="restart only this gateway after install or rollback"
     )
@@ -715,7 +782,7 @@ def main() -> None:
     operation.add_argument(
         "--rollback",
         action="store_true",
-        help="stop the key holder and disable finance, keeping the owner-only and group policy",
+        help="stop the key holder and disable finance, keeping the channel and family-room policy",
     )
     operation.add_argument(
         "--guard",
@@ -728,8 +795,9 @@ def main() -> None:
     if args.guard:
         guard()
         return
-    if args.persona is None or args.telegram_id is None:
-        parser.error("name the persona and --telegram-id")
+    if args.persona is None or args.owner is None:
+        parser.error("name the persona and --owner")
+    binding = {"telegram_id": args.telegram_id, "client_id": args.client_id}
     state_name, container = GATEWAYS[args.persona]
     state = GATEWAY_STATE_ROOT / state_name
     unit = f"household-pocketpiggies@{args.persona}.service"
@@ -740,7 +808,7 @@ def main() -> None:
                 original, _ = _read_config(state_descriptor)
             finally:
                 os.close(state_descriptor)
-            expected = configured(original, args.persona, args.telegram_id)
+            expected = configured(original, args.persona, args.owner)
             if any(
                 original.get(key) != expected.get(key)
                 for key in ("tools", "channels", "session", "plugins")
@@ -758,7 +826,9 @@ def main() -> None:
                 )
                 if answer.stdout.strip() != expected_state:
                     raise ValueError(f"verify {check[-1]} is {expected_state} before provisioning")
-            print(json.dumps(provision_client(KEY_HOLDER_STATE, args.persona, args.telegram_id)))
+            print(
+                json.dumps(provision_client(KEY_HOLDER_STATE, args.persona, args.owner, **binding))
+            )
             return
         if args.rollback:
             # Finance stops here: without its key holder the gateway holds no credential.
@@ -783,9 +853,9 @@ def main() -> None:
             drop_in = SYSTEMD_UNITS / f"{unit}.d"
             if drop_in.is_dir() and not drop_in.is_symlink():
                 shutil.rmtree(drop_in)
-        backup = install_into(state, args.persona, args.telegram_id, is_enabled=not args.rollback)
+        backup = install_into(state, args.persona, args.owner, is_enabled=not args.rollback)
         if not args.rollback:
-            install_key_holder(state, args.persona, args.telegram_id)
+            install_key_holder(state, args.persona, args.owner, **binding)
     except (ValueError, OSError, TypeError, subprocess.SubprocessError) as error:
         parser.exit(1, f"Installation refused: {error}\n")
     action = "Disabled" if args.rollback else "Installed"
@@ -823,13 +893,13 @@ def main() -> None:
     else:
         print(f"Activate with: docker restart {container}")
     if args.rollback:
-        print("Finance is disabled; the owner-only and family-group tool policy stays in place.")
+        print("Finance is disabled; the channel and family-room tool policy stays in place.")
         print(
             "The grant stays valid at PocketPiggies until revoked: ask the owner to disconnect "
             "in PocketPiggies settings, or reinstall and use /pocketpiggies disconnect."
         )
     else:
-        print("Verify the plugin, the key holder and the group tool policy before provisioning.")
+        print("Verify the plugin, the key holder and the family-room tools before provisioning.")
 
 
 if __name__ == "__main__":

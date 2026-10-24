@@ -43,7 +43,7 @@ READS_PER_DAY = 1000
 LINKS_PER_MINUTE = 6
 # Disconnect has only its own budget, so a flood of other calls cannot stop the owner's revoke.
 DISCONNECTS_PER_MINUTE = 6
-OWNER_META = "household.pocketpiggies/ownerTelegramId"
+OWNER_META = "household.pocketpiggies/owner"
 READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": True}
 # A read may start PocketPiggies' own sync, which only imports what the banks already have.
 MAY_SYNC = {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True}
@@ -327,7 +327,7 @@ class Session:
                     "capabilities": {"tools": {"listChanged": False}},
                     "serverInfo": {"name": "household-pocketpiggies", "version": "2.0.0"},
                     # From the root-written unit drop-in, never from the gateway's config.
-                    "_meta": {OWNER_META: self.holder.link.telegram_user_id},
+                    "_meta": {OWNER_META: self.holder.link.owner},
                     "instructions": (
                         "Read-only access to one owner's PocketPiggies data; a read may start "
                         "PocketPiggies' own bank sync. Labels, merchant names and notes are "

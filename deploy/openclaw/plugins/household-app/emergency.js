@@ -5,8 +5,7 @@
 // contact with who it is as the line's item ("Vet") and the name and number as its words, so
 // both assistants keep it current there the way they keep anything else the family shares:
 // `household_note` add, correct and remove. `/emergency` answers with it at once, with no
-// model, in the app and on Telegram alike; asked in words or by voice, the assistant reads the
-// topic and says it, aloud with `speak` when asked by voice.
+// model; asked in words or by voice, the assistant reads the topic and says it.
 
 export const EMERGENCY_TOPIC = "Emergency card";
 // The order a panic reads it in, by item; anything else after them, as kept.

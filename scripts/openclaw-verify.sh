@@ -136,16 +136,11 @@ check "recurring heartbeat" off "${heartbeat}"
 
 echo
 echo "=== the household reaches its assistant ==="
-# Once the app is configured, its own verdict checks the phone keys, Fam policy and
-# retired Telegram channel. The legacy check remains for a gateway not yet migrated.
+# The app is the household's only channel. Its verdict checks the owner, the family
+# room's tools, the tools the assistant is handed and that nothing Telegram left remains.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if jq -e '.channels.household | type == "object"' "${STATE}/openclaw.json" >/dev/null 2>&1; then
-  check "household app" ok \
-    "$(python3 "${here}/openclaw-household-app.py" verdict --container "${CT}" --state "${STATE}" 2>&1)"
-else
-  check "family group" ok \
-    "$(python3 "${here}/openclaw-family-group.py" verdict --container "${CT}" --state "${STATE}" 2>&1)"
-fi
+check "household app" ok \
+  "$(python3 "${here}/openclaw-household-app.py" verdict --container "${CT}" --state "${STATE}" 2>&1)"
 
 echo
 echo "=== nothing still routes to OpenAI ==="
@@ -156,12 +151,11 @@ check "openrouter only" ok \
   "$(python3 "${here}/openclaw-openrouter.py" verdict --container "${CT}" --state "${STATE}" 2>&1)"
 
 echo
-echo "=== a spoken reply goes through the speech plugin ==="
-# OpenClaw's own tts tool leaves a long text to the model and nothing bounds what it
-# spends, so each gateway speaks through the household-speech plugin and its ceilings.
-# This audits config: the plugin, the ceilings, the tool the assistant is handed, and
-# speech nobody asked for. Whether the running gateway loaded the plugin shows in a
-# chat; see docs/deploy/openclaw.md, "Speaking".
+echo "=== nothing speaks a reply unasked ==="
+# Speech is Speak and Talk in the app, under a daily ceiling, and nothing else. This
+# audits config: no automatic speech, no OpenClaw tts tool handed to the assistant, and
+# nothing left of the retired household-speech plugin; see docs/deploy/openclaw.md,
+# "Speaking".
 check "spoken replies" ok \
   "$(python3 "${here}/openclaw-speech.py" verdict --container "${CT}" --state "${STATE}" 2>&1)"
 

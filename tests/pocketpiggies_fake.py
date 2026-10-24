@@ -23,7 +23,12 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 CLIENT_CREDENTIAL = "ppc_" + "C" * 43
+# The owner's Telegram id, for the grants made before Telegram was retired, and the owner as
+# the household app names them, for every other grant (docs/deploy/pocketpiggies-server.md).
 OWNER = "7000000001"
+PERSON = "franco"
+TELEGRAM_FIELDS = {"telegramUserId": OWNER, "chatId": OWNER, "chatType": "private"}
+HOUSEHOLD_FIELDS = {"subjectType": "household_person", "subject": PERSON}
 ACCOUNT = "11111111-2222-4333-8444-555555555555"
 CATALOG: dict[str, Any] = {
     "schemaVersion": 1,
@@ -183,7 +188,11 @@ class _Handler(BaseHTTPRequestHandler):
         if self._bearer() != CLIENT_CREDENTIAL:
             self._send(401, {"code": "invalid_client"})
             return
-        if body.get("telegramUserId") != OWNER or body.get("chatType") != "private":
+        bound = {key: body.get(key) for key in (*TELEGRAM_FIELDS, *HOUSEHOLD_FIELDS)}
+        if bound not in (
+            {**dict.fromkeys(HOUSEHOLD_FIELDS), **TELEGRAM_FIELDS},
+            {**dict.fromkeys(TELEGRAM_FIELDS), **HOUSEHOLD_FIELDS},
+        ):
             self._send(403, {"code": "invalid_binding"})
             return
         if operation == "requests":
@@ -248,13 +257,21 @@ class _Handler(BaseHTTPRequestHandler):
         if state.live_grant(self._bearer()) is None:
             self._send(401, {"error": {"code": "credential_rejected"}})
             return
-        binding = (
-            self.headers.get("X-PocketPiggies-Client-Id"),
-            self.headers.get("X-PocketPiggies-Telegram-User-Id"),
-            self.headers.get("X-PocketPiggies-Chat-Id"),
-            self.headers.get("X-PocketPiggies-Chat-Type"),
+        binding = tuple(
+            self.headers.get(f"X-PocketPiggies-{name}")
+            for name in (
+                "Client-Id",
+                "Telegram-User-Id",
+                "Chat-Id",
+                "Chat-Type",
+                "Subject-Type",
+                "Subject",
+            )
         )
-        if binding != ("corey", OWNER, OWNER, "private"):
+        if binding not in (
+            ("corey", OWNER, OWNER, "private", None, None),
+            ("corey", None, None, None, "household_person", PERSON),
+        ):
             self._send(403, {"code": "assistant_scope_denied"})
         elif path == "/api/assistant/catalog":
             self._send(200, state.catalog)

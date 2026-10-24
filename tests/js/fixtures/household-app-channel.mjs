@@ -143,6 +143,16 @@ export async function runningChannel(cfg, {
       }
       return joined;
     },
+    // OpenClaw's before_dispatch for one inbound message: each of the plugin's handlers, in
+    // the order the plugin registered them, until one handles it.
+    async beforeDispatch(event, context = {}) {
+      for (const hook of hooks) {
+        if (hook.name !== "before_dispatch") continue;
+        const result = await hook.handler(event, context);
+        if (result?.handled) return result;
+      }
+      return undefined;
+    },
     // Every handler the plugin registered for a hook with no matcher, such as cron_changed, in
     // the order it registered them, each awaited.
     async hook(name, event, context) {

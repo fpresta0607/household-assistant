@@ -1,14 +1,14 @@
-"""openclaw-speech.py: a spoken reply is made by the household-speech plugin, under a ceiling.
+"""openclaw-speech.py: speech is asked for, and the retired speech plugin is taken out.
 
-On 2026-10-10 a spoken reply reached Telegram as three unlabelled voice notes with its
-summary sent twice, because OpenClaw's own `tts` tool leaves a long text to the model
-and nothing bounds what it spends. The plugin in deploy/openclaw/plugins/household-speech
-replaces that tool. This script is what hands it to both gateways and says, from each
-gateway's config, whether any way of speaking is left that goes around it.
+Until Telegram was retired the household-speech plugin spoke replies there as numbered voice
+notes, under its own ceilings, and the app refused them. Speak and Talk in the app are now
+all the speech a gateway makes, and household-app refuses every other way. This script says,
+from each gateway's config, whether anything still speaks a reply nobody asked for, and takes
+out what household-speech left behind.
 
-The first config below is the shape both gateways had that day, read from the box.
-The apply tests replace `docker exec` with a runner that applies the patch to the file
-the way `openclaw config patch` does.
+The first config below is the shape both gateways had before the retirement. The apply tests
+replace `docker exec` with a runner that applies the patch to the file the way `openclaw
+config patch` does.
 """
 
 from __future__ import annotations
@@ -28,10 +28,9 @@ from tests.capabilities import needs_nofollow_open, needs_symlinks
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "openclaw-speech.py"
 
-ROOM = "/opt/household-plugins/household-family-room"
+APP = "/opt/household-plugins/household-app"
 VIDEO = "/opt/household-plugins/household-openrouter-video"
 SPEECH = "/opt/household-plugins/household-speech"
-CEILINGS = {"replyCharacters": 8000, "dayCharacters": 25000}
 
 
 @pytest.fixture(scope="module")
@@ -50,78 +49,64 @@ def speech() -> ModuleType:
 
 
 def as_on_the_box() -> dict[str, Any]:
-    """Speech on request through OpenClaw's own tool, as both gateways ran on 10 October."""
+    """Both gateways with household-speech handed over, as before Telegram was retired."""
     return {
-        "tools": {"profile": "coding", "alsoAllow": ["tts"]},
+        "tools": {
+            "profile": "coding",
+            "alsoAllow": ["image", "speak"],
+            "deny": ["codex", "memory-wiki", "onepassword"],
+        },
         "tts": {
             "auto": "off",
             "provider": "openrouter",
-            "providers": {
-                "openrouter": {"model": "elevenlabs/eleven-v4-turbo", "speakerVoice": "will"},
-                "microsoft": {"enabled": False},
-            },
+            "providers": {"openrouter": {"model": "elevenlabs/eleven-v4-turbo"}},
         },
+        "channels": {"household": {"talkDailyCharacters": 20000}},
         "plugins": {
-            "load": {"paths": [ROOM, VIDEO]},
+            "load": {"paths": [APP, SPEECH, VIDEO]},
             "entries": {
-                "household-family-room": {"enabled": True, "config": {"groupChatId": "-1"}},
+                "household-app": {"enabled": True},
+                "household-speech": {
+                    "enabled": True,
+                    "hooks": {"allowConversationAccess": True},
+                    "config": {"replyCharacters": 8000, "dayCharacters": 25000},
+                },
                 "household-openrouter-video": {"enabled": True},
+                "telegram": {"enabled": True},
             },
         },
     }
 
 
-def test_a_gateway_still_on_the_built_in_tool_is_named_on_every_count(speech: ModuleType) -> None:
+def test_the_retired_plugin_and_its_tool_are_named(speech: ModuleType) -> None:
     assert speech.problems(as_on_the_box()) == [
-        f"the household-speech plugin is not loaded from {SPEECH}",
-        "the household-speech plugin is not enabled",
-        "the household-speech plugin may not read the turn, so a request to hear a reply "
-        "is not reminded to call speak",
-        "no replyCharacters ceiling is set",
-        "no dayCharacters ceiling is set",
-        "the assistant is not handed the speak tool",
-        "the assistant is still handed OpenClaw's own tts tool, which no ceiling covers",
-        "DMs are not kept per sender and groups per group, so speak refuses every chat",
-        "tools.deny leaves out codex, memory-wiki, onepassword, whose tools are asked for but "
-        "not loaded at start, so speak finds no voice adapter",
-        "the telegram plugin is not enabled by name, so a turn whose plugins load from the "
-        "config has no voice adapter",
+        "the assistant is still handed speak, which nothing provides any more",
+        "the retired household-speech plugin is still in plugins.entries.household-speech, "
+        "plugins.load.paths",
     ]
 
 
-def test_the_patch_hands_over_speak_and_keeps_what_every_list_already_held(
+def test_the_patch_takes_out_the_plugin_and_both_tools_and_keeps_everything_else(
     speech: ModuleType,
 ) -> None:
     config = as_on_the_box()
-    config["tools"]["alsoAllow"] = ["tts", "image"]
-    config["plugins"]["allow"] = ["household-family-room", "household-openrouter-video"]
+    config["tools"]["alsoAllow"] = ["tts", "image", "speak"]
+    config["plugins"]["allow"] = ["household-app", "household-speech", "telegram"]
 
     after = speech.patched(config, speech.speech_patch(config))
 
     assert speech.problems(after) == []
-    # A patch replaces a list whole, so each is written back with what it held.
+    # A patch replaces a list whole, so each is written back with what else it held.
     assert after["tools"] == {
         "profile": "coding",
-        "alsoAllow": ["image", "speak"],
+        "alsoAllow": ["image"],
         "deny": ["codex", "memory-wiki", "onepassword"],
     }
-    assert after["session"] == {"dmScope": "per-channel-peer", "groupScope": "per-group"}
-    assert after["plugins"]["load"]["paths"] == [ROOM, VIDEO, SPEECH]
-    assert after["plugins"]["allow"] == [
-        "household-family-room",
-        "household-openrouter-video",
-        "household-speech",
-    ]
-    assert after["plugins"]["entries"] == {
-        **config["plugins"]["entries"],
-        "household-speech": {
-            "enabled": True,
-            "hooks": {"allowConversationAccess": True},
-            "config": CEILINGS,
-        },
-        "telegram": {"enabled": True},
-    }
-    # The voice, the model and speech on request are not this script's to change.
+    assert after["plugins"]["load"]["paths"] == [APP, VIDEO]
+    assert after["plugins"]["allow"] == ["household-app", "telegram"]
+    assert "household-speech" not in after["plugins"]["entries"]
+    # Telegram, the voice, the model and speech on request are not this script's to change.
+    assert after["plugins"]["entries"]["telegram"] == {"enabled": True}
     assert after["tts"] == config["tts"]
 
 
@@ -129,134 +114,9 @@ def test_a_gateway_that_already_follows_it_is_left_as_it_is(speech: ModuleType) 
     config = as_on_the_box()
     followed = speech.patched(config, speech.speech_patch(config))
 
-    assert speech.patched(followed, speech.speech_patch(followed)) == followed
+    assert speech.speech_patch(followed) == {}
     # No allow list was there, and writing one would switch every other plugin off.
     assert "allow" not in followed["plugins"]
-
-
-def test_a_gateway_whose_turn_hook_is_blocked_is_reported_and_then_allowed(
-    speech: ModuleType,
-) -> None:
-    # Both gateways on 15 October: OpenClaw logged the plugin's before_prompt_build hook
-    # as blocked, because nothing allowed it to read the turn.
-    config = as_on_the_box()
-    config = speech.patched(config, speech.speech_patch(config))
-    del config["plugins"]["entries"]["household-speech"]["hooks"]
-
-    assert speech.problems(config) == [
-        "the household-speech plugin may not read the turn, so a request to hear a reply "
-        "is not reminded to call speak",
-    ]
-    after = speech.patched(config, speech.speech_patch(config))
-    assert speech.problems(after) == []
-    assert after["plugins"]["entries"]["household-speech"]["hooks"] == {
-        "allowConversationAccess": True
-    }
-
-
-@pytest.mark.parametrize(
-    ("session", "expected"),
-    [
-        (None, {"dmScope": "per-channel-peer", "groupScope": "per-group"}),
-        (
-            {"dmScope": "per-account-channel-peer", "idleMinutes": 30},
-            {"dmScope": "per-account-channel-peer", "idleMinutes": 30, "groupScope": "per-group"},
-        ),
-        (
-            {"dmScope": "per-channel-peer", "groupScope": "per-group"},
-            {"dmScope": "per-channel-peer", "groupScope": "per-group"},
-        ),
-    ],
-    ids=["no-session", "per-account", "already-isolated"],
-)
-def test_speak_gets_dms_kept_per_sender_and_an_isolating_scope_a_person_chose_stays(
-    speech: ModuleType, session: dict[str, Any] | None, expected: dict[str, Any]
-) -> None:
-    config = as_on_the_box()
-    if session is not None:
-        config["session"] = session
-
-    after = speech.patched(config, speech.speech_patch(config))
-
-    assert after["session"] == expected
-    assert speech.problems(after) == []
-
-
-def test_a_shared_dm_scope_a_person_set_is_reported_and_left_for_them(speech: ModuleType) -> None:
-    config = as_on_the_box()
-    config["session"] = {"dmScope": "main"}
-
-    after = speech.patched(config, speech.speech_patch(config))
-
-    assert after["session"] == {"dmScope": "main", "groupScope": "per-group"}
-    assert speech.problems(after) == [
-        "DMs are not kept per sender and groups per group, so speak refuses every chat"
-    ]
-
-
-def test_a_telegram_plugin_switched_off_on_purpose_is_reported_and_left(
-    speech: ModuleType,
-) -> None:
-    config = as_on_the_box()
-    config["plugins"]["entries"]["telegram"] = {"enabled": False, "config": {"kept": True}}
-
-    after = speech.patched(config, speech.speech_patch(config))
-
-    assert after["plugins"]["entries"]["telegram"] == {"enabled": False, "config": {"kept": True}}
-    assert speech.problems(after) == [
-        "the telegram plugin is not enabled by name, so a turn whose plugins load from the "
-        "config has no voice adapter"
-    ]
-
-
-def test_the_unloaded_tool_owners_are_denied_beside_what_a_person_denied(
-    speech: ModuleType,
-) -> None:
-    config = as_on_the_box()
-    config["tools"]["deny"] = ["browser", "memory-wiki"]
-
-    after = speech.patched(config, speech.speech_patch(config))
-
-    assert after["tools"]["deny"] == ["browser", "memory-wiki", "codex", "onepassword"]
-    # The coding profile and everything it hands over stay.
-    assert after["tools"]["profile"] == "coding"
-    assert speech.problems(after) == []
-    assert "deny" not in speech.speech_patch(after).get("tools", {})
-
-
-@pytest.mark.parametrize(
-    ("held", "expected"),
-    [
-        (None, CEILINGS),
-        ({}, CEILINGS),
-        ({"replyCharacters": 3000}, {"replyCharacters": 3000, "dayCharacters": 25000}),
-        (
-            {"replyCharacters": 3000, "dayCharacters": 9000},
-            {"replyCharacters": 3000, "dayCharacters": 9000},
-        ),
-        # The plugin refuses these and does not start, so each gets the default.
-        (
-            {"replyCharacters": 0, "dayCharacters": "9000"},
-            CEILINGS,
-        ),
-        ({"replyCharacters": True, "dayCharacters": 2.5}, CEILINGS),
-    ],
-)
-def test_a_ceiling_a_person_set_stays_and_one_that_is_missing_gets_the_default(
-    speech: ModuleType, held: dict[str, object] | None, expected: dict[str, int]
-) -> None:
-    config = as_on_the_box()
-    if held is not None:
-        config["plugins"]["entries"]["household-speech"] = {"enabled": False, "config": held}
-
-    after = speech.patched(config, speech.speech_patch(config))
-
-    assert after["plugins"]["entries"]["household-speech"] == {
-        "enabled": True,
-        "hooks": {"allowConversationAccess": True},
-        "config": expected,
-    }
-    assert speech.problems(after) == []
 
 
 @pytest.mark.parametrize(
@@ -264,14 +124,14 @@ def test_a_ceiling_a_person_set_stays_and_one_that_is_missing_gets_the_default(
     [
         (("tts",), "always"),
         (("agents", "entries", "main", "tts"), "inbound"),
-        (("channels", "telegram", "tts"), "tagged"),
-        (("channels", "telegram", "accounts", "default", "tts"), "always"),
+        (("channels", "household", "tts"), "tagged"),
+        (("channels", "household", "accounts", "default", "tts"), "always"),
     ],
 )
 def test_speech_nobody_asked_for_is_reported_wherever_it_is_set_and_never_changed(
     speech: ModuleType, path: tuple[str, ...], mode: str
 ) -> None:
-    """Automatic speech calls the provider from the reply itself, around the plugin."""
+    """Automatic speech calls the provider from the reply itself, around the app."""
     config = as_on_the_box()
     node = config
     for key in path:
@@ -309,63 +169,6 @@ def test_the_older_speech_toggle_is_read_the_way_openclaw_reads_it(
     assert speech.problems(speech.patched(config, speech.speech_patch(config))) == expected
 
 
-@pytest.mark.parametrize(
-    ("policy", "expected"),
-    [
-        (
-            {"enabled": False},
-            ["plugins are switched off, so the household-speech plugin cannot run"],
-        ),
-        ({"deny": ["household-speech"]}, ["plugins.deny blocks the household-speech plugin"]),
-        ({"deny": ["another-plugin"]}, []),
-    ],
-)
-def test_a_plugin_policy_that_blocks_it_is_reported_and_left_for_a_person(
-    speech: ModuleType, policy: dict[str, object], expected: list[str]
-) -> None:
-    config = as_on_the_box()
-    config["plugins"].update(policy)
-
-    after = speech.patched(config, speech.speech_patch(config))
-
-    assert speech.problems(after) == expected
-    for key, value in policy.items():
-        assert after["plugins"][key] == value
-
-
-def test_an_allow_list_that_leaves_it_out_is_reported_and_then_merged(speech: ModuleType) -> None:
-    config = as_on_the_box()
-    followed = speech.patched(config, speech.speech_patch(config))
-    followed["plugins"]["allow"] = ["household-family-room"]
-
-    assert speech.problems(followed) == ["plugins.allow leaves the household-speech plugin out"]
-    after = speech.patched(followed, speech.speech_patch(followed))
-    assert after["plugins"]["allow"] == ["household-family-room", "household-speech"]
-
-
-def test_a_config_key_the_plugin_refuses_is_reported_and_taken_out(speech: ModuleType) -> None:
-    """The plugin refuses a config with a key it does not know, and then registers nothing:
-    no `speak` tool, and no claim on `/tts`."""
-    config = as_on_the_box()
-    followed = speech.patched(config, speech.speech_patch(config))
-    held = followed["plugins"]["entries"]["household-speech"]["config"]
-    held["voice"] = "will"
-    held["dayCharacter"] = 9000
-
-    after = speech.patched(followed, speech.speech_patch(followed))
-
-    assert speech.problems(followed) == [
-        "the household-speech plugin refuses its config and does not start: "
-        "it does not know dayCharacter, voice"
-    ]
-    assert after["plugins"]["entries"]["household-speech"] == {
-        "enabled": True,
-        "hooks": {"allowConversationAccess": True},
-        "config": CEILINGS,
-    }
-    assert speech.problems(after) == []
-
-
 def write_state(path: Path, config: dict[str, Any]) -> Path:
     path.mkdir(parents=True)
     (path / "openclaw.json").write_text(json.dumps(config))
@@ -401,13 +204,13 @@ class FakeGateways:
 
 
 @pytest.fixture(autouse=True)
-def installed_plugin(speech: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """The plugin as scripts/openclaw-install.sh leaves it on the host."""
-    manifest: Path = tmp_path / "plugins" / str(speech.PLUGIN) / "openclaw.plugin.json"
-    manifest.parent.mkdir(parents=True)
-    manifest.write_text(json.dumps({"id": speech.PLUGIN}))
-    monkeypatch.setattr(speech, "PLUGIN_ON_HOST", manifest)
-    return manifest
+def installed_guard(speech: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """household-app's speech guard as scripts/openclaw-install.sh leaves it on the host."""
+    guard: Path = tmp_path / "plugins" / "household-app" / "speech-guard.js"
+    guard.parent.mkdir(parents=True)
+    guard.write_text("export const SPEECH_TOOLS = [];\n")
+    monkeypatch.setattr(speech, "GUARD_ON_HOST", guard)
+    return guard
 
 
 @pytest.fixture
@@ -443,7 +246,7 @@ def test_apply_backs_up_and_writes_both_gateways_and_then_they_follow_it(
         (saved,) = gateway.state.glob("openclaw.json.pre-speech-*")
         assert saved.read_bytes() == before[gateway.persona]
         assert str(saved) in out
-    assert "8,000 characters a reply, 25,000 a day" in out
+    assert "speech only when someone asks for it" in out
     assert speech.check(gateways) == 0
     # A second run has nothing left to do and writes nothing.
     assert speech.apply(gateways, run=fake, dry_run=False) == 0
@@ -465,7 +268,7 @@ def test_a_dry_run_validates_on_both_and_writes_nothing(
     assert fake.writes == []
     out = capsys.readouterr().out
     assert "dry run: nothing written" in out
-    assert '"alsoAllow": ["speak"]' in out
+    assert '"household-speech": null' in out
     for gateway in gateways:
         assert gateway.config_path.read_bytes() == before[gateway.persona]
         assert list(gateway.state.glob("openclaw.json.pre-speech-*")) == []
@@ -530,15 +333,15 @@ def test_apply_says_which_gateway_it_wrote_when_the_other_write_fails(
     assert "corey is already written, so the two gateways are apart until apply is run again" in err
 
 
-def test_apply_refuses_until_the_plugin_is_installed_and_touches_nothing(
+def test_apply_refuses_until_the_guard_is_installed_and_touches_nothing(
     speech: ModuleType,
     gateways: tuple[Any, ...],
     fake: FakeGateways,
-    installed_plugin: Path,
+    installed_guard: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Naming a plugin the gateway cannot find takes `tts` away and hands over nothing."""
-    installed_plugin.unlink()
+    """Without the guard, taking the old plugin out would leave `/tts on` to OpenClaw's own."""
+    installed_guard.unlink()
 
     assert speech.apply(gateways, run=fake, dry_run=False) == 1
 
@@ -593,10 +396,11 @@ def test_check_and_verdict_read_one_gateway_from_its_state(
 
     assert speech.check(gateways) == 1
     out = capsys.readouterr().out
-    assert "the assistant is not handed the speak tool" in out
+    assert "the assistant is still handed speak" in out
+    assert "20,000 characters" in out
     assert speech.verdict(denise.container, denise.state) == "ok"
     assert speech.verdict(corey.container, corey.state).startswith(
-        f"the household-speech plugin is not loaded from {SPEECH}; "
+        "the assistant is still handed speak, which nothing provides any more; "
     )
     assert speech.verdict("someone-else", corey.state) == "no policy for container someone-else"
     assert speech.verdict(corey.container, corey.state / "missing").startswith("unreadable: ")

@@ -30,17 +30,36 @@ FINANCE = ["pocketpiggies_catalog", "pocketpiggies_read", "pocketpiggies_records
 FRANCO_PHONE = "A" * 42 + "Q"
 FRANCO_IPAD = "B" * 42 + "Q"
 GIA_PHONE = "C" * 42 + "Q"
-THE_FAM = "-5100000001"
 # Google's iOS OAuth client for com.siqstack.stewardai, which Franco made on 15 October.
 GOOGLE_CLIENT_ID = "123456789012-abcdefghijklmnopqrstuvwxyz012345.apps.googleusercontent.com"
-# The Fam's tool allowlist on both gateways since PocketPiggies, 13 October 2026.
-THE_FAMS_TOOLS = [
+# The family room's tools: the tools safe in a group, the same list PocketPiggies' guard keeps.
+FAMILY_TOOLS = [
     "web_search",
     "web_fetch",
-    "speak",
     "family_history",
     "picture",
     "video",
+    "household_location",
+    "household_cart",
+    "household_home",
+    "household_react",
+    "household_note",
+    "scripture",
+]
+APP_TOOLS = [
+    "household_location",
+    "household_cart",
+    "household_brief",
+    "household_today",
+    "household_home",
+    "household_react",
+    "household_note",
+    "household_send",
+    "household_digest",
+    "household_wish",
+    "household_vault",
+    "household_meals",
+    "family_history",
 ]
 
 
@@ -61,19 +80,22 @@ def app() -> ModuleType:
 
 
 def as_on_the_box(persona: str = "corey") -> dict[str, Any]:
+    """A gateway before Telegram was retired: its channel switched off and The Fam's plugin."""
     pocket = f"/opt/household-plugins/pocket-piggies-{persona}"
     return {
         "commands": {"ownerAllowFrom": ["telegram:7100000001"]},
         "session": {"dmScope": "per-channel-peer", "groupScope": "per-group"},
         "channels": {
             "telegram": {
+                "enabled": False,
+                "botToken": {"source": "env", "id": "TELEGRAM_BOT_TOKEN"},
                 "groups": {
-                    THE_FAM: {
+                    "-5100000001": {
                         "requireMention": True,
                         "allowFrom": ["7100000001", "7100000002"],
-                        "tools": {"allow": list(THE_FAMS_TOOLS)},
+                        "tools": {"allow": ["web_search", "web_fetch", "family_history"]},
                     }
-                }
+                },
             }
         },
         "agents": {
@@ -86,12 +108,17 @@ def as_on_the_box(persona: str = "corey") -> dict[str, Any]:
                 "paths": [
                     "/opt/household-plugins/household-family-room",
                     "/opt/household-plugins/household-openrouter-video",
-                    "/opt/household-plugins/household-speech",
                     pocket,
                     "/opt/household-plugins/household-memory",
                 ]
             },
-            "entries": {"household-speech": {"enabled": True}},
+            "entries": {
+                "household-family-room": {
+                    "enabled": True,
+                    "config": {"groupChatId": "-5100000001"},
+                },
+                "telegram": {"enabled": True},
+            },
         },
     }
 
@@ -114,7 +141,9 @@ def paired(*devices: tuple[str, str, str]) -> dict[str, Any]:
     }
 
 
-def test_the_patch_names_the_plugin_and_the_room_and_keeps_every_list(app: ModuleType) -> None:
+def test_the_patch_names_the_plugin_and_the_room_and_takes_out_what_telegram_left(
+    app: ModuleType,
+) -> None:
     config = as_on_the_box()
     patch = app.household_patch(
         config,
@@ -127,118 +156,97 @@ def test_the_patch_names_the_plugin_and_the_room_and_keeps_every_list(app: Modul
     result = app.patched(config, patch)
 
     assert result["plugins"]["load"]["paths"] == [
-        *config["plugins"]["load"]["paths"],
+        "/opt/household-plugins/household-openrouter-video",
+        "/opt/household-plugins/pocket-piggies-corey",
+        "/opt/household-plugins/household-memory",
         "/opt/household-plugins/household-app",
     ]
-    assert result["plugins"]["entries"]["household-app"] == {
-        "enabled": True,
-        "hooks": {"allowConversationAccess": True},
+    assert result["plugins"]["entries"] == {
+        "household-app": {"enabled": True, "hooks": {"allowConversationAccess": True}},
     }
-    assert result["plugins"]["entries"]["household-speech"] == {"enabled": True}
-    assert result["channels"]["household"] == {
-        "enabled": True,
-        "owner": {"id": "franco", "name": "Franco", "deviceKeys": [FRANCO_PHONE]},
-        "assistant": {"id": "corey", "name": "Corey", "emoji": "🦉"},
-        "peer": {
-            "person": {"id": "gia", "name": "Gia", "deviceKeys": [GIA_PHONE]},
-            "assistant": {"id": "denise", "name": "Denise"},
-        },
-        "phoneUrl": "wss://household.example.ts.net:18789",
-        "approver": "franco",
-        "talkDailyCharacters": 20000,
-        "googleClientId": GOOGLE_CLIENT_ID,
-        "familyTools": THE_FAMS_TOOLS,
+    assert result["channels"] == {
+        "household": {
+            "enabled": True,
+            "owner": {"id": "franco", "name": "Franco", "deviceKeys": [FRANCO_PHONE]},
+            "assistant": {"id": "corey", "name": "Corey", "emoji": "🦉"},
+            "peer": {
+                "person": {"id": "gia", "name": "Gia", "deviceKeys": [GIA_PHONE]},
+                "assistant": {"id": "denise", "name": "Denise"},
+            },
+            "phoneUrl": "wss://household.example.ts.net:18789",
+            "approver": "franco",
+            "talkDailyCharacters": 20000,
+            "googleClientId": GOOGLE_CLIENT_ID,
+            "familyTools": FAMILY_TOOLS,
+        }
     }
-    assert result["commands"]["ownerAllowFrom"] == ["telegram:7100000001", "household:franco"]
-    assert result["channels"]["telegram"] == {**config["channels"]["telegram"], "enabled": False}
-    assert result["tools"] == {
-        "alsoAllow": [
-            "household_location",
-            "household_cart",
-            "household_brief",
-            "household_today",
-            "household_home",
-            "household_react",
-            "household_note",
-            "household_send",
-            "household_digest",
-            "household_wish",
-            "household_vault",
-            "household_meals",
-        ]
-    }
+    assert result["commands"]["ownerAllowFrom"] == ["household:franco"]
+    assert result["tools"] == {"alsoAllow": APP_TOOLS}
+    assert app.problems(result, app.GATEWAYS[0]) == []
 
 
-def test_the_family_room_gets_the_tools_the_fam_has_on_this_gateway(app: ModuleType) -> None:
+def test_the_family_room_tools_are_the_lists_pocketpiggies_keeps(app: ModuleType) -> None:
+    installer = load(ROOT / "scripts" / "pocket-piggies-install.py", "pocket_piggies_install")
+    assert app.FAMILY_TOOLS == installer.GROUP_TOOLS == FAMILY_TOOLS
+
+
+def test_what_telegram_left_is_reported_until_it_is_taken_out(app: ModuleType) -> None:
     config = as_on_the_box()
-    config["channels"]["telegram"]["groups"][THE_FAM]["tools"]["allow"] = ["web_search", "speak"]
-    patch = app.household_patch(
-        config, app.GATEWAYS[0], app.GATEWAYS[1], owner_keys=[], peer_keys=[], peer_identity={}
+    done = app.patched(
+        config,
+        app.household_patch(
+            config, app.GATEWAYS[0], app.GATEWAYS[1], owner_keys=[], peer_keys=[], peer_identity={}
+        ),
     )
-    assert patch["channels"]["household"]["familyTools"] == ["web_search", "speak"]
-    assert app.problems(app.patched(config, patch), app.GATEWAYS[0]) == []
+    done["channels"]["telegram"] = {"enabled": False}
+    done["plugins"]["entries"]["household-family-room"] = {"enabled": False}
+    done["plugins"]["entries"]["household-job-mirror"] = {"enabled": True}
+    done["plugins"]["load"]["paths"].append("/opt/household-plugins/household-family-room")
+    done["plugins"]["load"]["paths"].append("/opt/household-plugins/household-job-mirror")
+    done["plugins"]["allow"] = ["household-app", "household-job-mirror"]
+    done["commands"]["ownerAllowFrom"].append("telegram:7100000001")
+
+    assert app.problems(done, app.GATEWAYS[0]) == [
+        "Telegram is retired and still in channels.telegram, "
+        "plugins.entries.household-family-room, plugins.entries.household-job-mirror, "
+        "/opt/household-plugins/household-family-room, "
+        "/opt/household-plugins/household-job-mirror, telegram:7100000001"
+    ]
+    again = app.patched(
+        done,
+        app.household_patch(
+            done, app.GATEWAYS[0], app.GATEWAYS[1], owner_keys=[], peer_keys=[], peer_identity={}
+        ),
+    )
+    assert app.problems(again, app.GATEWAYS[0]) == []
+    assert again["plugins"]["allow"] == ["household-app"]
 
 
-def test_the_fam_is_the_group_openclaw_family_group_py_names(app: ModuleType) -> None:
-    family = load(ROOT / "scripts" / "openclaw-family-group.py", "openclaw_family_group")
-    assert app.FAMILY_GROUP == family.FAMILY_GROUP == THE_FAM
-
-
-def _the_fam(config: dict[str, Any]) -> dict[str, Any]:
-    group: dict[str, Any] = config["channels"]["telegram"]["groups"][THE_FAM]
-    return group
-
-
-@pytest.mark.parametrize(
-    "remove",
-    [
-        lambda c: c["channels"].pop("telegram"),
-        lambda c: c["channels"]["telegram"]["groups"].pop(THE_FAM),
-        lambda c: _the_fam(c).pop("tools"),
-        lambda c: _the_fam(c)["tools"].update({"allow": []}),
-        lambda c: _the_fam(c)["tools"].update({"deny": ["speak"]}),
-        lambda c: _the_fam(c)["tools"].update({"allow": "web_search"}),
-        lambda c: _the_fam(c)["tools"].update({"allow": ["web_search", 7]}),
-    ],
-    ids=[
-        "no telegram channel",
-        "no entry for The Fam",
-        "no tools",
-        "an empty allowlist",
-        "a deny beside the allowlist",
-        "an allowlist that is not a list",
-        "a name that is not a string",
-    ],
-)
-def test_with_no_allowlist_for_the_fam_the_room_gets_none_and_check_says_so(
-    app: ModuleType, remove: Callable[[dict[str, Any]], object]
+def test_a_gateway_with_no_session_scopes_gets_them_and_one_with_a_shared_scope_is_refused(
+    app: ModuleType,
 ) -> None:
     config = as_on_the_box()
-    # A room that had a list keeps none once The Fam has none: there is one source.
-    config["channels"]["household"] = {"familyTools": THE_FAMS_TOOLS}
-    remove(config)
-    patch = app.household_patch(
-        config, app.GATEWAYS[0], app.GATEWAYS[1], owner_keys=[], peer_keys=[], peer_identity={}
-    )
-    result = app.patched(config, patch)
-
-    assert app.family_tools(config) is None
-    assert "familyTools" not in result["channels"]["household"]
-    assert f"The Fam ({THE_FAM}) has no tool allowlist" in "; ".join(
-        app.problems(result, app.GATEWAYS[0])
-    )
+    del config["session"]
+    assert app.patched(config, app.plugin_patch(config))["session"] == {
+        "dmScope": "per-channel-peer",
+        "groupScope": "per-group",
+    }
+    config["session"] = {"dmScope": "main"}
+    with pytest.raises(app.UnsupportedConfig, match="per-channel-peer"):
+        app.refusals(config)
 
 
-def test_a_room_whose_tools_are_not_the_fams_is_reported(app: ModuleType) -> None:
+def test_a_room_whose_tools_are_not_the_households_list_is_reported(app: ModuleType) -> None:
     config = as_on_the_box()
     patch = app.household_patch(
         config, app.GATEWAYS[0], app.GATEWAYS[1], owner_keys=[], peer_keys=[], peer_identity={}
     )
     done = app.patched(config, patch)
-    done["channels"]["household"]["familyTools"] = [*THE_FAMS_TOOLS, "exec"]
-    assert app.problems(done, app.GATEWAYS[0]) == ["the family room's tools are not The Fam's"]
+    done["channels"]["household"]["familyTools"] = [*FAMILY_TOOLS, "exec"]
+    wrong = ["the family room's tools are not the household's list for a group"]
+    assert app.problems(done, app.GATEWAYS[0]) == wrong
     del done["channels"]["household"]["familyTools"]
-    assert app.problems(done, app.GATEWAYS[0]) == ["the family room's tools are not The Fam's"]
+    assert app.problems(done, app.GATEWAYS[0]) == wrong
 
 
 def test_the_location_tool_goes_before_the_finance_tools_so_the_guard_finds_nothing(
@@ -246,36 +254,15 @@ def test_the_location_tool_goes_before_the_finance_tools_so_the_guard_finds_noth
 ) -> None:
     installer = load(ROOT / "scripts" / "pocket-piggies-install.py", "pocket_piggies_install")
     config = as_on_the_box()
-    config["channels"] = {
-        "telegram": {
-            "dmPolicy": "allowlist",
-            "allowFrom": ["7100000001"],
-            "groupPolicy": "allowlist",
-        }
-    }
-    config["tools"] = {"alsoAllow": ["speak", "family_history"]}
-    guarded = installer.configured(config, "corey", "7100000001")
+    config["commands"] = {"ownerAllowFrom": ["household:franco"]}
+    config["channels"] = {"household": {"owner": {"id": "franco"}}}
+    config["tools"] = {"alsoAllow": ["web_search"]}
+    guarded = installer.configured(config, "corey", "franco")
 
     result = app.patched(guarded, app.plugin_patch(guarded))
 
-    assert result["tools"]["alsoAllow"] == [
-        "speak",
-        "family_history",
-        "household_location",
-        "household_cart",
-        "household_brief",
-        "household_today",
-        "household_home",
-        "household_react",
-        "household_note",
-        "household_send",
-        "household_digest",
-        "household_wish",
-        "household_vault",
-        "household_meals",
-        *FINANCE,
-    ]
-    assert installer.configured(result, "corey", "7100000001") == result
+    assert result["tools"]["alsoAllow"] == ["web_search", *APP_TOOLS, *FINANCE]
+    assert installer.configured(result, "corey", "franco") == result
 
 
 def test_a_gateway_without_the_apps_tools_is_told_so(app: ModuleType) -> None:
@@ -288,18 +275,7 @@ def test_a_gateway_without_the_apps_tools_is_told_so(app: ModuleType) -> None:
     )
     done["tools"]["alsoAllow"] = []
     assert app.problems(done, app.GATEWAYS[0]) == [
-        "the assistant is not handed household_location",
-        "the assistant is not handed household_cart",
-        "the assistant is not handed household_brief",
-        "the assistant is not handed household_today",
-        "the assistant is not handed household_home",
-        "the assistant is not handed household_react",
-        "the assistant is not handed household_note",
-        "the assistant is not handed household_send",
-        "the assistant is not handed household_digest",
-        "the assistant is not handed household_wish",
-        "the assistant is not handed household_vault",
-        "the assistant is not handed household_meals",
+        f"the assistant is not handed {tool}" for tool in APP_TOOLS
     ]
 
 
@@ -307,25 +283,11 @@ def test_a_gateway_that_has_the_location_tool_gets_the_cart_and_the_brief_beside
     app: ModuleType,
 ) -> None:
     config = as_on_the_box()
-    config["tools"] = {"alsoAllow": ["speak", "household_location"]}
+    config["tools"] = {"alsoAllow": ["image", "household_location"]}
 
     result = app.patched(config, app.plugin_patch(config))
 
-    assert result["tools"]["alsoAllow"] == [
-        "speak",
-        "household_location",
-        "household_cart",
-        "household_brief",
-        "household_today",
-        "household_home",
-        "household_react",
-        "household_note",
-        "household_send",
-        "household_digest",
-        "household_wish",
-        "household_vault",
-        "household_meals",
-    ]
+    assert result["tools"]["alsoAllow"] == ["image", *APP_TOOLS]
 
 
 def test_a_gateway_that_already_follows_it_needs_nothing(app: ModuleType) -> None:
@@ -479,7 +441,7 @@ def test_a_decision_someone_made_on_purpose_is_reported_and_not_undone(
 
 def test_the_owner_entry_is_added_once(app: ModuleType) -> None:
     config = as_on_the_box()
-    config["commands"]["ownerAllowFrom"].append("household:franco")
+    config["commands"]["ownerAllowFrom"] = ["household:franco"]
     patch = app.household_patch(
         config, app.GATEWAYS[0], app.GATEWAYS[1], owner_keys=[], peer_keys=[], peer_identity={}
     )
@@ -648,30 +610,12 @@ def test_apply_writes_only_the_gateway_it_is_told_and_backs_it_up_first(
     corey = json.loads(gateways[0].config_path.read_text(encoding="utf-8"))
     assert corey["channels"]["household"]["owner"]["deviceKeys"] == [FRANCO_PHONE]
     assert corey["channels"]["household"]["peer"]["person"]["deviceKeys"] == [GIA_PHONE]
-    assert corey["channels"]["household"]["familyTools"] == THE_FAMS_TOOLS
+    assert corey["channels"]["household"]["familyTools"] == FAMILY_TOOLS
+    assert "telegram" not in corey["channels"]
     assert list(gateways[0].state.glob("openclaw.json.pre-household-app-*"))
     assert json.loads(gateways[1].config_path.read_text(encoding="utf-8")) == as_on_the_box(
         "denise"
     )
-
-
-@needs_nofollow_open
-def test_apply_warns_when_the_fam_has_no_allowlist_and_leaves_the_room_without_tools(
-    app: ModuleType,
-    box: tuple[FakeGateways, tuple[Any, ...]],
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    fake, gateways = box
-    config = json.loads(gateways[0].config_path.read_text(encoding="utf-8"))
-    del _the_fam(config)["tools"]
-    gateways[0].config_path.write_text(json.dumps(config), encoding="utf-8")
-
-    assert app.main(["apply", "--gateway", "corey"], run=fake) == 0
-    said = capsys.readouterr().out
-    assert f"warning: The Fam ({THE_FAM}) has no tool allowlist here" in said
-    assert "verdict: ok" not in said
-    room = json.loads(gateways[0].config_path.read_text(encoding="utf-8"))["channels"]["household"]
-    assert "familyTools" not in room
 
 
 @needs_nofollow_open

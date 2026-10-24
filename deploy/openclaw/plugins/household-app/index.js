@@ -1,17 +1,17 @@
 // The household app as an OpenClaw channel, `household`: the family room the two people
-// and both assistants share, and each person's own thread with their assistant, in
-// place of Telegram.
+// and both assistants share, and each person's own thread with their assistant. It is the
+// household's only channel.
 //
-// A turn in the app is a channel turn like a Telegram one: it carries who sent it and the
+// A turn in the app is a channel turn: it carries who sent it and the
 // family room's recent messages as history. The owner's own turns, their thread and a
 // family-room turn they started, have every tool their thread has; anyone else's
-// family-room turn has The Fam's allowlist, or none without one (family-tools.js), and
+// family-room turn has the family room's allowlist, or none without one (family-tools.js), and
 // each family-room turn is told whose it is and who else reads the room. In the family room the
-// assistant answers only when a message names it or replies to it, the way the
-// household's Telegram group works, and a voice note is heard first to find out, once,
+// assistant answers only when a message names it or replies to it, and a voice note is
+// heard first to find out, once,
 // its words then shown under it and handed to the turn (voice-notes.js).
-// Replies, and anything the assistant sends there on its own (a reminder, a spoken
-// reply), land in the room and on the phone.
+// Replies, and anything the assistant sends there on its own (a reminder), land in the
+// room and on the phone.
 //
 // The phone talks to this through the gateway methods below, over the connection it
 // already pairs with. The other gateway's half of the family room arrives through the
@@ -91,6 +91,7 @@ import { gmailSource } from "./gmail-source.js";
 import { createOrderMail } from "./order-mail.js";
 import { createConnect } from "./connect.js";
 import { CONNECTORS, connectorsFor } from "./connectors.js";
+import { FAMILY_HISTORY_TOOL, createFamilyHistoryTool } from "./family-history.js";
 import { familyToolPolicy } from "./family-tools.js";
 import { createGoogleConnector, listGogAccounts, removeGogAccount } from "./google-connect.js";
 import { createHandovers } from "./handovers.js";
@@ -128,6 +129,7 @@ import { assistantPage, createSettings, nameOf } from "./settings.js";
 import { openSettingsStore } from "./settings-store.js";
 import { isTextSignedBy } from "./signature.js";
 import { createSpeak } from "./speak.js";
+import { REPLY_IN_TEXT, SPEECH_TOOLS, claimTtsCommand, refuseSpeechTool } from "./speech-guard.js";
 import { createSpend, mediaSpentSince } from "./spend.js";
 import { openRoomStore } from "./store.js";
 import { ownersFamilySession } from "./turn.js";
@@ -224,7 +226,7 @@ function mirrorAutomations() {
     if (!running || !current || current.signal?.aborted) return;
     const jobs = await current.cron.list({ includeDisabled: true });
     reminderPushes.know(jobs);
-    const counts = running.notes.mirror(familyAutomations(jobs, { config: runtime.config.current() }), { forWho: running.owner.id });
+    const counts = running.notes.mirror(familyAutomations(jobs), { forWho: running.owner.id });
     if (counts.added + counts.corrected + counts.removed > 0) logger?.info?.(`${PLUGIN_ID}: family automations mirrored: ${JSON.stringify(counts)}`);
   }).catch(() => logger?.warn?.(`${PLUGIN_ID}: the family automations could not be mirrored`));
   return mirroring;
@@ -242,7 +244,7 @@ const BOX_ENV = Object.fromEntries(
     .map((name) => [name, process.env[name]]),
 );
 // The plugin's own settings and spend, opened on first use and kept until the plugin's
-// service stops. They serve Telegram's turns as well as the app's, channel or not.
+// service stops. They serve a scheduled run's turns as well as the app's, channel or not.
 let own = null;
 
 function ownSettings() {
@@ -303,7 +305,7 @@ function ownSettings() {
       mediaSpent: async (firstDay) => (await mediaSpentSince(path.join(runtime.state.resolveStateDir(process.env), "household-pictures", "ledger.json"), firstDay)) + (live?.videos.spentSince(firstDay) ?? 0) + (live?.images.spentSince(firstDay) ?? 0),
       reportFile: path.join(directory, "spend.json"),
     }),
-    // Written from Telegram and a scheduled run as well as the app, channel or not.
+    // Written from a scheduled run as well as the app, channel or not.
     brief,
     today: createToday({ store, brief, changed: (today) => emit("today", { today }) }),
   };
@@ -1005,9 +1007,8 @@ function targetConversation(to) {
 }
 
 // What the assistant posts on its own, a tool's post included, marked when a tool of a
-// handed-over turn posts it. A reminder the job mirror copies here comes marked time
-// sensitive (household-job-mirror), and so does what a reminder announcing straight to the
-// app sends while it runs (automations.js), so its push gets through a Focus.
+// handed-over turn posts it. What a reminder announcing straight to the app sends while it
+// runs comes marked time sensitive (automations.js), so its push gets through a Focus.
 async function sendText({ to, text, isTimeSensitive }) {
   const conversation = targetConversation(to);
   const entry = await live.room.reply({
@@ -1386,12 +1387,13 @@ function registerFull(api) {
       handler: (req, res) => appleRoute(req, res, handle, api.logger),
     });
   }
-  // The same code for whoever runs the box, through an admin gateway client.
+  // The same code and link for whoever runs the box, through an admin gateway client: how
+  // a household's first phone pairs.
   api.registerGatewayMethod(
     `${PLUGIN_ID}.pair`,
     method(async (running) => {
       const { code, expiresAtMs } = await setupCode(running);
-      return { setupCode: code, expiresAtMs };
+      return { setupCode: code, link: pairLink(running.pairing.url, code), expiresAtMs };
     }),
     { scope: "operator.admin" },
   );
@@ -1500,9 +1502,9 @@ function registerFull(api) {
     })(params)),
     write,
   );
-  // How the assistant is named and talks, in every turn of the main agent, Telegram's
-  // included. A system-prompt addition, never a hook on what is sent, which would end
-  // Telegram's streaming preview. Every app turn also starts with the household note
+  // How the assistant is named and talks, in every turn of the main agent, and that it
+  // replies in text (speech-guard.js). A system-prompt addition, never a hook on what is
+  // sent, which would end a streaming reply. Every app turn also starts with the household note
   // (notes.js): the family room's shared session, which the other assistant's handed-over
   // turns run in, and the direct line's, where its handoffs run, all of it, and the owner's
   // own thread and own session of the room, which
@@ -1514,8 +1516,11 @@ function registerFull(api) {
     const isOwnersOwn = live !== null && (sessionKey === live.ownerSession || sessionKey === live.ownersFamilySession);
     const isAppTurn = isOwnersOwn || (live !== null && [live.familySession, live.pairSession].includes(sessionKey));
     const note = isAppTurn ? live.notes.prompt(event?.prompt, isOwnersOwn ? { fullFor: live.owner.id } : {}) : "";
-    return { appendSystemContext: [ownSettings().settings.guidance(cfg), householdRoutingGuidance(cfg)].filter(Boolean).join("\n\n"), ...(note ? { prependContext: note } : {}) };
+    return { appendSystemContext: [ownSettings().settings.guidance(cfg), householdRoutingGuidance(cfg), REPLY_IN_TEXT].filter(Boolean).join("\n\n"), ...(note ? { prependContext: note } : {}) };
   });
+  // Speech is Speak and Talk, never a voice note a chat tool makes (speech-guard.js).
+  api.on("before_tool_call", (event) => refuseSpeechTool(event), { matcher: SPEECH_TOOLS });
+  api.on("before_dispatch", (event) => claimTtsCommand(event));
   // This assistant's family automations, mirrored into the household note as OpenClaw
   // reconciles the scheduler and whenever a job changes, a run's finish included, since a
   // one-time job is gone once it ran.
@@ -1580,9 +1585,10 @@ function registerFull(api) {
   }), { matcher: ASKING_TOOLS });
   // A chart in the app is a card: a dashboard widget there would reach nobody.
   api.on("before_tool_call", (event, context) => refuseDashboardInApp(context), { matcher: [DASHBOARD_TOOL] });
-  // Old family destinations resolve to the app once, with no Telegram copy.
-  const familyPosts = createFamilyPosts({ config: () => runtime.config.current() });
-  api.on("before_tool_call", (event, context) => familyPosts.beforeToolCall(event, context), { matcher: FAMILY_POST_TOOLS });
+  // A post to the family by one of its names goes to the app's family room, and one to
+  // Telegram is refused (family-posts.js).
+  const familyPosts = createFamilyPosts();
+  api.on("before_tool_call", (event) => familyPosts.beforeToolCall(event), { matcher: FAMILY_POST_TOOLS });
   // Gift and wishlist memory, in the owner's own turns only (wish-tool.js).
   api.registerTool(
     (context) => live && createWishTool({
@@ -1666,8 +1672,8 @@ function registerFull(api) {
     { names: [REACT_TOOL], optional: true },
   );
   // Today's brief: written by the assistant in its own turns, the morning's scheduled run
-  // included, and read by the phone. The owner comes from the config, since a Telegram
-  // turn or a scheduled run needs no running channel.
+  // included, and read by the phone. The owner comes from the config, since a scheduled
+  // run needs no running channel.
   api.registerTool(
     (context) => {
       const cfg = runtime.config.current();
@@ -1676,7 +1682,6 @@ function registerFull(api) {
         ? createBriefTool({
             context,
             owner: account.config.owner.id,
-            owners: cfg?.commands?.ownerAllowFrom,
             write: (text) => ownSettings().brief.write(text),
           })
         : null;
@@ -1684,6 +1689,17 @@ function registerFull(api) {
     { names: [BRIEF_TOOL], optional: true },
   );
   api.registerGatewayMethod(`${PLUGIN_ID}.brief`, method(() => ({ brief: ownSettings().brief.today() })), read);
+  // The family room's history, for a turn of one of its people: the room's own messages and
+  // the saved words of its voice notes, read-only (family-history.js). It reads the room's
+  // store from the state, so it needs no running channel.
+  api.registerTool(
+    (context) => createFamilyHistoryTool({
+      context,
+      current: () => runtime.config.current(),
+      stateDir: () => runtime.state.resolveStateDir(process.env),
+    }),
+    { names: [FAMILY_HISTORY_TOOL], optional: true },
+  );
   // The Sunday night digest, in the same turns as the brief: its weekly scheduled run gives
   // the week and the decisions, and the plugin adds the note's and the cart's own lines and
   // posts it in the owner's thread (digest.js). There is nothing to post to without a channel.
@@ -1696,7 +1712,6 @@ function registerFull(api) {
         ? createDigestTool({
             context,
             owner: account.config.owner.id,
-            owners: cfg?.commands?.ownerAllowFrom,
             post: async (week, decide, events) => {
               const lines = composeDigest({
                 week,
@@ -1725,7 +1740,6 @@ function registerFull(api) {
         ? createTodayTool({
             context,
             owner: account.config.owner.id,
-            owners: cfg?.commands?.ownerAllowFrom,
             write: (today) => ownSettings().today.write(today),
           })
         : null;

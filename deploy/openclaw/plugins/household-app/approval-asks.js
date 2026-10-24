@@ -6,9 +6,9 @@
 // It asks only when the turn's requester is this channel and its session is the owner's
 // thread or the owner's own session of the family room (turn.js ownersFamilySession), which
 // only the owner's turns run in, so it asks whatever sender the hook is told. Everyone
-// else's family-room turns run in the room's shared session with The Fam's tools, which
-// change no calendar (family-tools.js). Telegram, a scheduled run and every other session
-// get nothing from here, exactly as before.
+// else's family-room turns run in the room's shared session with the family room's tools,
+// which change no calendar (family-tools.js). A scheduled run and every other session get
+// nothing from here, exactly as before.
 //
 // A reminder is a job of OpenClaw's scheduler. OpenClaw 2026.9.4 names that tool
 // `automations`, and turns the model's `cron` into it before any hook sees the call. Adding,

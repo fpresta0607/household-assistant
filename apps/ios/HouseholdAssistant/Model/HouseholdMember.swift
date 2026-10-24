@@ -1,8 +1,7 @@
-// The two people a phone can be set up for, and the assistant each asks for a code.
+// The two people a phone can be set up for, and the assistant each pairs with.
 //
-// Only the onboarding uses this, to say whom to ask and to open that assistant in
-// Telegram with `/app` ready to send, and to know where to sign in with Apple. A setup
-// code itself says which gateway it is for.
+// Only the onboarding uses this, to show whose phone it is and to know where to sign in
+// with Apple. A setup code itself says which gateway it is for.
 
 import Foundation
 
@@ -61,16 +60,4 @@ enum HouseholdMember: String, CaseIterable, Identifiable, Sendable {
         return URL(string: "https://\(Self.gatewayHost):\(port)")!
     }
 
-    /// The assistant's chat in Telegram with `/app` typed in, ready to send.
-    var telegramLink: URL {
-        let bot: String
-        switch self {
-        case .franco:
-            bot = "Corey_the_man_bot"
-        case .gia:
-            bot = "Denise_the_woman_bot"
-        }
-        // Both bot names are fixed ASCII, so this address always parses.
-        return URL(string: "https://t.me/\(bot)?text=%2Fapp")!
-    }
 }

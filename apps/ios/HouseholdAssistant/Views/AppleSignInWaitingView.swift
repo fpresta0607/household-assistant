@@ -27,7 +27,7 @@ struct AppleSignInWaitingView: View {
                 .foregroundStyle(Palette.secondaryText)
                 .multilineTextAlignment(.center)
             if member == .franco {
-                Text("If this is your only iPhone, send /app to Corey in Telegram instead.")
+                Text("If this is your only iPhone, ask whoever runs your household's server for a setup link instead.")
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
                     .multilineTextAlignment(.center)

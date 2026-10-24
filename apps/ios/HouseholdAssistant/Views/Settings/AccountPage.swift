@@ -42,11 +42,6 @@ struct AccountPage: View {
                         }
                     }
                 }
-                SettingsRow("Telegram", subtitle: "\(model.assistantName) in your chats and The Fam") {
-                    BrandTile("telegram")
-                } trailing: {
-                    EmptyView()
-                }
             }
             LinkAppleIDSection()
             PairedPhonesSection(removing: $removing)
@@ -121,7 +116,7 @@ struct AccountPage: View {
                 model.forgetPairing()
             }
         } message: {
-            Text("You will need a new code from \(model.assistantName) in Telegram, or to sign in with Apple.")
+            Text("You will need a new setup link, from another of your iPhones or whoever runs your household's server, or to sign in with Apple.")
         }
         .confirmationDialog(
             removing.map { "Remove \($0.name)?" } ?? "",

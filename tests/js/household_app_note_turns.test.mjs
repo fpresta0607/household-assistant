@@ -198,10 +198,11 @@ test("a weigh-in Denise keeps as rows reaches Corey's family-room turn through t
 });
 
 // Corey's weekly family posts were automations of his alone, delivered to The Fam, so Denise
-// never knew they existed.
+// never knew they existed. One still delivering to the retired Telegram group posts nowhere,
+// so it is not mirrored either.
 test("Corey's automations that post in the family room reach Denise's family-room turns by name and schedule, never their prompt, and go when deleted", async () => {
   // Arrange
-  const cfg = { ...CFG, plugins: { entries: { "household-family-room": { config: { groupChatId: "-5100000001" } } } } };
+  const cfg = CFG;
   const job = (id, name, delivery, extra = {}) => ({
     id, name, agentId: "main", enabled: true, delivery,
     schedule: { kind: "cron", expr: "40 16 * * 6", tz: "America/Chicago" },
@@ -209,11 +210,12 @@ test("Corey's automations that post in the family room reach Denise's family-roo
     ...extra,
   });
   const jobs = [
-    job("job-fam", "Saturday supplies reminder", { mode: "announce", channel: "telegram", to: "-5100000001" }),
+    job("job-fam", "Saturday supplies reminder", { mode: "announce", channel: "household", to: "family" }),
     job("job-room", "Sunday plan for the week", { mode: "announce", channel: "household", to: "household:family" }),
-    job("job-own", "Franco's morning brief", { mode: "announce", channel: "telegram", to: "7100000001" }),
-    job("job-off", "Paused family post", { mode: "announce", channel: "telegram", to: "-5100000001" }, { enabled: false }),
-    job("job-other", "Another agent's post", { mode: "announce", channel: "telegram", to: "-5100000001" }, { agentId: "money" }),
+    job("job-own", "Franco's morning brief", { mode: "announce", channel: "household", to: "household:franco" }),
+    job("job-telegram", "Old Fam post", { mode: "announce", channel: "telegram", to: "-5100000001" }),
+    job("job-off", "Paused family post", { mode: "announce", channel: "household", to: "family" }, { enabled: false }),
+    job("job-other", "Another agent's post", { mode: "announce", channel: "household", to: "family" }, { agentId: "money" }),
   ];
   const scheduler = { list: async () => structuredClone(jobs) };
   const abort = new AbortController();
@@ -235,7 +237,7 @@ test("Corey's automations that post in the family room reach Denise's family-roo
       ["add", "Sunday plan for the week", { job: "job-room", schedule: "on the schedule 40 16 * * 6 (America/Chicago)" }],
     ]);
     assert.equal(JSON.parse(await readFile(outbox, "utf8")).notes[2].kind, "remove");
-    assert.doesNotMatch(await readFile(outbox, "utf8"), /PRIVATE PROMPT WORDS|morning brief|Paused|Another agent/);
+    assert.doesNotMatch(await readFile(outbox, "utf8"), /PRIVATE PROMPT WORDS|morning brief|Old Fam|Paused|Another agent/);
   } finally {
     abort.abort();
     await corey.stop();

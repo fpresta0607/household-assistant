@@ -30,7 +30,6 @@ def node_or_skip() -> str:
 @pytest.mark.parametrize(
     "tests",
     [
-        "family-history.test.mjs",
         "household_app_amazon_mail.test.mjs",
         "household_app_apple.test.mjs",
         "household_app_approvals.test.mjs",
@@ -46,6 +45,7 @@ def node_or_skip() -> str:
         "household_app_did.test.mjs",
         "household_app_emergency.test.mjs",
         "household_app_digest.test.mjs",
+        "household_app_family_history.test.mjs",
         "household_app_family_parity.test.mjs",
         "household_app_family_posts.test.mjs",
         "household_app_family_tools.test.mjs",
@@ -77,6 +77,7 @@ def node_or_skip() -> str:
         "household_app_settings.test.mjs",
         "household_app_signature.test.mjs",
         "household_app_speak.test.mjs",
+        "household_app_speech_guard.test.mjs",
         "household_app_spend.test.mjs",
         "household_app_spend_in.test.mjs",
         "household_app_store.test.mjs",
@@ -88,12 +89,10 @@ def node_or_skip() -> str:
         "household_app_wishes.test.mjs",
         "household_app_video.test.mjs",
         "household_app_vision.test.mjs",
-        "household_family_room.test.mjs",
         "household_memory.test.mjs",
         "household_openrouter_video.test.mjs",
         "household_pictures.test.mjs",
         "household_scripture.test.mjs",
-        "household_speech.test.mjs",
         "steward_cards_skill.test.mjs",
     ],
 )
@@ -112,11 +111,9 @@ def test_each_plugin_passes_its_own_tests(tests: str) -> None:
 @pytest.mark.parametrize(
     "plugin",
     [
-        "household-family-room",
         "household-openrouter-video",
         "household-pictures",
         "household-scripture",
-        "household-speech",
     ],
 )
 def test_the_extension_each_package_declares_is_its_manifest_plugin(plugin: str) -> None:
@@ -149,28 +146,15 @@ def test_the_extension_each_package_declares_is_its_manifest_plugin(plugin: str)
 
 def test_each_manifest_declares_what_its_config_and_providers_are() -> None:
     """What 2026.9.4 reads from a manifest without running the plugin."""
-    room = json.loads(
-        (PLUGINS / "household-family-room" / "openclaw.plugin.json").read_text(encoding="utf-8")
-    )
     video = json.loads(
         (PLUGINS / "household-openrouter-video" / "openclaw.plugin.json").read_text(
             encoding="utf-8"
         )
     )
 
-    assert room["configSchema"]["required"] == ["groupChatId"]
-    assert set(room["configSchema"]["properties"]) == {"groupChatId"}
     # OpenClaw only routes tools.media.models to a provider a manifest owns.
     assert video["contracts"]["mediaUnderstandingProviders"] == ["openrouter-video"]
     assert video["configSchema"]["properties"] == {}
-    speech = json.loads(
-        (PLUGINS / "household-speech" / "openclaw.plugin.json").read_text(encoding="utf-8")
-    )
-    # OpenClaw refuses a tool its manifest does not declare, and validates the ceilings against
-    # this schema before it loads the plugin.
-    assert speech["contracts"]["tools"] == ["speak"]
-    assert speech["configSchema"]["required"] == ["replyCharacters", "dayCharacters"]
-    assert set(speech["configSchema"]["properties"]) == {"replyCharacters", "dayCharacters"}
     pictures = json.loads(
         (PLUGINS / "household-pictures" / "openclaw.plugin.json").read_text(encoding="utf-8")
     )

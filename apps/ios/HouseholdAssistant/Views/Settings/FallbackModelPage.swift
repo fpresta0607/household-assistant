@@ -45,7 +45,7 @@ struct FallbackModelPage: View {
             let shown = settings.fallbackChoices(position, matching: query).filter { isSearching || $0.id != picked }
             SettingsGroup(
                 isSearching ? "Results" : "Popular",
-                note: "Through OpenRouter. \(name) uses it from the next answer, here and on Telegram.",
+                note: "Through OpenRouter. \(name) uses it from the next answer.",
                 refusal: isSearching ? settings.refusal(for: [field]) : nil
             ) {
                 if shown.isEmpty {

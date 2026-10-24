@@ -89,7 +89,7 @@ const FAMILY_ROOM = {
 test("the tool is offered to a scheduled run and the owner's own turns, never the room's shared session, and takes one-line lists", async () => {
   // Arrange
   const posted = [];
-  const offer = (context) => createDigestTool({ context, owner: "franco", owners: [], post: async (week, decide) => (posted.push({ week, decide }), 9) });
+  const offer = (context) => createDigestTool({ context, owner: "franco", post: async (week, decide) => (posted.push({ week, decide }), 9) });
   const tool = offer(SCHEDULED);
 
   // Act
@@ -184,7 +184,7 @@ test("given the week's events, the digest shows them as an agenda card, each day
 test("the tool takes the week's events and refuses one with no start or day, both, or a time with no offset", async () => {
   // Arrange
   const posted = [];
-  const tool = createDigestTool({ context: SCHEDULED, owner: "franco", owners: [], post: async (week, decide, events) => (posted.push({ week, decide, events }), 7) });
+  const tool = createDigestTool({ context: SCHEDULED, owner: "franco", post: async (week, decide, events) => (posted.push({ week, decide, events }), 7) });
   const run = async (args) => JSON.parse((await tool.execute("call-1", args)).content[0].text);
 
   // Act

@@ -163,8 +163,8 @@ fi
 # runs inside the gateway process, so its code is root-owned here and the
 # compose file mounts this directory read-only at /opt/household-plugins: the
 # assistant can write its own state directory but never this. Each gateway
-# loads a plugin once openclaw.json names it; openclaw-family-group.py apply
-# does that for household-family-room.
+# loads a plugin once openclaw.json names it; openclaw-household-app.py apply
+# does that for household-app.
 #
 # The directory is the mount itself, so what is inside it is replaced rather than
 # the directory: a running container keeps the directory it was started with, and

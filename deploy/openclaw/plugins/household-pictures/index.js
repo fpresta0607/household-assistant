@@ -11,8 +11,8 @@
 //   change or build on, by the image model chosen in Settings
 //   (agents.defaults.mediaModels.image, which household-app writes), one a call. This
 //   plugin sends it to the chat: the Steward app keeps it in the room at full size like
-//   any photo, and Telegram sends it as a photo. The tool's result is a line of text and
-//   no picture, so the model is handed nothing heavy and nothing is sent twice.
+//   any photo. The tool's result is a line of text and no picture, so the model is handed
+//   nothing heavy and nothing is sent twice.
 // - A video is started the same way, by the video model chosen in Settings. The tool
 //   answers at once, and the video is sent to the chat once OpenRouter has made it. Only
 //   this process waits for it, so one still being made when the gateway restarts is lost.
@@ -20,9 +20,9 @@
 //   asked and never with what. Each person has a ceiling a day for pictures and one for
 //   videos on this gateway. Past it the tool refuses and says so, and a video whose listed
 //   price would pass it is refused before it starts.
-// - Only a person's turn in a chat the household set up gets either tool: the app's family
-//   room and its owner's own thread, The Fam on Telegram and the owner's DM, the rule
-//   `speak` keeps. A scheduled run, a sub-agent or a gateway client gets neither.
+// - Only a person's turn in the household app gets either tool: the family room, for its
+//   two people, and its owner's own thread, the turns family_history answers in. A
+//   scheduled run, a sub-agent or a gateway client gets neither.
 // - OpenClaw's own image_generate and video_generate are refused if a config ever hands
 //   them back to the model.
 
@@ -45,7 +45,7 @@ const VIDEO_ASPECT_RATIOS = ["16:9", "9:16", "1:1"];
 const MAX_PROMPT = 4000;
 const MAX_PHOTOS = 4;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-// The app's ceiling for one file, and Telegram's for a bot's upload.
+// The app's ceiling for one file.
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 const VIDEO_SECONDS = 6;
 const VIDEO_POLL_MS = 5_000;
@@ -58,17 +58,22 @@ const NOT_AUTHORIZED = "Not made: this turn is not one a person in the household
 const AFTER_PICTURE = "The picture is in the chat. Say one short line about it, without describing it or saying it again. Name the cost only if asked.";
 const AFTER_VIDEO = "Tell them in one short line that the video will arrive in this chat in a minute or two. Name the cost only if asked.";
 
-function telegramId(value) {
-  return typeof value === "string" ? /^(?:(?:telegram|tg):)?(-?[1-9]\d*)$/i.exec(value)?.[1] : undefined;
-}
-
 function householdId(value) {
   return typeof value === "string" ? /^(?:household:)?([a-z][a-z0-9-]{0,31})$/.exec(value)?.[1] : undefined;
 }
 
-// The household app's family room, for its two people, and its owner's own thread. The
-// app names no native chat, so its trusted delivery target stands in for one.
-function isAuthorizedInApp(config, context) {
+// A person's turn in the household app: the family room, for its two people, and its
+// owner's own thread. The app names no native chat, so its trusted delivery target stands
+// in for one.
+export function isAuthorizedTurn(config, context) {
+  if (
+    !context || context.agentId !== "main" || context.agentAccountId !== "default" ||
+    context.oneShotCliRun === true || config?.plugins?.enabled === false ||
+    config?.plugins?.entries?.[PLUGIN_ID]?.enabled !== true ||
+    config?.session?.groupScope !== "per-group" ||
+    !["per-channel-peer", "per-account-channel-peer"].includes(config?.session?.dmScope) ||
+    context.messageChannel !== "household"
+  ) return false;
   const household = config?.channels?.household;
   const owner = household?.owner?.id;
   const people = [owner, household?.peer?.person?.id].filter((id) => householdId(id) === id);
@@ -86,48 +91,9 @@ function isAuthorizedInApp(config, context) {
   return chat === owner && sender === owner && context.sessionKey === `agent:main:household:direct:${owner}`;
 }
 
-// The same turns household-speech lets `speak` answer, read the same way.
-export function isAuthorizedTurn(config, context) {
-  const family = config?.plugins?.entries?.["household-family-room"];
-  const group = family?.config?.groupChatId;
-  if (
-    !/^-[1-9]\d*$/.test(group) || !context ||
-    context.agentId !== "main" || context.agentAccountId !== "default" ||
-    context.oneShotCliRun === true || config?.plugins?.enabled === false ||
-    config?.plugins?.entries?.[PLUGIN_ID]?.enabled !== true || family.enabled !== true ||
-    config?.session?.groupScope !== "per-group" ||
-    !["per-channel-peer", "per-account-channel-peer"].includes(config?.session?.dmScope)
-  ) return false;
-  if (context.messageChannel === "household") return isAuthorizedInApp(config, context);
-  const telegram = config?.channels?.telegram;
-  const members = telegram?.groups?.[group];
-  const sender = telegramId(context.requesterSenderId);
-  const delivery = context.deliveryContext;
-  if (
-    !sender || !/^[1-9]\d*$/.test(sender) || context.messageChannel !== "telegram" ||
-    telegram?.enabled === false || telegram?.groupPolicy === "disabled" ||
-    members?.enabled === false || members?.groupPolicy === "disabled" ||
-    Object.keys(telegram?.accounts ?? {}).length > 0 ||
-    !Array.isArray(members?.allowFrom) || !members.allowFrom.some((value) => telegramId(String(value).trim()) === sender) ||
-    delivery?.channel !== "telegram" || delivery.accountId !== "default" || delivery.threadId != null
-  ) return false;
-  const destination = telegramId(delivery.to);
-  const native = context.nativeChannelId === undefined ? destination : telegramId(context.nativeChannelId);
-  if (!native || native !== destination) return false;
-  if (native === group) return context.sessionKey === `agent:main:telegram:group:${group}`;
-  const account = config.session.dmScope === "per-account-channel-peer" ? "default:" : "";
-  return native === sender && context.sessionKey === `agent:main:telegram:${account}direct:${sender}`;
-}
-
-// Who asked, as the ledger counts them: a person of the household by their app id, the
-// owner on Telegram too, and anyone else in The Fam by their Telegram id.
-export function personOf(config, context) {
-  if (context.messageChannel === "household") return householdId(context.requesterSenderId);
-  const sender = telegramId(context.requesterSenderId);
-  const owner = config?.channels?.household?.owner?.id;
-  const owners = Array.isArray(config?.commands?.ownerAllowFrom) ? config.commands.ownerAllowFrom : [];
-  const isOwner = owners.some((value) => /^(?:telegram|tg):/i.test(String(value)) && telegramId(String(value)) === sender);
-  return isOwner && householdId(owner) === owner ? owner : `telegram:${sender}`;
+// Who asked, as the ledger counts them: a person of the household by their app id.
+export function personOf(context) {
+  return householdId(context.requesterSenderId);
 }
 
 // The OpenRouter id of the model Settings chose for a kind of media, or null.
@@ -244,8 +210,8 @@ export function createPictures(api, config, options = {}) {
     return photos;
   }
 
-  // Sends a file, or a line of text, to the chat a turn came from, the way household-speech
-  // sends a voice note: Telegram takes a whole payload, and the app has sendMedia.
+  // Sends a file, or a line of text, to the chat a turn came from: a channel that takes a
+  // whole payload gets one, and the app has sendText and sendMedia.
   async function send(target, { bytes, mime, text }) {
     const adapter = await api.runtime.channel.outbound.loadAdapter(target.channel);
     const base = { cfg: api.runtime.config.current(), to: target.to, accountId: target.accountId, threadId: target.threadId };
@@ -330,7 +296,7 @@ export function createPictures(api, config, options = {}) {
         if (!model) return failure("Not made: no picture model is chosen in Settings.");
         const apiKey = env.OPENROUTER_API_KEY;
         if (!apiKey) return failure("Not made: OPENROUTER_API_KEY is not in the gateway's environment.");
-        const person = personOf(cfg, context);
+        const person = personOf(context);
         return inTurn(person, async () => {
           const refused = await refusal(person, "picture", pictureDayDollars);
           if (refused) return result({ made: false, reason: "daily_limit" }, refused);
@@ -459,7 +425,7 @@ export function createPictures(api, config, options = {}) {
         const resolution = resolutionOf(listed);
         const perSecond = dollarsPerSecond(listed, resolution);
         const estimate = seconds !== null && perSecond !== null ? seconds * perSecond : 0;
-        const person = personOf(cfg, context);
+        const person = personOf(context);
         return inTurn(person, async () => {
           const refused = await refusal(person, "video", videoDayDollars, estimate);
           if (refused) return result({ made: false, reason: "daily_limit" }, refused);

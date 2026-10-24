@@ -12,9 +12,9 @@
 // policy that restricts nothing. An empty deny list is a policy OpenClaw takes, so it stops
 // there and never falls back to the room's own group.
 //
-// Every turn in the room's shared session, the owner's included, gets what a turn in The
-// Fam gets: that Telegram group's own allowlist on this gateway, which
-// scripts/openclaw-household-app.py copies into `channels.household.familyTools`. So the
+// Every turn in the room's shared session, the owner's included, gets the family room's
+// allowlist, `channels.household.familyTools`, which scripts/openclaw-household-app.py
+// writes from the tools PocketPiggies and the household agree are safe in a group. So the
 // other person, the other assistant's handover, a gateway client's chat.send (which names
 // its own client id) and a run OpenClaw asks about with sender rules off
 // (`senderPolicyMode: "never"`, a scheduled run) get the list, and what the owner's tools

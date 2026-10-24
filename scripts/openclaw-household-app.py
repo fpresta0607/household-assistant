@@ -10,11 +10,13 @@ the plugin mount; nothing loads it until this names it in a gateway's config:
 - `channels.household`: whose gateway this is, its assistant, and who is on the other
   gateway, with each person's paired phones pinned;
 - `household:<person>` in `commands.ownerAllowFrom`, so the owner is the owner in the
-  app as on Telegram, and nobody else is;
-- `channels.household.familyTools`: The Fam's tool allowlist on this gateway, so a
-  family-room turn gets the tools a turn in The Fam gets. The Telegram entry is the one
-  source: with no plain allowlist there, the room's list is removed and the plugin gives
-  family-room turns no tools at all, and `apply` says so;
+  app, and nobody else is;
+- `channels.household.familyTools`: the family room's tool allowlist, the tools safe in a
+  group (FAMILY_TOOLS, the list PocketPiggies' guard keeps there too), so everyone else's
+  family-room turns can neither read the gateway's files nor reach the owner's finance;
+- the plugin's `family_history` tool in `tools.alsoAllow`, so the assistant can read the
+  family room's earlier messages, and DMs kept per person and groups per group, which it
+  answers only under;
 - the plugin's `household_location` tool in `tools.alsoAllow`, so the assistant can say
   where its owner is in the owner's own thread, while the owner shares it from the app;
 - the plugin's `household_cart` tool beside it, the household's shared shopping cart;
@@ -27,7 +29,7 @@ the plugin mount; nothing loads it until this names it in a gateway's config:
   for what the family tracks together, which every app turn starts with;
 - the plugin's turn hook allowed (`hooks.allowConversationAccess`), which OpenClaw asks of
   a plugin loaded from a path: it adds the assistant's name and how its person asked it to
-  talk, from the app's Settings, to every turn, Telegram's included;
+  talk, from the app's Settings, to every turn, and answers `/tts` in a chat;
 - `channels.household.talkDailyCharacters`: how many characters the gateway speaks for
   Talk and voice samples in a day, written only where a gateway has none, so a ceiling a
   person set stays;
@@ -54,8 +56,14 @@ One gateway at a time, as the household's rollouts go:
     python3 scripts/openclaw-household-app.py apply --gateway corey --dry-run
     python3 scripts/openclaw-household-app.py apply --gateway corey
 
-Writing the channel restarts that gateway's channels in process. Telegram is disabled;
-its old family allowlist is retained only as the existing privacy policy for app turns.
+Writing the channel restarts that gateway's channels in process.
+
+The app is the household's only channel, and `apply` takes out what Telegram left: the
+Telegram channel with its bot token, the telegram plugin's switch, Telegram owners in
+`commands.ownerAllowFrom`, the household-family-room plugin, whose `family_history` the
+household-app plugin now serves, and the household-job-mirror plugin. On a gateway with
+PocketPiggies, run scripts/pocket-piggies-install.py first, so its guard no longer looks
+for Telegram.
 """
 
 from __future__ import annotations
@@ -84,6 +92,7 @@ from gateway_config import (
     load_household,
     patched,
     read_config,
+    session_patch,
     sessions_kept_apart,
 )
 
@@ -102,13 +111,37 @@ PHONE_URLS = {
 }
 # Who lets a new phone in that signed in with Apple, from his own app, on both gateways.
 APPROVER = "franco"
-# The Fam, whose tool allowlist the family room copies.
-FAMILY_GROUP = IDENTIFIERS.family_group
+# The family room's tools: none reads the gateway's files or reaches the key holders.
+# Must equal GROUP_TOOLS in pocket-piggies-install.py, whose guard keeps the same list there
+# on a gateway with finance, and SAFE_GROUP_TOOLS in the PocketPiggies plugin.
+FAMILY_TOOLS = [
+    "web_search",
+    "web_fetch",
+    "family_history",
+    "picture",
+    "video",
+    "household_location",
+    "household_cart",
+    "household_home",
+    "household_react",
+    "household_note",
+    "scripture",
+]
+# What Telegram left in a gateway's config: the channel, the telegram plugin's switch, the
+# plugin that read The Fam, whose family_history this plugin now serves, and the one that
+# copied scheduled posts from The Fam into the app.
+RETIRED_CHANNEL = "telegram"
+RETIRED_PLUGINS = ("household-family-room", "household-job-mirror", RETIRED_CHANNEL)
+RETIRED_PATHS = (
+    "/opt/household-plugins/household-family-room",
+    "/opt/household-plugins/household-job-mirror",
+)
 # The plugin's tools: where the owner is while they share it, the household's shared
 # cart, the assistant's Today card and its line for the day, the house's thermostat and
 # music, a tapback on a person's message, the household note, a draft the owner sends
-# with one tap, the Sunday digest, the wishlist, the document vault, and the meal plan. They
-# are optional, so under a tool profile only `tools.alsoAllow` hands them to the model.
+# with one tap, the Sunday digest, the wishlist, the document vault, the meal plan, and the
+# family room's history. They are optional, so under a tool profile only
+# `tools.alsoAllow` hands them to the model.
 APP_TOOLS = [
     "household_location",
     "household_cart",
@@ -122,6 +155,7 @@ APP_TOOLS = [
     "household_wish",
     "household_vault",
     "household_meals",
+    "family_history",
 ]
 # The PocketPiggies guard rewrites `tools.alsoAllow` as everything else in its order,
 # then these three. Putting the new tool before them leaves the guard nothing to do.
@@ -228,21 +262,6 @@ def assistant_identity(config: dict[str, Any], persona: str) -> dict[str, str]:
     return found
 
 
-def family_tools(config: dict[str, Any]) -> list[str] | None:
-    """The Fam's tool allowlist on this gateway, which the family room copies.
-
-    Only The Fam's own entry counts, and only a non-empty `tools.allow` of names with
-    nothing beside it, since a copy of the allow list alone would drop a deny. None
-    otherwise, and the family room then gets no tools.
-    """
-    groups = _section(_section(_section(config, "channels"), "telegram"), "groups")
-    tools = _section(_section(groups, FAMILY_GROUP), "tools")
-    names = _strings(tools.get("allow"))
-    if list(tools) != ["allow"] or not names or names != tools["allow"]:
-        return None
-    return names
-
-
 def _app_phones(devices: dict[str, Any]) -> list[dict[str, Any]]:
     rows = devices.get("paired")
     return [
@@ -285,33 +304,47 @@ def refusals(config: dict[str, Any]) -> None:
         )
     if PLUGIN in _strings(plugins.get("deny")):
         raise UnsupportedConfig(f"plugins.deny blocks {PLUGIN}; take it out by hand first")
-    if not sessions_kept_apart(config):
+    if not sessions_kept_apart(patched(config, session_patch(config))):
         raise UnsupportedConfig(
             "this gateway keeps every DM or group in one shared main session; the app's "
-            "threads need DMs per person and groups per group (openclaw-family-group.py apply)"
+            "threads need DMs per person and groups per group, so set session.dmScope to "
+            "per-channel-peer and session.groupScope to per-group by hand first"
         )
 
 
 def plugin_patch(config: dict[str, Any]) -> dict[str, Any]:
-    """The plugin, loaded from the mount and enabled, and its tool handed to the model.
+    """The plugin, loaded from the mount and enabled, and its tools handed to the model.
 
     It goes first and on its own: 2026.9.4 validates `channels.household` against the
     plugins the gateway has already loaded, so the channel is refused until this has been
     written and the gateway has restarted onto it. With no channel named, the plugin
-    starts nothing and its tool tells nothing. A patch replaces a list whole, so each list
-    keeps what it held.
+    starts nothing and its tool tells nothing. The plugins Telegram left go in the same
+    restart. A patch replaces a list whole, so each list keeps what else it held, and a
+    null deletes an entry.
     """
     plugins = _section(config, "plugins")
+    entries = _section(plugins, "entries")
     patch: dict[str, Any] = {
-        "entries": {PLUGIN: {"enabled": True, "hooks": {"allowConversationAccess": True}}}
+        "entries": {
+            PLUGIN: {"enabled": True, "hooks": {"allowConversationAccess": True}},
+            **{name: None for name in RETIRED_PLUGINS if name in entries},
+        }
     }
     paths = _section(plugins, "load").get("paths")
-    if PLUGIN_PATH not in _strings(paths):
-        patch["load"] = {"paths": [*(paths if isinstance(paths, list) else []), PLUGIN_PATH]}
+    held = paths if isinstance(paths, list) else []
+    kept = [path for path in held if path not in RETIRED_PATHS]
+    if PLUGIN_PATH not in kept:
+        kept.append(PLUGIN_PATH)
+    if kept != held:
+        patch["load"] = {"paths": kept}
     allow = plugins.get("allow")
-    if isinstance(allow, list) and PLUGIN not in _strings(allow):
-        patch["allow"] = [*allow, PLUGIN]
-    whole: dict[str, Any] = {"plugins": patch}
+    if isinstance(allow, list):
+        allowed_plugins = [name for name in allow if name not in RETIRED_PLUGINS]
+        if PLUGIN not in allowed_plugins:
+            allowed_plugins.append(PLUGIN)
+        if allowed_plugins != allow:
+            patch["allow"] = allowed_plugins
+    whole: dict[str, Any] = {"plugins": patch, **session_patch(config)}
     allowed = _also_allowed(config)
     missing = [tool for tool in APP_TOOLS if tool not in allowed]
     if missing:
@@ -349,21 +382,23 @@ def channel_patch(
     existing = _section(_section(config, "channels"), CHANNEL)
     if not _is_count(existing.get("talkDailyCharacters")):
         room["talkDailyCharacters"] = TALK_DAILY_CHARACTERS
-    tools = family_tools(config)
-    if tools is not None:
-        room["familyTools"] = tools
-    elif "familyTools" in existing:
-        # A list The Fam no longer has goes with it.
-        room["familyTools"] = None
+    room["familyTools"] = list(FAMILY_TOOLS)
     patch: dict[str, Any] = {"channels": {CHANNEL: room}}
-    if "telegram" in _section(config, "channels"):
-        patch["channels"]["telegram"] = {"enabled": False}
+    # The retired channel goes whole, its bot token with it.
+    if RETIRED_CHANNEL in _section(config, "channels"):
+        patch["channels"][RETIRED_CHANNEL] = None
     owners = _section(config, "commands").get("ownerAllowFrom")
+    held = owners if isinstance(owners, list) else []
     owner_entry = f"{CHANNEL}:{gateway.person}"
-    if owner_entry not in _strings(owners):
-        patch["commands"] = {
-            "ownerAllowFrom": [*(owners if isinstance(owners, list) else []), owner_entry]
-        }
+    kept = [
+        entry
+        for entry in held
+        if not (isinstance(entry, str) and entry.startswith(f"{RETIRED_CHANNEL}:"))
+    ]
+    if owner_entry not in kept:
+        kept.append(owner_entry)
+    if kept != held:
+        patch["commands"] = {"ownerAllowFrom": kept}
     return patch
 
 
@@ -396,6 +431,24 @@ def _channel_validates(gateway: Gateway, patch: dict[str, Any], run: Runner) -> 
     except RuntimeError:
         return False
     return True
+
+
+def telegram_leftovers(config: dict[str, Any]) -> list[str]:
+    """Where a gateway's config still names what Telegram left."""
+    plugins = _section(config, "plugins")
+    left = (
+        [f"channels.{RETIRED_CHANNEL}"] if RETIRED_CHANNEL in _section(config, "channels") else []
+    )
+    left += [
+        f"plugins.entries.{name}"
+        for name in RETIRED_PLUGINS
+        if name in _section(plugins, "entries")
+    ]
+    paths = _strings(_section(plugins, "load").get("paths"))
+    left += [path for path in RETIRED_PATHS if path in paths]
+    owners = _strings(_section(config, "commands").get("ownerAllowFrom"))
+    left += [entry for entry in owners if entry.startswith(f"{RETIRED_CHANNEL}:")]
+    return left
 
 
 def problems(config: dict[str, Any], gateway: Gateway) -> list[str]:
@@ -446,17 +499,11 @@ def problems(config: dict[str, Any], gateway: Gateway) -> list[str]:
         wrong.append(f"{gateway.person} is not the owner in the app")
     if not sessions_kept_apart(config):
         wrong.append("DMs or groups share one main session")
-    if _section(_section(config, "channels"), "telegram").get(
-        "enabled"
-    ) is not False and "telegram" in _section(config, "channels"):
-        wrong.append("Telegram must be disabled; household communication uses the app")
-    tools = family_tools(config)
-    if tools is None:
-        wrong.append(
-            f"The Fam ({FAMILY_GROUP}) has no tool allowlist, so the family room gets no tools"
-        )
-    elif room.get("familyTools") != tools:
-        wrong.append("the family room's tools are not The Fam's")
+    if room.get("familyTools") != FAMILY_TOOLS:
+        wrong.append("the family room's tools are not the household's list for a group")
+    left = telegram_leftovers(config)
+    if left:
+        wrong.append(f"Telegram is retired and still in {', '.join(left)}")
     return wrong
 
 
@@ -633,11 +680,6 @@ def apply(gateway: Gateway, *, run: Runner, dry_run: bool) -> int:
         print(f"  {label}: " + ("none paired yet" if not lines else ""))
         for line in lines:
             print(f"    {line}")
-    if family_tools(config) is None:
-        print(
-            f"  warning: The Fam ({FAMILY_GROUP}) has no tool allowlist here, so a family-room "
-            "turn gets no tools until it has one and apply runs again"
-        )
     if needs_job:
         print(
             f"  Today card {describe_today_job(job)}, apply writes it at {TODAY_SCHEDULE} in the "

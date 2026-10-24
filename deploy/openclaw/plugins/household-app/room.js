@@ -18,7 +18,7 @@
 //
 // Who answers: the owner's direct messages always reach the assistant. A person's
 // family message reaches it only when it names the assistant or replies to one of its
-// messages, which is how the household's Telegram group works; a voice note names it by
+// messages; a voice note names it by
 // its words, heard once on this gateway (voice-notes.js). The other assistant hands it a
 // request by @mentioning it, or puts a question to it by name (mentions.js), and that
 // starts one family-room turn whose sender is that assistant, never a person, so nothing

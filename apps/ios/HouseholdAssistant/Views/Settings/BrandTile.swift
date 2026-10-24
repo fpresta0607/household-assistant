@@ -32,7 +32,6 @@ struct BrandTile: View {
         "notion": .black,
         "openai": .black,
         "perplexity": hex(0x1FB8CD),
-        "telegram": hex(0x26A5E4),
     ]
 
     /// Drawn as they come, on white.

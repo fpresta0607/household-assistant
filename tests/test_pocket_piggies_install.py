@@ -18,12 +18,13 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-OWNER = "123456"
-FAMILY = "-5100000001"
+# The owner as the app names them, and the Telegram chat their grant was made under before
+# Telegram was retired.
+OWNER = "franco"
+TELEGRAM_ID = "123456"
 GROUP_TOOLS = [
     "web_search",
     "web_fetch",
-    "speak",
     "family_history",
     "picture",
     "video",
@@ -48,24 +49,30 @@ def installer() -> ModuleType:
 
 
 def as_on_the_box(profile: str = "coding") -> dict[str, Any]:
+    """Corey's gateway with the app as its channel and the retired Telegram switched off."""
     return {
-        "commands": {"ownerAllowFrom": [f"telegram:{OWNER}"]},
+        "commands": {"ownerAllowFrom": [f"telegram:{TELEGRAM_ID}", f"household:{OWNER}"]},
         "channels": {
+            "household": {
+                "enabled": True,
+                "owner": {"id": OWNER, "name": "Franco"},
+                "peer": {"person": {"id": "gia", "name": "Gia"}},
+                "familyTools": ["web_search", "family_history"],
+            },
             "telegram": {
+                "enabled": False,
                 "botToken": {"source": "env", "id": "EXISTING"},
                 "groupPolicy": "allowlist",
-                "groupAllowFrom": [OWNER, "654321"],
-                "groups": {FAMILY: {"requireMention": True, "allowFrom": [OWNER, "654321"]}},
-            }
+            },
         },
         "models": {"default": "existing-model"},
         "session": {"dmScope": "per-channel-peer", "groupScope": "per-group"},
         "tools": {
             "profile": profile,
-            "alsoAllow": ["speak", "family_history"],
+            "alsoAllow": ["household_note", "family_history"],
             "deny": ["codex", "memory-wiki", "onepassword"],
         },
-        "plugins": {"entries": {"household-speech": {"enabled": True}}},
+        "plugins": {"entries": {"household-app": {"enabled": True}}},
     }
 
 
@@ -73,49 +80,60 @@ def as_on_the_box(profile: str = "coding") -> dict[str, Any]:
 def test_the_owner_keeps_every_tool_and_everyone_else_is_kept_from_finance(profile: str) -> None:
     original = as_on_the_box(profile)
 
-    installed = installer().configured(original, "denise", OWNER)
+    installed = installer().configured(original, "corey", OWNER)
 
     tools = installed["tools"]
     assert tools["profile"] == profile
     assert tools["deny"] == original["tools"]["deny"]
-    assert tools["alsoAllow"] == ["speak", "family_history", *FINANCE_TOOLS]
+    assert tools["alsoAllow"] == ["household_note", "family_history", *FINANCE_TOOLS]
     assert "allow" not in tools and "sessions" not in tools
-    telegram = installed["channels"]["telegram"]
-    assert telegram["dmPolicy"] == "allowlist" and telegram["allowFrom"] == [OWNER]
-    assert telegram["groupPolicy"] == "allowlist"
-    assert telegram["groups"][FAMILY] == {
-        "requireMention": True,
-        "allowFrom": [OWNER, "654321"],
-        "tools": {"allow": GROUP_TOOLS},
+    assert installed["channels"]["household"] == {
+        **original["channels"]["household"],
+        "familyTools": GROUP_TOOLS,
     }
-    assert telegram["botToken"] == original["channels"]["telegram"]["botToken"]
+    assert installed["channels"]["telegram"] == original["channels"]["telegram"]
     assert installed["models"] == original["models"]
     assert installed["commands"] == original["commands"]
     assert installed["plugins"]["entries"]["pocket-piggies"] == {
         "enabled": True,
-        "config": {
-            "ownerTelegramId": OWNER,
-            "accountLabel": "denise",
-            "ownerHouseholdPersonId": "gia",
-        },
+        "config": {"ownerHouseholdPersonId": OWNER, "accountLabel": "corey"},
     }
-    assert installed["plugins"]["load"]["paths"] == ["/opt/household-plugins/pocket-piggies-denise"]
-    assert installer().configured(installed, "denise", OWNER) == installed
-    assert "dmPolicy" not in original["channels"]["telegram"]
+    assert installed["plugins"]["load"]["paths"] == ["/opt/household-plugins/pocket-piggies-corey"]
+    assert installer().configured(installed, "corey", OWNER) == installed
+    assert original["channels"]["household"]["familyTools"] == ["web_search", "family_history"]
 
 
-@pytest.mark.parametrize(("persona", "person"), [("corey", "franco"), ("denise", "gia")])
-def test_each_gateway_maps_its_own_app_owner_to_the_finance_owner(
-    persona: str, person: str
-) -> None:
-    installed = installer().configured(as_on_the_box(), persona, OWNER)
+def test_every_other_chat_channel_is_switched_off() -> None:
+    """The app is the household's only channel: another one would admit senders this policy
+    never reviewed into a turn with every tool."""
+    original = as_on_the_box()
+    original["channels"]["telegram"]["enabled"] = True
+    original["channels"]["whatsapp"] = {"dmPolicy": "allowlist", "allowFrom": ["+15550100"]}
+    original["channels"]["defaults"] = {"groupPolicy": "allowlist"}
 
-    assert installed["plugins"]["entries"]["pocket-piggies"]["config"] == {
-        "ownerTelegramId": OWNER,
-        "accountLabel": persona,
-        "ownerHouseholdPersonId": person,
+    installed = installer().configured(original, "corey", OWNER)
+
+    assert installed["channels"]["telegram"]["enabled"] is False
+    assert installed["channels"]["whatsapp"] == {
+        "dmPolicy": "allowlist",
+        "allowFrom": ["+15550100"],
+        "enabled": False,
     }
-    assert installer().configured(installed, persona, OWNER) == installed
+    assert installed["channels"]["defaults"] == {"groupPolicy": "allowlist"}
+    assert (
+        "enabled" not in installed["channels"]["household"]
+        or installed["channels"]["household"]["enabled"]
+    )
+
+
+def test_a_gateway_with_no_app_channel_yet_keeps_finance_to_nobody_but_the_owner() -> None:
+    original = as_on_the_box()
+    del original["channels"]["household"]
+
+    installed = installer().configured(original, "corey", OWNER)
+
+    assert "household" not in installed["channels"]
+    assert installed["channels"]["telegram"]["enabled"] is False
 
 
 def test_the_group_allowlist_is_the_one_the_plugin_accepts() -> None:
@@ -133,11 +151,10 @@ def test_the_group_allowlist_is_the_one_the_plugin_accepts() -> None:
         {"plugins": {"deny": ["pocket-piggies"]}},
         {"bindings": [{"session": {"groupScope": "main"}}]},
         {"tools": {"allow": ["web_search"]}},
-        {"channels": {}},
-        {"channels": {"telegram": {"accounts": {"second": {}}}}},
-        {"channels": {"telegram": {"direct": {"*": {"tools": {"allow": ["exec"]}}}}}},
-        {"channels": {"telegram": {"groups": {FAMILY: {"toolsBySender": {"id:1": {}}}}}}},
-        {"channels": {"telegram": {"groups": {FAMILY: {"topics": {"*": {}}}}}}},
+        {"channels": []},
+        {"channels": {"household": {"owner": {"id": "gia"}}}},
+        {"channels": {"household": "on"}},
+        {"channels": {"signal": True}},
     ],
 )
 def test_routing_the_installer_cannot_make_safe_is_refused(change: dict[str, Any]) -> None:
@@ -146,27 +163,33 @@ def test_routing_the_installer_cannot_make_safe_is_refused(change: dict[str, Any
         installer().configured(original, "corey", OWNER)
 
 
-@pytest.mark.parametrize("value", ["-100123", "0", "123\n", "display-name", "", "telegram:123"])
-def test_installer_requires_exact_numeric_owner_id(value: str) -> None:
+@pytest.mark.parametrize("value", ["Franco", "123456", "", "household:franco", "franco\n"])
+def test_installer_requires_a_household_person_id(value: str) -> None:
+    original = as_on_the_box()
+    original["commands"]["ownerAllowFrom"].append(f"household:{value}")
     with pytest.raises(ValueError):
-        installer().configured(as_on_the_box(), "corey", value)
+        installer().configured(original, "corey", value)
 
 
-@pytest.mark.parametrize("owners", [[], ["*"], [f"telegram:{OWNER}"], ["789000"]])
-def test_install_refuses_an_owner_other_than_the_gateways_trusted_owner(owners: list[str]) -> None:
+@pytest.mark.parametrize(
+    "owners", [[], ["*"], [f"telegram:{TELEGRAM_ID}"], ["household:gia"], [OWNER]]
+)
+def test_install_refuses_an_owner_other_than_the_gateways_app_owner(owners: list[str]) -> None:
     original = {**as_on_the_box(), "commands": {"ownerAllowFrom": owners}}
     with pytest.raises(ValueError, match="owner"):
-        installer().configured(original, "corey", "789000")
+        installer().configured(original, "corey", OWNER)
 
 
 @pytest.mark.parametrize("persona", ["corey", "denise"])
-def test_rollback_disables_finance_and_keeps_the_owner_only_and_group_policy(persona: str) -> None:
+def test_rollback_disables_finance_and_keeps_the_channel_and_family_room_policy(
+    persona: str,
+) -> None:
     module = installer()
     installed = module.configured(as_on_the_box(), persona, OWNER)
 
     rolled_back = module.configured(installed, persona, OWNER, is_enabled=False)
 
-    assert rolled_back["tools"]["alsoAllow"] == ["speak", "family_history"]
+    assert rolled_back["tools"]["alsoAllow"] == ["household_note", "family_history"]
     assert rolled_back["plugins"]["entries"]["pocket-piggies"] == {"enabled": False}
     assert rolled_back["plugins"]["load"]["paths"] == []
     assert rolled_back["channels"] == installed["channels"]
@@ -270,6 +293,7 @@ def test_the_key_holder_gets_its_own_user_root_owned_code_and_a_private_socket_d
     assert sorted(path.name for path in (code / "household" / "pocketpiggies").iterdir()) == [
         "__init__.py",
         "api.py",
+        "binding.py",
         "errors.py",
         "link.py",
         "reads.py",
@@ -285,7 +309,9 @@ def test_the_key_holder_gets_its_own_user_root_owned_code_and_a_private_socket_d
     for name in ("service", "path", "timer"):
         assert (units / f"household-pocketpiggies-guard.{name}").is_file()
     drop_in = (units / "household-pocketpiggies@corey.service.d" / "gateway.conf").read_text()
-    assert f"Environment=POCKETPIGGIES_OWNER_TELEGRAM_ID={OWNER}\n" in drop_in
+    assert f"Environment=POCKETPIGGIES_OWNER={OWNER}\n" in drop_in
+    assert "Environment=POCKETPIGGIES_CLIENT_ID=corey\n" in drop_in
+    assert "TELEGRAM" not in drop_in
     assert f"BindPaths={state / 'pocketpiggies'}:/run/household-pocketpiggies\n" in drop_in
     sockets = state / "pocketpiggies"
     assert sockets.stat().st_mode & 0o7777 == 0o2750
@@ -412,17 +438,86 @@ def test_client_provisioning_writes_only_into_the_key_holder_state_and_never_rot
     stored = json.loads(original)
     assert stored["clientCredential"].startswith("ppc_") and len(stored["clientCredential"]) == 47
     assert stored["grant"] is None and stored["pending"] is None
-    assert set(registration) == {"clientId", "credentialSha256", "telegramUserId", "botUsername"}
+    assert stored["owner"] == OWNER and "ownerTelegramId" not in stored
+    assert registration == {
+        "clientId": "corey",
+        "credentialSha256": registration["credentialSha256"],
+        "subjectType": "household_person",
+        "subject": OWNER,
+        "redirectUri": "steward://pocketpiggies/linked",
+    }
     assert stored["clientCredential"] not in json.dumps(registration)
     assert path.stat().st_mode & 0o777 == 0o600
     assert module.provision_client(tmp_path, "corey", OWNER) == registration
     assert path.read_bytes() == original
     with pytest.raises(ValueError, match="different owner"):
-        module.provision_client(tmp_path, "corey", "789000")
+        module.provision_client(tmp_path, "corey", "gia")
+    with pytest.raises(ValueError, match="different owner"):
+        module.provision_client(tmp_path, "corey", OWNER, telegram_id=TELEGRAM_ID)
     path.unlink()
     os.symlink(tmp_path / "missing", path)
     with pytest.raises(ValueError, match="symlinked"):
         module.provision_client(tmp_path, "corey", OWNER)
+
+
+def test_a_grant_made_on_telegram_keeps_its_binding_in_the_drop_in() -> None:
+    """Franco's and Gia's grants were made under their Telegram chats, which PocketPiggies
+    still checks, so their key holders keep speaking for them."""
+    module = installer()
+    state = Path("/var/lib/household-assistant/openclaw")
+
+    franco = module.drop_in(state, OWNER, "corey", TELEGRAM_ID).decode()
+    marina = module.drop_in(state, "marina", "hh-7f3a", None).decode()
+
+    assert franco.splitlines()[2:] == [
+        f"Environment=POCKETPIGGIES_OWNER={OWNER}",
+        "Environment=POCKETPIGGIES_CLIENT_ID=corey",
+        f"Environment=POCKETPIGGIES_TELEGRAM_ID={TELEGRAM_ID}",
+        f"BindPaths={state / 'pocketpiggies'}:/run/household-pocketpiggies",
+    ]
+    assert "TELEGRAM" not in marina and "POCKETPIGGIES_CLIENT_ID=hh-7f3a" in marina
+
+
+@posix
+def test_a_telegram_binding_is_refused_for_a_client_it_was_never_made_with(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = installer()
+    monkeypatch.setattr(module.os, "chown", lambda *_: None)
+    host = FakeHost(has_user=True)
+    for owner, telegram_id, client in [
+        (OWNER, TELEGRAM_ID, "hh-7f3a"),
+        (OWNER, "telegram:123", None),
+        ("Franco", None, None),
+    ]:
+        with pytest.raises(ValueError):
+            module.install_key_holder(
+                tmp_path,
+                "corey",
+                owner,
+                telegram_id=telegram_id,
+                client_id=client,
+                code_root=tmp_path / "code",
+                units=tmp_path,
+                run=host,
+            )
+    assert host.commands == []
+
+
+@posix
+def test_provisioning_a_telegram_bound_key_holder_keeps_the_file_it_had(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = installer()
+    monkeypatch.setattr(module.os, "fchown", lambda *_: None)
+    (tmp_path / "corey").mkdir(mode=0o700)
+
+    registration = module.provision_client(tmp_path, "corey", OWNER, telegram_id=TELEGRAM_ID)
+
+    stored = json.loads((tmp_path / "corey" / "connection.json").read_text())
+    assert stored["ownerTelegramId"] == TELEGRAM_ID and "owner" not in stored
+    assert registration["telegramUserId"] == TELEGRAM_ID
+    assert registration["botUsername"] == "Corey_the_man_bot"
 
 
 def installed(tmp_path: Path, persona: str = "corey", owner: str = OWNER) -> tuple[Path, Path]:
@@ -437,7 +532,10 @@ def installed(tmp_path: Path, persona: str = "corey", owner: str = OWNER) -> tup
     drop_in = units / f"household-pocketpiggies@{persona}.service.d"
     drop_in.mkdir(parents=True)
     (drop_in / "gateway.conf").write_text(
-        f"[Service]\nEnvironment=POCKETPIGGIES_OWNER_TELEGRAM_ID={owner}\n", encoding="utf-8"
+        f"[Service]\nEnvironment=POCKETPIGGIES_OWNER={owner}\n"
+        f"Environment=POCKETPIGGIES_CLIENT_ID={persona}\n"
+        f"Environment=POCKETPIGGIES_TELEGRAM_ID={TELEGRAM_ID}\n",
+        encoding="utf-8",
     )
     return state_root, units
 
@@ -446,15 +544,13 @@ def installed(tmp_path: Path, persona: str = "corey", owner: str = OWNER) -> tup
 @pytest.mark.parametrize(
     "drift",
     [
-        lambda config: config["channels"]["telegram"]["groups"][FAMILY]["tools"].update(
-            allow=["exec", "read"]
-        ),
-        lambda config: config["channels"]["telegram"]["groups"][FAMILY].pop("tools"),
-        lambda config: config["channels"]["telegram"].update(dmPolicy="pairing"),
-        lambda config: config["channels"]["telegram"].update(allowFrom=[OWNER, "654321"]),
+        lambda config: config["channels"]["household"].update(familyTools=["exec", "read"]),
+        lambda config: config["channels"]["household"].pop("familyTools"),
+        lambda config: config["channels"]["telegram"].update(enabled=True),
+        lambda config: config["channels"]["telegram"].pop("enabled"),
         lambda config: config["session"].update(dmScope="main"),
         lambda config: config["plugins"]["entries"]["pocket-piggies"]["config"].update(
-            ownerTelegramId="654321"
+            ownerHouseholdPersonId="gia"
         ),
     ],
 )
@@ -518,10 +614,8 @@ def test_the_guard_leaves_an_intact_config_and_an_uninstalled_gateway_alone(tmp_
 @pytest.mark.parametrize(
     "unsafe",
     [
-        lambda config: config["channels"]["telegram"].update(accounts={"second": {}}),
-        lambda config: config["channels"]["telegram"]["groups"][FAMILY].update(
-            toolsBySender={"id:654321": {"alsoAllow": ["exec"]}}
-        ),
+        lambda config: config["channels"]["household"].update(owner={"id": "gia"}),
+        lambda config: config["channels"].update(signal=True),
         lambda config: config["tools"].update(allow=["exec"]),
         lambda config: config.update(bindings=[{"session": {"groupScope": "main"}}]),
     ],
@@ -602,7 +696,7 @@ def test_rollback_stops_the_key_holder_first_and_touches_only_this_gateway(
     peer_drop_in = tmp_path / "household-pocketpiggies@corey.service.d"
     peer_drop_in.mkdir()
     monkeypatch.setattr(
-        sys, "argv", ["installer", "denise", "--telegram-id", OWNER, "--rollback", "--restart"]
+        sys, "argv", ["installer", "denise", "--owner", OWNER, "--rollback", "--restart"]
     )
     actions: list[object] = []
 
@@ -615,9 +709,9 @@ def test_rollback_stops_the_key_holder_first_and_touches_only_this_gateway(
         stdout = "inactive\n" if command[1:2] == ["is-active"] else ""
         return subprocess.CompletedProcess(command, 0, stdout, "")
 
-    def install(state: Path, persona: str, telegram_id: str, *, is_enabled: bool = True) -> Path:
+    def install(state: Path, persona: str, owner: str, *, is_enabled: bool = True) -> Path:
         assert state == Path("/var/lib/household-assistant/openclaw-denise")
-        assert persona == "denise" and telegram_id == OWNER and not is_enabled
+        assert persona == "denise" and owner == OWNER and not is_enabled
         # The guard must already have lost this gateway, or it would put finance back.
         assert not drop_in.exists() and peer_drop_in.exists()
         actions.append("disable finance")
@@ -627,7 +721,7 @@ def test_rollback_stops_the_key_holder_first_and_touches_only_this_gateway(
 
     monkeypatch.setattr(module.subprocess, "run", run)
     monkeypatch.setattr(module, "install_into", install)
-    monkeypatch.setattr(module, "install_key_holder", lambda *_: actions.append("key holder"))
+    monkeypatch.setattr(module, "install_key_holder", lambda *_, **__: actions.append("key holder"))
 
     if has_failure:
         with pytest.raises(SystemExit) as error:
@@ -666,7 +760,7 @@ def test_rollback_never_reports_finance_off_while_the_key_holder_still_runs(
     module = installer()
     monkeypatch.setattr(module.os, "geteuid", lambda: 0, raising=False)
     monkeypatch.setattr(module, "SYSTEMD_UNITS", tmp_path)
-    monkeypatch.setattr(sys, "argv", ["installer", "corey", "--telegram-id", OWNER, "--rollback"])
+    monkeypatch.setattr(sys, "argv", ["installer", "corey", "--owner", OWNER, "--rollback"])
 
     def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         stdout = "active\n" if command[1:2] == ["is-active"] else ""
@@ -710,7 +804,7 @@ def test_a_hostile_config_stops_only_its_own_finance_and_the_guard_goes_on(
     corey.write_text(hostile(json.loads(corey.read_text())), encoding="utf-8")
     denise = state_root / "openclaw-denise" / "openclaw.json"
     drifted = json.loads(denise.read_text())
-    drifted["channels"]["telegram"]["dmPolicy"] = "open"
+    drifted["channels"]["telegram"]["enabled"] = True
     denise.write_text(json.dumps(drifted), encoding="utf-8")
     host = FakeHost(has_user=True)
     lines: list[str] = []
@@ -727,7 +821,7 @@ def test_a_hostile_config_stops_only_its_own_finance_and_the_guard_goes_on(
 
     assert host.commands == [["systemctl", "stop", "household-pocketpiggies@corey.service"]]
     assert naps == [module.GUARD_RETRY_SECONDS]
-    assert json.loads(denise.read_text())["channels"]["telegram"]["dmPolicy"] == "allowlist"
+    assert json.loads(denise.read_text())["channels"]["telegram"]["enabled"] is False
     assert [line.split(":")[0] for line in lines] == ["corey", "denise"]
 
 
@@ -816,7 +910,7 @@ def test_a_config_too_deep_or_large_to_rewrite_cheaply_stops_finance(
     state_root, units = installed(tmp_path)
     config_path = state_root / "openclaw" / "openclaw.json"
     config = json.loads(config_path.read_text())
-    config["channels"]["telegram"]["dmPolicy"] = "open"
+    config["channels"]["telegram"]["enabled"] = True
     config_path.write_text(json.dumps(config)[:-1] + ", " + text + "}", encoding="utf-8")
     assert config_path.stat().st_size <= module.MAX_CONFIG_BYTES
     host = FakeHost(has_user=True)
@@ -865,7 +959,7 @@ def test_a_failing_stop_is_logged_and_the_guard_still_reaches_the_other_gateway(
     (state_root / "openclaw" / "openclaw.json").write_text("not json", encoding="utf-8")
     denise = state_root / "openclaw-denise" / "openclaw.json"
     drifted = json.loads(denise.read_text())
-    drifted["channels"]["telegram"]["dmPolicy"] = "open"
+    drifted["channels"]["telegram"]["enabled"] = True
     denise.write_text(json.dumps(drifted), encoding="utf-8")
     lines: list[str] = []
 
@@ -887,7 +981,7 @@ def test_a_failing_stop_is_logged_and_the_guard_still_reaches_the_other_gateway(
         "corey: stopping PocketPiggies failed: TimeoutExpired",
         "denise: put back the PocketPiggies policy in channels",
     ]
-    assert json.loads(denise.read_text())["channels"]["telegram"]["dmPolicy"] == "allowlist"
+    assert json.loads(denise.read_text())["channels"]["telegram"]["enabled"] is False
 
 
 @posix
@@ -951,7 +1045,7 @@ def test_a_config_that_keeps_drifting_back_stops_finance(tmp_path: Path) -> None
     lines: list[str] = []
     for repair in range(module.MAX_REPAIRS + 1):
         drifted = json.loads(config_path.read_text())
-        drifted["channels"]["telegram"]["dmPolicy"] = "open"
+        drifted["channels"]["telegram"]["enabled"] = True
         config_path.write_text(json.dumps(drifted), encoding="utf-8")
         module.guard(
             units=units,
@@ -973,7 +1067,7 @@ def test_a_config_at_the_shape_limits_is_still_repaired(tmp_path: Path) -> None:
     state_root, units = installed(tmp_path)
     config_path = state_root / "openclaw" / "openclaw.json"
     config = json.loads(config_path.read_text())
-    config["channels"]["telegram"]["dmPolicy"] = "open"
+    config["channels"]["telegram"]["enabled"] = True
     # The top-level value is depth 1, so 32 nested lists put the innermost at the limit.
     config_path.write_text(
         json.dumps(config)[:-1] + ', "junk": ' + "[" * 32 + "]" * 32 + "}", encoding="utf-8"
@@ -990,7 +1084,7 @@ def test_a_config_at_the_shape_limits_is_still_repaired(tmp_path: Path) -> None:
     )
 
     assert host.commands == []
-    assert json.loads(config_path.read_text())["channels"]["telegram"]["dmPolicy"] == "allowlist"
+    assert json.loads(config_path.read_text())["channels"]["telegram"]["enabled"] is False
 
 
 @posix
@@ -1051,7 +1145,7 @@ def test_repairs_spread_out_in_time_never_trip_the_breaker(tmp_path: Path) -> No
     host = FakeHost(has_user=True)
     for repair in range(module.MAX_REPAIRS * 2):
         drifted = json.loads(config_path.read_text())
-        drifted["channels"]["telegram"]["dmPolicy"] = "open"
+        drifted["channels"]["telegram"]["enabled"] = True
         config_path.write_text(json.dumps(drifted), encoding="utf-8")
         module.guard(
             units=units,
@@ -1079,7 +1173,7 @@ def test_the_breaker_counts_each_gateway_alone_and_survives_a_corrupt_record(
     (runtime / "repairs-denise.json").write_text("{not json")
     denise = state_root / "openclaw-denise" / "openclaw.json"
     drifted = json.loads(denise.read_text())
-    drifted["channels"]["telegram"]["dmPolicy"] = "open"
+    drifted["channels"]["telegram"]["enabled"] = True
     denise.write_text(json.dumps(drifted), encoding="utf-8")
     host = FakeHost(has_user=True)
 
@@ -1137,7 +1231,7 @@ def test_repairs_that_cannot_be_counted_stop_only_that_gateway(tmp_path: Path) -
     for state_name in ("openclaw", "openclaw-denise"):
         config_path = state_root / state_name / "openclaw.json"
         drifted = json.loads(config_path.read_text())
-        drifted["channels"]["telegram"]["dmPolicy"] = "open"
+        drifted["channels"]["telegram"]["enabled"] = True
         config_path.write_text(json.dumps(drifted), encoding="utf-8")
     runtime = tmp_path / "runtime"
     runtime.write_text("not a directory")
@@ -1159,9 +1253,9 @@ def test_repairs_that_cannot_be_counted_stop_only_that_gateway(tmp_path: Path) -
     ]
     assert all(
         json.loads((state_root / name / "openclaw.json").read_text())["channels"]["telegram"][
-            "dmPolicy"
+            "enabled"
         ]
-        == "allowlist"
+        is False
         for name in ("openclaw", "openclaw-denise")
     )
     assert (
@@ -1260,7 +1354,7 @@ def test_restart_judges_doctor_by_its_report_not_its_exit_code(
     module = installer()
     monkeypatch.setattr(module.os, "geteuid", lambda: 0, raising=False)
     monkeypatch.setattr(module, "SYSTEMD_UNITS", tmp_path)
-    monkeypatch.setattr(sys, "argv", ["installer", "corey", "--telegram-id", OWNER, "--restart"])
+    monkeypatch.setattr(sys, "argv", ["installer", "corey", "--owner", OWNER, "--restart"])
     broken = {"level": "error", "pluginId": "pocket-piggies", "message": "failed to load"}
 
     def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -1271,7 +1365,7 @@ def test_restart_judges_doctor_by_its_report_not_its_exit_code(
 
     monkeypatch.setattr(module.subprocess, "run", run)
     monkeypatch.setattr(module, "install_into", lambda *_, **__: Path("/backup/openclaw.json"))
-    monkeypatch.setattr(module, "install_key_holder", lambda *_: None)
+    monkeypatch.setattr(module, "install_key_holder", lambda *_, **__: None)
 
     if has_problem:
         with pytest.raises(SystemExit) as error:

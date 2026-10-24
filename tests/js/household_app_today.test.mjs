@@ -31,7 +31,7 @@ const MORNING = new Date(2026, 9, 15, 6, 45).getTime();
 const EVENING = new Date(2026, 9, 15, 16, 45).getTime();
 const NEXT_MORNING = new Date(2026, 9, 16, 6, 45).getTime();
 const FRANCO_TELEGRAM = "7100000001";
-const OWNERS = [`telegram:${FRANCO_TELEGRAM}`, "household:franco"];
+const OWNERS = ["household:franco"];
 const VERSE = {
   text: "Be still, and know that I am God.",
   reference: "Psalm 46:10",
@@ -100,7 +100,7 @@ const THE_FAM = {
 const SCHEDULED_RUN = { agentId: "main", sessionKey: "agent:main:cron:6f1c2a:run:91b0" };
 
 function toolFor(context, today) {
-  return createTodayTool({ context, owner: "franco", owners: OWNERS, write: (card) => today.write(card) });
+  return createTodayTool({ context, owner: "franco", write: (card) => today.write(card) });
 }
 
 async function answer(found, args) {
@@ -236,11 +236,10 @@ test("the tool says what the card is, its limits, and whose day it may draw on",
 
 // MARK: - Where it is offered
 
-test("the tool is offered where the brief is, and not in the family room or a Telegram group", async () => {
+test("the tool is offered where the brief is, and not in the family room or on Telegram", async () => {
   const { today } = await setup();
   for (const [label, turn] of [
     ["the owner's own thread in the app", OWN_THREAD],
-    ["the owner's private chat on Telegram", OWNERS_TELEGRAM],
     ["a scheduled run of the main agent", SCHEDULED_RUN],
   ]) {
     assert.equal(toolFor(turn, today)?.name, TODAY_TOOL, label);
@@ -248,6 +247,7 @@ test("the tool is offered where the brief is, and not in the family room or a Te
   for (const [label, turn] of [
     ["the family room", FAMILY_ROOM],
     ["The Fam on Telegram", THE_FAM],
+    ["the owner's private chat on Telegram, which the household retired", OWNERS_TELEGRAM],
     ["a sub-agent", { agentId: "main", sessionKey: "agent:main:subagent:today" }],
     ["no context at all", undefined],
   ]) {

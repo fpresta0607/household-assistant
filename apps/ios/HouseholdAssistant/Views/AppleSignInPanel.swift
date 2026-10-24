@@ -1,4 +1,4 @@
-// Pairing without Telegram: Sign in with Apple at the chosen person's own gateway. A
+// Pairing without a setup code: Sign in with Apple at the chosen person's own gateway. A
 // known Apple ID pairs at once, and a new one waits for Franco (AppleSignInWaitingView).
 //
 // The gateway's nonce is fetched before the button can be tapped, because Apple's

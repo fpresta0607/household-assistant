@@ -35,7 +35,7 @@
 //
 // What is kept lives in kept.json in this plugin's own directory under the gateway's
 // state, beside everything else a backup of that state carries. OpenClaw 2026.9.4 refuses its SQLite plugin
-// stores to a plugin loaded from a local path, as it does for household-family-room.
+// stores to a plugin loaded from a local path.
 
 import { readFileSync } from "node:fs";
 import path from "node:path";

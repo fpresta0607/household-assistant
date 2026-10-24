@@ -27,8 +27,6 @@ def written(tmp_path: Path, content: object) -> Path:
 def test_the_example_reads_as_the_household() -> None:
     household = load_household(EXAMPLE)
 
-    assert household.family_group == "-5100000001"
-    assert household.telegram_ids == {"franco": "7100000001", "gia": "7100000002"}
     assert household.gateway_host == "household.example.ts.net"
     assert household.google_client_id.endswith(".apps.googleusercontent.com")
     assert household.shared_calendar == "Family Calendar"
@@ -45,13 +43,8 @@ def test_the_tests_read_the_example() -> None:
 @pytest.mark.parametrize(
     ("change", "message"),
     [
-        (lambda data: data.pop("familyGroup"), "has no familyGroup"),
-        (lambda data: data.update(familyGroup=""), "has no familyGroup"),
         (lambda data: data.pop("gatewayHost"), "has no gatewayHost"),
         (lambda data: data.update(googleClientId=7), "has no googleClientId"),
-        (lambda data: data["telegram"].pop("gia"), "exactly franco, gia"),
-        (lambda data: data["telegram"].update(denise="7100000003"), "exactly franco, gia"),
-        (lambda data: data["telegram"].update(franco=7100000001), "has no franco"),
         (lambda data: data.pop("sharedCalendar"), "has no sharedCalendar"),
         (lambda data: data["sharedCalendar"].pop("appleId"), "has no appleId"),
         (lambda data: data.pop("bibleVersion"), "has no bibleVersion"),
@@ -69,7 +62,17 @@ def test_a_household_file_missing_a_value_is_refused(
 
 def test_a_household_file_that_is_not_an_object_is_refused(tmp_path: Path) -> None:
     with pytest.raises(UnsupportedConfig, match="not a JSON object"):
-        load_household(written(tmp_path, ["familyGroup"]))
+        load_household(written(tmp_path, ["gatewayHost"]))
+
+
+def test_the_telegram_identifiers_a_file_from_before_still_names_are_not_read(
+    tmp_path: Path,
+) -> None:
+    data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+    data["familyGroup"] = "-5100000001"
+    data["telegram"] = {"franco": "7100000001"}
+
+    assert load_household(written(tmp_path, data)) == load_household(EXAMPLE)
 
 
 def test_a_missing_household_file_stops_the_installer(tmp_path: Path) -> None:

@@ -203,7 +203,7 @@ struct AssistantPage: View {
                     choices: AnswerLength.allCases,
                     selection: settings.length,
                     isPending: settings.isPending(.length),
-                    note: "How much \(name) says in each answer, here and on Telegram.",
+                    note: "How much \(name) says in each answer.",
                     refusal: settings.refusal(for: [.length]),
                     label: { $0.label }
                 ) { length in

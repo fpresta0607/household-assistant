@@ -382,13 +382,7 @@ class Reader:
         self._sync_attempts: deque[datetime] = deque()
 
     def _headers(self) -> dict[str, str]:
-        owner = self.link.telegram_user_id
-        return {
-            "X-PocketPiggies-Client-Id": self.link.client_id,
-            "X-PocketPiggies-Telegram-User-Id": owner,
-            "X-PocketPiggies-Chat-Id": owner,
-            "X-PocketPiggies-Chat-Type": "private",
-        }
+        return self.link.binding.read_headers()
 
     def _call(
         self,

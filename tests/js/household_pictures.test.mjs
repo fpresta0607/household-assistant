@@ -15,8 +15,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import telegramContexts from "./fixtures/openclaw-telegram-contexts.json" with { type: "json" };
-
 import plugin, {
   chosenModel,
   createPictures,
@@ -30,17 +28,10 @@ const START = new Date(2026, 9, 17, 12, 0).getTime();
 const DAY = 24 * 3_600_000;
 const KEY = `fixture-${randomBytes(8).toString("hex")}`;
 const CONFIG = { pictureDayDollars: 0.1, videoDayDollars: 1 };
-const FAM = "-7000000002";
-const OWNER_TELEGRAM = "7000000001";
-const OTHER_TELEGRAM = "7000000003";
 const RUNTIME_CONFIG = {
-  plugins: { entries: {
-    "household-pictures": { enabled: true },
-    "household-family-room": { enabled: true, config: { groupChatId: FAM } },
-  } },
-  commands: { ownerAllowFrom: [`telegram:${OWNER_TELEGRAM}`, "household:sam"] },
+  plugins: { entries: { "household-pictures": { enabled: true } } },
+  commands: { ownerAllowFrom: ["household:sam"] },
   channels: {
-    telegram: { groups: { [FAM]: { allowFrom: [OWNER_TELEGRAM, OTHER_TELEGRAM] } } },
     household: { enabled: true, owner: { id: "sam" }, peer: { person: { id: "alex" } } },
   },
   session: { dmScope: "per-channel-peer", groupScope: "per-group" },
@@ -58,12 +49,6 @@ const APP_PRIVATE = {
 const APP_FAMILY = {
   ...APP_PRIVATE, requesterSenderId: "alex", sessionKey: "agent:main:household:group:family",
   deliveryContext: { channel: "household", accountId: "default", to: "household:family" },
-};
-const TELEGRAM_PRIVATE = telegramContexts.cases.find((entry) => entry.name === "fresh-private").context;
-const THE_FAM = {
-  agentId: "main", agentAccountId: "default", messageChannel: "telegram", requesterSenderId: OTHER_TELEGRAM,
-  nativeChannelId: FAM, sessionKey: `agent:main:telegram:group:${FAM}`,
-  deliveryContext: { channel: "telegram", accountId: "default", to: `telegram:${FAM}` },
 };
 // The first bytes of a PNG, which is all the plugin looks at.
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("picture body")]);
@@ -156,9 +141,6 @@ function standIns({ config = RUNTIME_CONFIG, photos = {} } = {}) {
                 async sendMedia(params) { keep(params); return { messageId: `app-${sent.length}` }; },
               };
             }
-            if (channel === "telegram") {
-              return { async sendPayload(params) { keep(params); return { messageId: String(900 + sent.length) }; } };
-            }
             return undefined;
           },
         },
@@ -211,17 +193,16 @@ test("the models are the ones Settings chose on OpenRouter, and nothing else cou
   assert.equal(chosenModel({}, "video"), null);
 });
 
-test("who asked: a person by their app id, the owner on Telegram too, anyone else in The Fam by their Telegram id", () => {
-  assert.equal(personOf(RUNTIME_CONFIG, APP_PRIVATE), "sam");
-  assert.equal(personOf(RUNTIME_CONFIG, APP_FAMILY), "alex");
-  assert.equal(personOf(RUNTIME_CONFIG, TELEGRAM_PRIVATE), "sam");
-  assert.equal(personOf(RUNTIME_CONFIG, THE_FAM), `telegram:${OTHER_TELEGRAM}`);
+test("who asked: a person of the household by their app id", () => {
+  assert.equal(personOf(APP_PRIVATE), "sam");
+  assert.equal(personOf(APP_FAMILY), "alex");
+  assert.equal(personOf({ ...APP_FAMILY, requesterSenderId: "household:alex" }), "alex");
 });
 
 test("only a person's turn in a chat the household set up is handed either tool", async () => {
   const made = await pictures(standIns(), fakeOpenRouter());
   const ownersOwnSession = { ...APP_FAMILY, requesterSenderId: "sam", sessionKey: "agent:main:household:group:family:sender:sam" };
-  for (const context of [APP_PRIVATE, APP_FAMILY, ownersOwnSession, TELEGRAM_PRIVATE, THE_FAM]) {
+  for (const context of [APP_PRIVATE, APP_FAMILY, ownersOwnSession]) {
     assert.equal(made.pictureTool(context)?.name, "picture", context.sessionKey);
     assert.equal(made.videoTool(context)?.name, "video", context.sessionKey);
   }
@@ -231,8 +212,11 @@ test("only a person's turn in a chat the household set up is handed either tool"
     { ...APP_PRIVATE, sessionKey: "agent:main:main" },
     { ...APP_FAMILY, requesterSenderId: "corey" },
     { ...APP_FAMILY, sessionKey: "agent:main:household:group:family:sender:sam" },
-    { ...THE_FAM, requesterSenderId: "7000000099" },
-    { ...TELEGRAM_PRIVATE, sessionKey: "agent:main:cron:daily" },
+    { ...APP_FAMILY, requesterSenderId: "pat" },
+    { ...APP_PRIVATE, sessionKey: "agent:main:cron:daily" },
+    { ...APP_PRIVATE, messageChannel: "telegram" },
+    { ...APP_PRIVATE, deliveryContext: { channel: "telegram", accountId: "default", to: "telegram:7000000001" } },
+    { ...APP_FAMILY, deliveryContext: { ...APP_FAMILY.deliveryContext, threadId: "1" } },
     { ...APP_PRIVATE, oneShotCliRun: true },
     { ...APP_PRIVATE, agentId: "worker" },
     { agentId: "main", agentAccountId: "default", sessionKey: "agent:main:main" },
@@ -268,14 +252,14 @@ test("a picture in the app is made with the chosen model, sent to the thread at 
   assert.ok(api.logged.every((line) => !line.includes("fox")), "what was asked for is never logged");
 });
 
-test("on Telegram the picture goes as a whole payload to the chat it was asked in", async () => {
+test("a picture in the family room is sent to the room", async () => {
   const api = standIns();
   const made = await pictures(api, fakeOpenRouter());
-  await made.pictureTool(THE_FAM).execute("call-1", { prompt: "A lighthouse at dusk" });
+  await made.pictureTool(APP_FAMILY).execute("call-1", { prompt: "A lighthouse at dusk" });
 
   assert.equal(api.sent.length, 1);
-  assert.equal(api.sent[0].to, `telegram:${FAM}`);
-  assert.match(api.sent[0].payload.mediaUrl, /\.png$/);
+  assert.equal(api.sent[0].to, "household:family");
+  assert.match(api.sent[0].mediaUrl, /\.png$/);
   assert.deepEqual(api.sent[0].bytes, PNG);
 });
 
@@ -333,7 +317,7 @@ test("photos to work from are read under the gateway's media folders and sent al
   const api = standIns({ photos: { [photo]: { buffer: Buffer.from("jpeg bytes"), mime: "image/jpeg" } } });
   const openRouter = fakeOpenRouter();
   const made = await pictures(api, openRouter);
-  await made.pictureTool(TELEGRAM_PRIVATE).execute("call-1", { prompt: "Make it a watercolor", images: [photo] });
+  await made.pictureTool(APP_PRIVATE).execute("call-1", { prompt: "Make it a watercolor", images: [photo] });
 
   assert.deepEqual(api.loaded[0].options.localRoots, [path.join("/state", "media"), path.join("/state", "household-app", "media")]);
   assert.deepEqual(openRouter.asked[0].body.input_references, [
@@ -427,10 +411,10 @@ test("a video OpenRouter could not make says so in the chat, and one never done 
 
   const slowApi = standIns();
   const slow = await pictures(slowApi, fakeOpenRouter({ jobs: Array(500).fill("in_progress") }));
-  await slow.videoTool(TELEGRAM_PRIVATE).execute("call-1", { prompt: "Clouds" });
+  await slow.videoTool(APP_PRIVATE).execute("call-1", { prompt: "Clouds" });
   await until(() => slowApi.sent.length === 1);
   assert.equal(slow.sleeps.length, 181, "asked every 5 seconds for 15 minutes, then given up on");
-  assert.equal(slowApi.sent.at(-1).payload.text, "The video could not be made: it was not done in 15 minutes.");
+  assert.equal(slowApi.sent.at(-1).text, "The video could not be made: it was not done in 15 minutes.");
   assert.equal((await slow.ledger.today("sam", "video")).isUncounted, true);
 });
 

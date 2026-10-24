@@ -1,5 +1,5 @@
 // One thing the assistant can reach, by the name a person knows it by, switched on or off
-// for this assistant everywhere, Telegram included, and where it stands on this phone's own
+// for this assistant everywhere, and where it stands on this phone's own
 // gateway: connected, waiting for its person's sign-in, or unavailable with the reason why.
 // For one that signs in, how it does, and the accounts it is signed in with, which the
 // gateway lists only for its own person, so each phone shows only its own side.

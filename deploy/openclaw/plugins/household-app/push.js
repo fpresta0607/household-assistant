@@ -1,4 +1,4 @@
-// A notification on the person's phone for each new message, the way Telegram's were,
+// A notification on the person's phone for each new message,
 // through Apple's push service without Apple ever reading a family message.
 //
 // Apple is a service the gateways did not use before the app, so nothing said in the

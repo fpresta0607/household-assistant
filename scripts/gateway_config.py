@@ -52,12 +52,10 @@ HOUSEHOLD_FILE = Path(os.environ.get("HOUSEHOLD_FILE", "/etc/household-assistant
 
 @dataclass(frozen=True, slots=True)
 class Household:
-    """The family group, each person's Telegram account, where the phones reach the
-    gateways, the app's Google client, the calendar the planner reads and the Bible
-    edition the household reads."""
+    """Where the phones reach the gateways, the app's Google client, the calendar the
+    planner reads and the Bible edition the household reads. The Telegram group and
+    accounts a file written before Telegram was retired still names are not read."""
 
-    family_group: str
-    telegram_ids: dict[str, str]
     gateway_host: str
     google_client_id: str
     shared_calendar: str
@@ -76,18 +74,10 @@ def load_household(path: Path = HOUSEHOLD_FILE) -> Household:
     loaded = json.loads(path.read_bytes())
     if not isinstance(loaded, dict):
         raise UnsupportedConfig(f"{path} is not a JSON object")
-    telegram = loaded.get("telegram")
-    people = sorted(gateway.person for gateway in GATEWAYS)
-    if not isinstance(telegram, dict) or sorted(telegram) != people:
-        raise UnsupportedConfig(
-            f"{path} must name the Telegram account of exactly {', '.join(people)}"
-        )
     calendar = loaded.get("sharedCalendar")
     if not isinstance(calendar, dict):
         raise UnsupportedConfig(f"{path} has no sharedCalendar")
     return Household(
-        family_group=_text(loaded, "familyGroup", path),
-        telegram_ids={person: _text(telegram, person, path) for person in people},
         gateway_host=_text(loaded, "gatewayHost", path),
         google_client_id=_text(loaded, "googleClientId", path),
         shared_calendar=_text(calendar, "name", path),
@@ -96,9 +86,9 @@ def load_household(path: Path = HOUSEHOLD_FILE) -> Household:
     )
 
 
-# speak and family_history answer only in the family group or a family member's own
-# private chat, which they tell apart by session key. OpenClaw's default puts every DM
-# in one shared main session, so both need DMs kept per sender and groups per group.
+# family_history, pictures and finance answer only in the family room or a person's own
+# thread, which they tell apart by session key. OpenClaw's default puts every DM in one
+# shared main session, so they need DMs kept per sender and groups per group.
 ISOLATED_DM_SCOPES = ("per-channel-peer", "per-account-channel-peer")
 
 # How long one `docker exec` into a gateway may take. A probe or a config write

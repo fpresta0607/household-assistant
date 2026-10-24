@@ -8,7 +8,7 @@
   },
   "channels": ["household"],
   "contracts": {
-    "tools": ["household_location", "household_cart", "household_brief", "household_today", "household_home", "household_react", "household_note", "household_send", "household_digest", "household_wish", "household_vault", "household_meals"]
+    "tools": ["household_location", "household_cart", "household_brief", "household_today", "household_home", "household_react", "household_note", "household_send", "household_digest", "household_wish", "household_vault", "household_meals", "family_history"]
   },
   "toolMetadata": {
     "household_location": {
@@ -182,14 +182,14 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 1000000,
-            "description": "The most characters this gateway speaks for Talk and voice samples in a day, beside the voice-note ceiling in household-speech. 20000 when unset."
+            "description": "The most characters this gateway speaks for Talk, Speak and voice samples in a day. 20000 when unset."
           },
           "familyTools": {
             "type": "array",
             "minItems": 1,
             "maxItems": 32,
             "uniqueItems": true,
-            "description": "The only tools a family-room turn may use: this gateway's Telegram family group's tools.allow, which scripts/openclaw-household-app.py copies here. Without it a family-room turn gets no tools at all.",
+            "description": "The only tools everyone else's family-room turns may use, which scripts/openclaw-household-app.py writes and PocketPiggies' guard keeps. Without it those turns get no tools at all.",
             "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" }
           }
         }

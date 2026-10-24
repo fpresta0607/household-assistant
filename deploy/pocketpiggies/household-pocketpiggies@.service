@@ -8,7 +8,8 @@
 #
 # Lives at /etc/systemd/system/household-pocketpiggies@.service on the box. The
 # installer (scripts/pocket-piggies-install.py) writes the per-instance drop-in with
-# the owner's Telegram id and the gateway directory to bind.
+# the owner, the PocketPiggies client, the Telegram chat a grant made before Telegram
+# was retired is bound to, if any, and the gateway directory to bind.
 
 [Unit]
 Description=PocketPiggies key holder for %i
@@ -56,7 +57,7 @@ SystemCallFilter=@system-service
 # line; this keeps whatever still gets through from crowding out other services' logs.
 LogRateLimitIntervalSec=30s
 LogRateLimitBurst=1000
-# Small and in the background: SIQsermon is this host's primary tenant. A 2 MB answer is
+# Small and in the background: the gateways come first on this host. A 2 MB answer is
 # held a few times over while it is parsed, checked and wrapped, so leave room for that.
 MemoryMax=128M
 TasksMax=32

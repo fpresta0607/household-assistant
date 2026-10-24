@@ -19,9 +19,9 @@ A card is one JSON object, and the app turns it into a native chart, table, chec
 
 Send a card when the Runtime line of your system prompt says `channel=household`, which is the Steward AI app, or when a scheduled job explicitly delivers to the `household` channel.
 An isolated scheduled run still needs cards when its delivery destination is Steward; use the job's actual destination, never an assumed one.
-Anywhere else, Telegram included, answer in plain prose or an ordinary Markdown list, and never write a `steward-card` block.
-Nothing turns a card into text on the way out, so on Telegram it would arrive as raw JSON.
-A chart asked for on Telegram is the numbers as a short plain list.
+Anywhere else answer in plain prose or an ordinary Markdown list, and never write a `steward-card` block.
+Nothing turns a card into text on the way out, so anywhere else it would arrive as raw JSON.
+A chart asked for anywhere else is the numbers as a short plain list.
 
 ## When to send one
 
@@ -98,7 +98,7 @@ Whenever someone asks for a chart, a graph or a plot, or to put something in a c
 - One short sentence before the card says what it shows, or the one thing worth noticing in it.
   Do not list the numbers again after it.
 - Never make a picture of a chart: the card is drawn on the phone, sharp at any size, in light and dark.
-- Never use the dashboard tool for a chart or a table: its widgets reach nobody in the family, in the app or on Telegram.
+- Never use the dashboard tool for a chart or a table: its widgets reach nobody in the family.
 
 ```steward-card
 {"type":"chart","title":"Grocery spend","kind":"bar","x":["W1","W2","W3"],"series":[{"name":"Spend","values":[142,118,131]}],"unit":"$"}

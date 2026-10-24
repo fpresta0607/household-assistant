@@ -3,13 +3,13 @@
 // the gateway is configured with, so the voices never need a key on the phone. The audio
 // is kept in the media store, and the phone reads it like any other attachment.
 //
-// Talk has its own ceiling, a number of characters a day, beside the one for voice notes
-// in Telegram. Every character asked for counts before the provider is called, so a call
-// that fails after it was billed is still under the ceiling.
+// Talk and Speak have a ceiling, a number of characters a day. Every character asked for
+// counts before the provider is called, so a call that fails after it was billed is still
+// under the ceiling. No chat tool speaks (speech-guard.js), so this is all the speech a
+// gateway makes.
 //
-// Speech is made for the household channel's account, as household-speech makes the
-// voice replies the app already plays as voice notes, so the same channel's speech
-// settings and audio format apply to both.
+// Speech is made for the household channel's account, so that channel's speech settings
+// and audio format apply.
 
 import { readFile as readFileFromDisk } from "node:fs/promises";
 import path from "node:path";

@@ -226,7 +226,7 @@ targets:
     # The widget and the two other extensions are separate processes and read what they
     # show, or leave what was shared, in this group; see docs/apple-signing.md. The App
     # Group must be enabled on all four App IDs before a signed build. Sign in with Apple pairs a
-    # phone with no Telegram, Push Notifications lets Apple give the phone the token
+    # phone with no setup code, Push Notifications lets Apple give the phone the token
     # its gateway pushes to, Communication Notifications lets a notification show
     # the sender's face, and Time Sensitive Notifications lets a reminder's push through
     # a Focus; each must be enabled on the app's App ID before a signed build.

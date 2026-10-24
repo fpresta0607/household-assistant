@@ -10,8 +10,7 @@
 // again through the channel's `authorizeActorAction`, and the first answer from any
 // surface wins.
 //
-// Only approvals from a turn in this channel come here. A turn on Telegram keeps its own
-// approvals, exactly as before.
+// Only approvals from a turn in this channel come here.
 //
 // A draft the owner sends with one tap (send-tool.js) is such an approval too. OpenClaw keeps
 // only a few lines of a request's words, so its card carries the whole draft, found by the

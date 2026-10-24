@@ -1,4 +1,4 @@
-// A setup code, as Corey or Denise sends it in Telegram after `/app`: the gateway's
+// A setup code, as a gateway issues it in a setup link: the gateway's
 // address and a single-use token that works for ten minutes. It is OpenClaw's own
 // setup code, unpadded base64url of JSON, with the person and the assistant added.
 //

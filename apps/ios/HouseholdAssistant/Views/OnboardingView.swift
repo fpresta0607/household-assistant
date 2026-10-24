@@ -1,8 +1,9 @@
 // The first run, until this phone is paired: what Steward AI is, three things worth
-// knowing, whose phone it is, and the code that pairs it. Nothing is typed: Corey or
-// Denise sends the code in Telegram, and it is pasted here, or opened as a link. Or the
-// person signs in with Apple, and an iPhone nobody linked yet waits for Franco to let
-// it in. Once paired, PermissionStepsView offers what is worth turning on.
+// knowing, whose phone it is, and the code that pairs it. Nothing is typed: the setup
+// link whoever runs the household's server gives, or a paired iPhone shows on Account,
+// is opened here, or its code pasted. Or the person signs in with Apple, and an iPhone
+// nobody linked yet waits for Franco to let it in. Once paired, PermissionStepsView
+// offers what is worth turning on.
 //
 // The welcome shows the app's own icon and the family's faces floating in under it,
 // one after another, and a light glides once across Get started when they have. With
@@ -145,9 +146,9 @@ struct OnboardingView: View {
     private var facts: some View {
         VStack(alignment: .leading, spacing: 24) {
             Spacer()
-            fact("link", "Pair right here, with a code Corey or Denise sends you in Telegram, or by signing in with Apple.")
+            fact("link", "Pair right here, with a setup link from whoever runs your household's server, or by signing in with Apple.")
             fact("arrow.down.app", "Updates come through TestFlight. Turn on Automatic Updates for Steward AI there.")
-            fact("paperplane", "Telegram keeps working side by side, with the same assistants and the same memory.")
+            fact("lock.shield", "Your assistants run on your household's own server, and only your family can reach them.")
             Spacer()
             next("Continue") {
                 step = .who
@@ -207,18 +208,10 @@ struct OnboardingView: View {
         return VStack(spacing: 24) {
             Spacer()
             AssistantAvatar(emoji: person.assistantEmoji, size: 72, ring: nil)
-            Text("Get your code from \(person.assistantName)")
+            Text("Pair with \(person.assistantName)")
                 .font(.title2.weight(.bold))
                 .multilineTextAlignment(.center)
-            Link(destination: person.telegramLink) {
-                Label("Open \(person.assistantName) in Telegram", systemImage: "paperplane.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-            }
-            .buttonStyle(.glass)
-            .tint(Palette.highlight)
-            Text("Send /app, then tap the code to copy it and come back.")
+            Text("Open your setup link on this iPhone, or copy its code and paste it here.")
                 .font(.subheadline)
                 .foregroundStyle(Palette.secondaryText)
                 .multilineTextAlignment(.center)
@@ -327,7 +320,7 @@ struct OnboardingView: View {
 
     private func paste(_ strings: [String]) {
         guard let code = strings.lazy.compactMap({ PairingCode(text: $0) }).first else {
-            refusal = "That is not a Steward AI code. Copy the code from Telegram and try again."
+            refusal = "That is not a Steward AI code. Copy the whole setup code and try again."
             return
         }
         refusal = nil

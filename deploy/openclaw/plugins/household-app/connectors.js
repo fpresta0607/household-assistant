@@ -1,9 +1,9 @@
 // The connectors a phone may switch on and off for its own assistant, in Settings.
 //
 // Each switches the narrowest settings that take it away from the assistant everywhere it
-// answers, Telegram and the family room included: a skill's own
+// answers, the family room included: a skill's own
 // `skills.entries.<name>.enabled`, or a tool in the gateway-wide `tools.deny`, which
-// wins over every allow list, The Fam's and the family room's included. Neither needs a
+// wins over every allow list, the family room's included. Neither needs a
 // restart. A plugin is never switched off: that restarts the gateway, and PocketPiggies'
 // guard puts its plugin back anyway, while it leaves `tools.deny` alone.
 //
@@ -12,7 +12,7 @@
 // without what it needs to run, is listed only for the other.
 //
 // Nothing that keeps the app or the family room working is here: not the household
-// plugins, memory, Telegram, device pairing, PocketPiggies' key holder or a model
+// plugins, memory, device pairing, PocketPiggies' key holder or a model
 // provider. Switching one of those off from a phone would cut that phone off.
 
 export const CATEGORIES = ["money", "faith", "calendar-and-mail", "notes", "web", "pictures-and-video", "everyday"];

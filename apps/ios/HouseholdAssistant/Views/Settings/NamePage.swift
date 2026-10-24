@@ -16,7 +16,7 @@ struct NamePage: View {
         let isUnchanged = cleaned == settings.current?.assistant.name
         SettingsPage("Name") {
             SettingsGroup(
-                note: "Letters, spaces, hyphens and apostrophes, up to \(AssistantName.longest). The new name is used here and on Telegram.",
+                note: "Letters, spaces, hyphens and apostrophes, up to \(AssistantName.longest). The new name is used everywhere at once.",
                 refusal: settings.refusal(for: [.name])
             ) {
                 HStack(spacing: 12) {

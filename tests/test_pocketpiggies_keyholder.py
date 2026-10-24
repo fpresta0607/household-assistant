@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import os
 import shutil
@@ -20,6 +21,7 @@ from typing import Any
 import pytest
 
 from household.pocketpiggies.api import PocketPiggiesApi
+from household.pocketpiggies.binding import Binding
 from household.pocketpiggies.errors import PocketPiggiesError
 from household.pocketpiggies.link import AccountLink
 from household.pocketpiggies.reads import SYNCS_PER_DAY, Reader
@@ -40,6 +42,7 @@ from tests.pocketpiggies_fake import (
     CATALOG,
     CLIENT_CREDENTIAL,
     OWNER,
+    PERSON,
     PUBLISHED_CATALOG,
     FakeState,
     Seen,
@@ -49,6 +52,11 @@ from tests.pocketpiggies_fake import (
 ROOT = Path(__file__).resolve().parent.parent
 SECRET = "ppa_ro_" + "Z" * 43
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="the key holder runs only on Linux")
+# Corey's key holder as it runs for Franco: bound to his Telegram chat, where his grant was
+# made, and, once he links again under the household binding, to him as the app names him.
+TELEGRAM = Binding("corey", PERSON, OWNER)
+HOUSEHOLD = Binding("corey", PERSON)
+IDENTITY = TELEGRAM.stored_identity()
 
 
 class Clock:
@@ -76,19 +84,21 @@ def state_directory(tmp_path: Path) -> Path:
 
 
 def provisioned(directory: Path) -> CredentialStore:
-    store = CredentialStore(directory, OWNER)
+    store = CredentialStore(directory, IDENTITY)
     store.save(LinkState(CLIENT_CREDENTIAL, None, None))
     return store
 
 
 def make_link(
-    fake: FakeState, store: CredentialStore, clock: Callable[[], int] | None = None
+    fake: FakeState,
+    store: CredentialStore,
+    clock: Callable[[], int] | None = None,
+    binding: Binding = TELEGRAM,
 ) -> AccountLink:
     return AccountLink(
         store=store,
         api=PocketPiggiesApi(fake.base_url, timeout=5),
-        client_id="corey",
-        telegram_user_id=OWNER,
+        binding=binding,
         **({"now": clock} if clock else {}),
     )
 
@@ -105,14 +115,14 @@ def connected(fake: FakeState, directory: Path) -> AccountLink:
 
 
 def test_store_round_trips_only_for_its_owner(state_directory: Path) -> None:
-    store = CredentialStore(state_directory, OWNER)
+    store = CredentialStore(state_directory, IDENTITY)
     assert store.load() == LinkState(None, None, None)
     grant = Grant(SECRET, 2_000_000_000_000, ACCOUNT, ACCOUNT)
     store.save(LinkState(CLIENT_CREDENTIAL, None, grant))
 
     assert store.load().grant == grant
     with pytest.raises(PocketPiggiesError) as refused:
-        CredentialStore(state_directory, "7000000009").load()
+        CredentialStore(state_directory, {"ownerTelegramId": "7000000009"}).load()
     assert refused.value.code == "credential_store_invalid"
     assert sorted(path.name for path in state_directory.iterdir()) == ["connection.json"]
     assert (state_directory / "connection.json").stat().st_mode & 0o777 == 0o600
@@ -159,7 +169,7 @@ def test_store_refuses_corrupt_state_without_echoing_it(
     path.write_text(content)
     path.chmod(0o600)
     with pytest.raises(PocketPiggiesError) as refused:
-        CredentialStore(state_directory, OWNER).load()
+        CredentialStore(state_directory, IDENTITY).load()
     assert refused.value.code == "credential_store_invalid"
     assert "ppc_" not in refused.value.message and "ppa_" not in refused.value.message
 
@@ -211,6 +221,56 @@ def test_consent_binds_a_grant_that_never_leaves_the_key_holder(
     exchange = [seen for seen in fake.seen if seen.path.endswith("/exchange")][-1]
     assert exchange.headers["authorization"] == f"Bearer {CLIENT_CREDENTIAL}"
     assert exchange.body["telegramUserId"] == OWNER and exchange.body["chatType"] == "private"
+
+
+def test_the_household_binding_links_and_reads_as_the_household_person(
+    fake: FakeState, tmp_path: Path
+) -> None:
+    """A key holder with no Telegram id speaks for the person the app names, returns the
+    owner to the Steward app and keeps its file under that name
+    (docs/deploy/pocketpiggies-server.md)."""
+    directory = tmp_path / "household"
+    directory.mkdir(mode=0o700)
+    directory.chmod(0o700)
+    store = CredentialStore(directory, HOUSEHOLD.stored_identity())
+    store.save(LinkState(CLIENT_CREDENTIAL, None, None))
+    link = make_link(fake, store, binding=HOUSEHOLD)
+    request_id = link.start()["url"].rsplit("=", 1)[1]
+    fake.approve(request_id)
+    link.complete(request_id)
+    Reader(api=PocketPiggiesApi(fake.base_url, timeout=5), link=link).catalog()
+
+    for seen in fake.seen:
+        if seen.path.startswith("/api/assistant/link/"):
+            assert seen.body["subjectType"] == "household_person"
+            assert seen.body["subject"] == PERSON
+            assert "telegramUserId" not in seen.body and "chatId" not in seen.body
+    started = next(seen for seen in fake.seen if seen.path.endswith("/requests"))
+    assert started.body["redirectUri"] == "steward://pocketpiggies/linked"
+    read = fake.seen[-1]
+    assert read.headers["x-pocketpiggies-subject-type"] == "household_person"
+    assert read.headers["x-pocketpiggies-subject"] == PERSON
+    assert "x-pocketpiggies-telegram-user-id" not in read.headers
+    stored = json.loads((directory / "connection.json").read_text())
+    assert stored["owner"] == PERSON and "ownerTelegramId" not in stored
+    # A file written under one binding is never read under the other.
+    with pytest.raises(PocketPiggiesError) as refused:
+        CredentialStore(directory, IDENTITY).load()
+    assert refused.value.code == "credential_store_invalid"
+
+
+def test_a_binding_is_refused_unless_it_names_a_person_and_a_known_telegram_client() -> None:
+    assert TELEGRAM.redirect_uri == "https://t.me/Corey_the_man_bot"
+    assert Binding("hh-marina", "marina").redirect_uri == "steward://pocketpiggies/linked"
+    for client, owner, telegram in [
+        ("corey", "Franco", None),
+        ("corey", "", None),
+        ("Corey", "franco", None),
+        ("hh-marina", "marina", OWNER),
+        ("corey", "franco", "telegram:7000000001"),
+    ]:
+        with pytest.raises(ValueError):
+            Binding(client, owner, telegram)
 
 
 def test_an_exchange_is_single_use_and_bound_to_the_pending_request(
@@ -303,7 +363,7 @@ def test_disconnect_clears_here_first_and_a_retry_still_revokes(
 def test_linking_needs_a_provisioned_client_credential(
     fake: FakeState, state_directory: Path
 ) -> None:
-    link = make_link(fake, CredentialStore(state_directory, OWNER))
+    link = make_link(fake, CredentialStore(state_directory, IDENTITY))
     with pytest.raises(PocketPiggiesError) as refused:
         link.start()
     assert refused.value.code == "invalid_client"
@@ -1159,7 +1219,7 @@ def test_mcp_lifecycle_over_the_socket(served: tuple[Holder, list[str]]) -> None
         b"not json\n",
     )
     assert answers[0]["result"]["protocolVersion"] == "2025-11-25"
-    assert answers[0]["result"]["_meta"] == {OWNER_META: OWNER}
+    assert answers[0]["result"]["_meta"] == {OWNER_META: PERSON}
     assert [tool["name"] for tool in answers[1]["result"]["tools"]][:3] == [
         "pocketpiggies_catalog",
         "pocketpiggies_read",
@@ -1356,7 +1416,6 @@ def test_the_openclaw_plugin_reads_through_the_real_key_holder(
                 node,
                 str(ROOT / "tests" / "pocket-piggies" / "fixtures" / "drive-plugin.mjs"),
                 str(running.path),
-                request_id,
             ],
             capture_output=True,
             text=True,
@@ -1642,3 +1701,24 @@ def test_a_template_filled_onto_the_records_link_or_sync_route_is_refused(
         reader.read("assistant.anything", {"area": filled, "name": "revoke"})
     assert refused.value.code == "invalid_arguments"
     assert len(fake.seen) == before
+
+
+# The key holder's entry point, as systemd starts it.
+
+
+def test_the_drop_in_names_the_binding() -> None:
+    spec = importlib.util.spec_from_file_location(
+        "pocketpiggies_keyholder", ROOT / "scripts" / "pocketpiggies-keyholder.py"
+    )
+    assert spec is not None and spec.loader is not None
+    entry = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(entry)
+
+    franco = {"POCKETPIGGIES_OWNER": PERSON, "POCKETPIGGIES_TELEGRAM_ID": OWNER}
+    assert entry.binding_from("corey", franco) == TELEGRAM
+    assert entry.binding_from("corey", {"POCKETPIGGIES_OWNER": PERSON}) == HOUSEHOLD
+    marina = {"POCKETPIGGIES_OWNER": "marina", "POCKETPIGGIES_CLIENT_ID": "hh-7f3a"}
+    assert entry.binding_from("ada", marina) == Binding("hh-7f3a", "marina")
+    for refused in ({}, {"POCKETPIGGIES_OWNER_TELEGRAM_ID": OWNER}):
+        with pytest.raises(ValueError):
+            entry.binding_from("corey", refused)

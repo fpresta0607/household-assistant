@@ -627,7 +627,7 @@ test("the plugin asks through its own before_tool_call hook, for the scheduler a
 
   entry.registerFull(api);
 
-  const asks = hooks.find((hook) => hook.name === "before_tool_call" && hook.options?.matcher);
+  const asks = hooks.find((hook) => hook.name === "before_tool_call" && hook.options?.matcher?.includes("automations"));
   assert.deepEqual(asks.options, { matcher: ASKING_TOOLS });
   assert.deepEqual(ASKING_TOOLS, ["automations", "exec"]);
   assert.equal(
@@ -635,5 +635,5 @@ test("the plugin asks through its own before_tool_call hook, for the scheduler a
     undefined,
     "nothing asks while the channel is not running",
   );
-  assert.ok(!hooks.some((hook) => hook.name === "message_sending" || hook.name === "reply_payload_sending"), "Telegram keeps its streaming preview");
+  assert.ok(!hooks.some((hook) => hook.name === "message_sending" || hook.name === "reply_payload_sending"), "a streaming reply keeps its preview");
 });

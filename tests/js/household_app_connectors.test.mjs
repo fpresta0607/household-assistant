@@ -21,11 +21,8 @@ import {
 // room, or reach PocketPiggies' key holder or a model provider.
 const NEVER_OFFERED = [
   "household-app",
-  "household-family-room",
   "household-memory",
-  "household-speech",
   "memory-core",
-  "telegram",
   "device-pair",
   "pocketpiggies-keyholder",
   "openrouter",

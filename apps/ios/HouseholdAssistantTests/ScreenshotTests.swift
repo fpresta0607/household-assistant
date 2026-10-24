@@ -1907,7 +1907,7 @@ final class ScreenshotTests: XCTestCase {
             OnboardingView(
                 step: .code,
                 member: .franco,
-                refusal: "That is not a Steward AI code. Copy the code from Telegram and try again."
+                refusal: "That is not a Steward AI code. Copy the whole setup code and try again."
             )
             .environment(fresh.model)
         }

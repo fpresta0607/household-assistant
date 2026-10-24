@@ -2,7 +2,8 @@ import { callKeyHolder } from "./client.mjs";
 import { ConnectorError, TOOLS, errorResult, redact } from "./tools.mjs";
 
 /**
- * The only tools a family group may use: none reads gateway files or reaches the key holder.
+ * The only tools the family room may use: none reads gateway files or reaches the key holder.
+ * family_history reads only the family room's own messages.
  * household_location is read-only and answers in a group only while that person shares
  * their location with the family from the app. household_cart reaches only the household's
  * shared shopping cart, in the app's family room, and records no orders there.
@@ -14,9 +15,13 @@ import { ConnectorError, TOOLS, errorResult, redact } from "./tools.mjs";
  * were asked in.
  */
 export const SAFE_GROUP_TOOLS = [
-  "web_search", "web_fetch", "speak", "family_history", "picture", "video", "household_location",
+  "web_search", "web_fetch", "family_history", "picture", "video", "household_location",
   "household_cart", "household_home", "household_react", "household_note", "scripture",
 ];
+// The household app's channel, the household's only one, and the keys beside the channels
+// in `channels` that configure them all rather than being one.
+const CHANNEL = "household";
+const CHANNEL_SETTINGS = new Set(["defaults", "modelByChannel"]);
 const CONNECT_URL = /^https:\/\/pocketpiggies\.app\/assistant\/connect\?request=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /**
  * The ids OpenClaw 2026.9.4 lets a gateway client connect as (GATEWAY_CLIENT_IDS). chat.send
@@ -29,12 +34,6 @@ const GATEWAY_CLIENT_IDS = new Set([
   "openclaw-android", "node-host", "openclaw-worker", "test", "fingerprint", "openclaw-probe",
 ]);
 
-function telegramId(value) {
-  return typeof value === "string"
-    ? /^(?:telegram:)?([1-9]\d*)$/.exec(value)?.[1]
-    : undefined;
-}
-
 function householdId(value) {
   return typeof value === "string"
     ? /^(?:household:)?([a-z][a-z0-9-]{0,31})$/.exec(value)?.[1]
@@ -46,65 +45,35 @@ function isSafeGroupAllowlist(allowed) {
 }
 
 /**
- * The controls that keep the owner's finance out of everyone else's turns. The owner's
- * own chat keeps every tool, so these hold only if no one else can reach a full-tool
- * turn: private messages come from the owner alone, and every group the bot admits runs
- * with a tool allowlist that cannot read gateway files or reach the key holder. So does
- * the household app's family room wherever its channel is configured, switched off or
- * not, since switching it on is a hot reload.
+ * The owner whose finances this gateway may read, as the household app names them, or
+ * undefined. A gateway client's id is refused: chat.send names its sender by that id, so a
+ * household person called one of these could be spoken for by any client with write scope.
  */
-export function hasFinanceSafeGatewayPolicy(config, owner) {
-  const telegram = config?.channels?.telegram;
-  const allowFrom = telegram?.allowFrom;
-  const groups = telegram?.groups ?? {};
-  const household = config?.channels?.household;
-  return (
-    typeof owner === "string" && telegram?.dmPolicy === "allowlist" &&
-    Array.isArray(allowFrom) && allowFrom.length === 1 && telegramId(String(allowFrom[0])) === owner &&
-    ["allowlist", "disabled"].includes(telegram.groupPolicy) &&
-    telegram.accounts === undefined && telegram.direct === undefined &&
-    config.session?.dmScope === "per-channel-peer" && config.session?.groupScope === "per-group" &&
-    config.session?.scope !== "global" &&
-    (config.bindings ?? []).every((binding) => binding?.session?.groupScope !== "main") &&
-    Object.values(groups).every((group) => (
-      isSafeGroupAllowlist(group?.tools?.allow) &&
-        Object.keys(group.tools).join() === "allow" &&
-        group.toolsBySender === undefined && group.topics === undefined
-    )) &&
-    (household === undefined || isSafeGroupAllowlist(household?.familyTools))
-  );
-}
-
-function ownsPrivateChat({ channel, sender, chat, sessionKey }, config) {
-  const owner = config.ownerTelegramId;
-  if (typeof owner !== "string" || !/^[1-9]\d*$/.test(owner)) return false;
-  if (channel !== "telegram" || telegramId(sender) !== owner || chat !== owner) return false;
-  // Shared main, group, cron, sub-agent and manual CLI sessions fail closed. The
-  // installer uses per-channel-peer, which names no account in the session key.
-  return sessionKey === `agent:main:telegram:direct:${owner}`;
+function ownerOf(config) {
+  const owner = config?.ownerHouseholdPersonId;
+  return householdId(owner) === owner && owner !== "family" && !GATEWAY_CLIENT_IDS.has(owner) ? owner : undefined;
 }
 
 /**
- * Every identity here is runtime metadata; no model argument can select an account.
- * A queued turn can omit the native chat, so then the trusted delivery destination
- * stands in for it, as for family_history; when both are present they must agree.
+ * The controls that keep the owner's finance out of everyone else's turns. The owner's
+ * own turns keep every tool, so these hold only if no one else can reach a full-tool
+ * turn: the app's channel is the owner's, everyone else's family-room turns run with a
+ * tool allowlist that cannot read gateway files or reach the key holder, wherever the
+ * channel is configured, switched off or not, and every other chat channel is switched
+ * off, since it would admit senders this policy never reviewed. Switching any of them on
+ * is a hot reload, so this is checked again before every call.
  */
-export function authorizedPrivateTurn(context, config) {
-  if (context.agentId !== "main" || context.agentAccountId !== "default" || context.oneShotCliRun === true) {
-    return false;
-  }
-  const delivery = context.deliveryContext;
-  if (delivery?.channel !== "telegram" || delivery.accountId !== "default" || delivery.threadId != null) {
-    return false;
-  }
-  const destination = telegramId(delivery.to);
-  const chat = context.nativeChannelId === undefined ? destination : telegramId(context.nativeChannelId);
-  return chat === destination && ownsPrivateChat({
-    channel: context.messageChannel,
-    sender: context.requesterSenderId,
-    chat,
-    sessionKey: context.sessionKey,
-  }, config);
+export function hasFinanceSafeGatewayPolicy(config, owner) {
+  const channels = config?.channels ?? {};
+  const household = channels[CHANNEL];
+  return (
+    typeof owner === "string" && householdId(owner) === owner &&
+    config.session?.dmScope === "per-channel-peer" && config.session?.groupScope === "per-group" &&
+    config.session?.scope !== "global" &&
+    (config.bindings ?? []).every((binding) => binding?.session?.groupScope !== "main") &&
+    Object.entries(channels).every(([id, channel]) => id === CHANNEL || CHANNEL_SETTINGS.has(id) || channel?.enabled === false) &&
+    (household === undefined || (household?.owner?.id === owner && isSafeGroupAllowlist(household?.familyTools)))
+  );
 }
 
 /**
@@ -119,23 +88,21 @@ export function authorizedPrivateTurn(context, config) {
  * as that sender: a gateway client's chat.send names its own client id, the agent method
  * names one only to resume a turn the gateway already admitted, automations name none, the
  * other person's and the other assistant's family-room turns name themselves, and the
- * household channel belongs to household-app alone. The config maps the household person
- * to the Telegram owner the key holder is pinned to.
+ * household channel belongs to household-app alone. Every identity here is runtime
+ * metadata; no model argument can select an account. A queued turn can omit the native
+ * chat; when both are present they must agree.
  */
 export function authorizedAppTurn(context, config) {
-  const owner = householdId(config.ownerHouseholdPersonId);
-  if (owner === undefined || owner !== config.ownerHouseholdPersonId || owner === "family" || GATEWAY_CLIENT_IDS.has(owner)) {
-    return false;
-  }
+  const owner = ownerOf(config);
+  if (owner === undefined) return false;
   if (context.agentId !== "main" || context.agentAccountId !== "default" || context.oneShotCliRun === true) {
     return false;
   }
   const delivery = context.deliveryContext;
-  if (delivery?.channel !== "household" || delivery.accountId !== "default" || delivery.threadId != null) {
+  if (delivery?.channel !== CHANNEL || delivery.accountId !== "default" || delivery.threadId != null) {
     return false;
   }
-  if (context.messageChannel !== "household" || householdId(context.requesterSenderId) !== owner) return false;
-  // A queued turn can omit the native chat; when both are present they must agree.
+  if (context.messageChannel !== CHANNEL || householdId(context.requesterSenderId) !== owner) return false;
   const to = householdId(delivery.to);
   const chat = context.nativeChannelId === undefined ? to : householdId(context.nativeChannelId);
   if (chat !== to) return false;
@@ -147,23 +114,19 @@ export function authorizedAppTurn(context, config) {
   );
 }
 
-/** The Telegram owner whose finances this turn may read, or undefined when it may read none. */
-function financeOwner(context, config) {
-  if (authorizedPrivateTurn(context, config)) return telegramId(context.requesterSenderId);
-  return authorizedAppTurn(context, config) ? config.ownerTelegramId : undefined;
-}
-
-export function authorizedPrivateCommand(context, config) {
+/**
+ * `/pocketpiggies` in the owner's own thread, and nowhere else: a connect link posted in the
+ * family room would be everyone's to tap. household-app lets only the owner's signed
+ * messages run a command, which OpenClaw passes on as `isAuthorizedSender`.
+ */
+export function authorizedAppCommand(context, config) {
+  const owner = ownerOf(config);
   return (
-    context.isAuthorizedSender === true &&
+    owner !== undefined && context.channel === CHANNEL && context.isAuthorizedSender === true &&
     context.messageThreadId === undefined &&
-    telegramId(context.from) === config.ownerTelegramId &&
-    ownsPrivateChat({
-      channel: context.channel,
-      sender: context.senderId,
-      chat: telegramId(context.to),
-      sessionKey: context.sessionKey,
-    }, config)
+    householdId(context.senderId) === owner && householdId(context.from) === owner &&
+    householdId(context.to) === owner &&
+    context.sessionKey === `agent:main:household:direct:${owner}`
   );
 }
 
@@ -190,26 +153,26 @@ function answerOf(result) {
 
 export function register(api, { invoke = callKeyHolder } = {}) {
   const initialConfig = { ...api.pluginConfig };
+  const owner = ownerOf(initialConfig);
   let hasWarned = false;
   const isCurrentConfig = () => {
     const isCurrent = (
-      hasFinanceSafeGatewayPolicy(api.runtime?.config?.current?.() ?? api.config, initialConfig.ownerTelegramId) &&
-      api.pluginConfig?.ownerTelegramId === initialConfig.ownerTelegramId &&
-      api.pluginConfig?.accountLabel === initialConfig.accountLabel &&
-      api.pluginConfig?.ownerHouseholdPersonId === initialConfig.ownerHouseholdPersonId
+      owner !== undefined &&
+      hasFinanceSafeGatewayPolicy(api.runtime?.config?.current?.() ?? api.config, owner) &&
+      api.pluginConfig?.ownerHouseholdPersonId === owner &&
+      api.pluginConfig?.accountLabel === initialConfig.accountLabel
     );
     if (!isCurrent && !hasWarned) {
       hasWarned = true;
       api.logger?.warn?.(
-        "pocket-piggies: finance is off: the gateway no longer keeps private messages owner-only " +
-        "and groups, the app's family room included, on their tool allowlist; rerun " +
-        "scripts/pocket-piggies-install.py, and scripts/openclaw-household-app.py apply for the room",
+        "pocket-piggies: finance is off: the gateway no longer keeps every other chat channel off " +
+        "and the app's family room on its tool allowlist; rerun scripts/pocket-piggies-install.py, " +
+        "and scripts/openclaw-household-app.py apply for the room",
       );
     }
     if (isCurrent) hasWarned = false;
     return isCurrent;
   };
-  const owner = initialConfig.ownerTelegramId;
   const link = async (name, args = {}) => {
     const value = answerOf(await invoke(name, args, { owner }));
     if (typeof value.text !== "string") {
@@ -219,43 +182,29 @@ export function register(api, { invoke = callKeyHolder } = {}) {
     if (typeof value.url !== "string" || !CONNECT_URL.test(value.url)) {
       throw new ConnectorError("mcp_transport_error", "The PocketPiggies connect link was invalid.");
     }
-    return {
-      text: value.text,
-      channelData: { telegram: { buttons: [[{ text: "Connect PocketPiggies", url: value.url }]] } },
-    };
-  };
-  const command = async (context, isCallback) => {
-    try {
-      if (!isCurrentConfig() || !authorizedPrivateCommand(context, api.pluginConfig ?? {})) {
-        throw new ConnectorError("private_chat_required", "Use your own private Telegram chat for PocketPiggies.");
-      }
-      const argument = context.args?.trim() ?? "";
-      if (isCallback) {
-        if (argument === "pp_connect") return await link("link_start");
-        if (argument.startsWith("pp_")) return await link("link_complete", { requestId: argument.slice(3) });
-        return { text: "Use /pocketpiggies connect to connect your PocketPiggies account." };
-      }
-      if (["", "connect", "reconnect"].includes(argument)) return await link("link_start");
-      if (argument === "status") return await link("link_status");
-      if (argument === "disconnect") return await link("link_disconnect");
-      return { text: "Use /pocketpiggies connect, status, reconnect or disconnect." };
-    } catch (error) {
-      return { text: JSON.parse(errorResult(error).content[0].text).message, isError: true };
-    }
+    return { text: `${value.text}\n\n${value.url}` };
   };
   api.registerCommand({
     name: "pocketpiggies", description: "Connect or disconnect your PocketPiggies account",
-    channels: ["telegram"], acceptsArgs: true, requireAuth: true,
-    handler: (context) => command(context, false),
-  });
-  api.registerCommand({
-    name: "start", description: "Finish connecting your PocketPiggies account",
-    channels: ["telegram"], acceptsArgs: true, requireAuth: true,
-    handler: (context) => command(context, true),
+    channels: [CHANNEL], acceptsArgs: true, requireAuth: true,
+    handler: async (context) => {
+      try {
+        if (!isCurrentConfig() || !authorizedAppCommand(context, api.pluginConfig ?? {})) {
+          throw new ConnectorError("private_chat_required", "Send /pocketpiggies in your own thread with your assistant.");
+        }
+        const argument = context.args?.trim() ?? "";
+        if (["", "connect", "reconnect"].includes(argument)) return await link("link_start");
+        if (argument === "status") return await link("link_status");
+        if (argument === "disconnect") return await link("link_disconnect");
+        return { text: "Use /pocketpiggies connect, status, reconnect or disconnect." };
+      } catch (error) {
+        return { text: JSON.parse(errorResult(error).content[0].text).message, isError: true };
+      }
+    },
   });
   api.registerTool(
     (context) => {
-      if (!isCurrentConfig() || financeOwner(context, api.pluginConfig ?? {}) === undefined) return null;
+      if (!isCurrentConfig() || !authorizedAppTurn(context, api.pluginConfig ?? {})) return null;
       return TOOLS.map((tool) => ({
         name: tool.name,
         label: "PocketPiggies",
@@ -264,11 +213,10 @@ export function register(api, { invoke = callKeyHolder } = {}) {
         async execute(_id, args, signal) {
           try {
             // Recheck policy and owner configuration if either changed after discovery.
-            const owner = isCurrentConfig() ? financeOwner(context, api.pluginConfig ?? {}) : undefined;
-            if (owner === undefined) {
+            if (!isCurrentConfig() || !authorizedAppTurn(context, api.pluginConfig ?? {})) {
               throw new ConnectorError(
                 "private_chat_required",
-                "Use your own private chat for PocketPiggies financial data.",
+                "Use your own thread for PocketPiggies financial data.",
               );
             }
             const result = await invoke(tool.name, args ?? {}, { signal, owner });

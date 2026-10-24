@@ -119,8 +119,8 @@ function result(payload, isError = false) {
 
 // The tool, in the owner's own turns and a scheduled run, or null. `post(week, decide,
 // events)` composes and posts the digest, and answers how many lines it posted.
-export function createDigestTool({ context, owner, owners, post }) {
-  if (!isOwnTurn({ context, owner, owners })) return null;
+export function createDigestTool({ context, owner, post }) {
+  if (!isOwnTurn({ context, owner })) return null;
   const lines = (value, most) => Array.isArray(value) && value.length <= most &&
     value.every((line) => typeof line === "string" && line.trim() && line.length <= MAX_LINE && !NOT_ONE_LINE.test(line));
   const isEvent = (event) => Boolean(event) && typeof event === "object" && !Array.isArray(event) &&

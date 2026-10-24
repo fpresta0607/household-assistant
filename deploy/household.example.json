@@ -1,9 +1,4 @@
 {
-  "familyGroup": "-5100000001",
-  "telegram": {
-    "franco": "7100000001",
-    "gia": "7100000002"
-  },
   "gatewayHost": "household.example.ts.net",
   "googleClientId": "123456789012-abcdefghijklmnopqrstuvwxyz012345.apps.googleusercontent.com",
   "sharedCalendar": {

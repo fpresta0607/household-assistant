@@ -1,5 +1,5 @@
 const PRIVATE =
-  " Only in the account owner's private Telegram chat or their own thread in the Steward AI app. " +
+  " Only in the account owner's own thread in the Steward AI app, or a family-room turn they started. " +
   "Nothing here can move money, categorize, transfer or change anything; sync only starts the bank " +
   "sync PocketPiggies' own Sync now button runs. These figures are the owner's private finances: " +
   "never post them to a group or the family room, or write them into workspace, memory or other " +

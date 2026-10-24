@@ -92,11 +92,9 @@ final class SmallRulesTests: XCTestCase {
         }
     }
 
-    func testEachPersonIsSentToTheirOwnAssistantInTelegram() {
+    func testEachPersonPairsWithTheirOwnAssistant() {
         XCTAssertEqual(HouseholdMember.franco.assistantName, "Corey")
         XCTAssertEqual(HouseholdMember.gia.assistantName, "Denise")
-        XCTAssertEqual(HouseholdMember.franco.telegramLink.absoluteString, "https://t.me/Corey_the_man_bot?text=%2Fapp")
-        XCTAssertEqual(HouseholdMember.gia.telegramLink.absoluteString, "https://t.me/Denise_the_woman_bot?text=%2Fapp")
     }
 
     func testOnlyPermissionsIOSHasNotAskedAboutAreOffered() {

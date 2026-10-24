@@ -1,4 +1,4 @@
-// Sign in with Apple, so a phone can pair with no Telegram.
+// Sign in with Apple, so a phone can pair with no setup code.
 //
 // The phone asks its gateway for a nonce, signs in with Apple using that nonce's hash, and
 // sends back Apple's identity token. The gateway checks the token itself: Apple's own keys,

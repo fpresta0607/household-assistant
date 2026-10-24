@@ -7,8 +7,11 @@ import { ConnectorError } from "./tools.mjs";
 /** The host key holder binds its socket directory here, inside the gateway's own state. */
 export const KEY_HOLDER_SOCKET = join(homedir(), ".openclaw", "pocketpiggies", "broker.sock");
 const PROTOCOL = "2025-11-25";
-/** The key holder names its owner here, from its root-written unit, never from gateway config. */
-export const OWNER_META = "household.pocketpiggies/ownerTelegramId";
+/**
+ * The key holder names its owner here, the household person, from its root-written unit,
+ * never from gateway config.
+ */
+export const OWNER_META = "household.pocketpiggies/owner";
 const MAX_RESPONSE_BYTES = 3 * 1024 * 1024;
 
 /**

@@ -19,8 +19,8 @@ So does the heartbeat check: the `docker` shim prints a given scheduler listing
 for `cron list --all --json`, shaped like the one the gateway returns, so the
 check is asserted to count enabled heartbeats and nothing else.
 
-And the family group check: the state directory gets an `openclaw.json`, and the
-real openclaw-family-group.py beside the script reads it.
+And the household app check: the state directory gets an `openclaw.json`, and the
+real openclaw-household-app.py beside the script reads it.
 
 And the calendar library check: the `docker` shim prints a given result for the
 import the script runs inside the container.
@@ -431,83 +431,13 @@ def test_verify_fails_while_the_calendar_skill_cannot_import_its_library(
     assert expected in result.stdout, result.stdout
 
 
-def family_group(**groups: object) -> dict[str, object]:
-    """A named agent with the family-room plugin, whose Telegram channel has only the
-    given group entries."""
-    room = "household-family-room"
-    return {
-        "agents": {"entries": {"main": {"identity": {"name": "Denise"}}}},
-        "channels": {"telegram": {"enabled": True, "groups": groups}},
-        "tools": {"alsoAllow": ["family_history"]},
-        "session": {"dmScope": "per-channel-peer", "groupScope": "per-group"},
-        "plugins": {
-            "load": {"paths": [f"/opt/household-plugins/{room}"]},
-            "entries": {
-                room: {
-                    "enabled": True,
-                    "hooks": {"allowConversationAccess": True},
-                    "config": {"groupChatId": "-5100000001"},
-                }
-            },
-        },
-    }
-
-
-@pytest.mark.parametrize(
-    ("container", "config", "expected"),
-    [
-        (
-            "openclaw-denise",
-            family_group(
-                **{
-                    "-5100000001": {
-                        "requireMention": True,
-                        "allowFrom": ["7100000001", "7100000002"],
-                        "ingest": True,
-                    }
-                }
-            ),
-            "PASS  family group                     ok",
-        ),
-        (
-            "openclaw-denise",
-            family_group(),
-            "FAIL  family group                     expected ok, got "
-            "franco dropped (not-allowed); gia dropped (not-allowed)",
-        ),
-        (
-            "openclaw-gateway",
-            family_group(**{"*": {"requireMention": True}}),
-            "FAIL  family group                     expected ok, got "
-            "franco dropped (groupPolicy: allowlist, no group allowlist entries); "
-            "gia dropped (groupPolicy: allowlist, no group allowlist entries)",
-        ),
-        (
-            "openclaw-gateway",
-            None,
-            "FAIL  family group                     expected ok, got unreadable:",
-        ),
-    ],
-    ids=["follows-the-policy", "group-not-allowed", "no-senders-allowed", "no-config"],
-)
-def test_verify_fails_while_the_household_cannot_reach_the_gateway_in_the_group(
-    tmp_path: Path, container: str, config: dict[str, object] | None, expected: str
-) -> None:
-    """A gateway that drops the family group fails verification, whatever else passes."""
-    result = run_verify(tmp_path, container, GATEWAY_DIGEST, 3072, 250_000, config=config)
-
-    assert expected in result.stdout, result.stdout
-
-
-@pytest.mark.parametrize("telegram_enabled", [False, True])
-def test_migrated_gateway_checks_the_app_and_requires_telegram_off(
-    tmp_path: Path, telegram_enabled: bool
-) -> None:
+def migrated() -> dict[str, object]:
+    """A gateway as openclaw-household-app.py apply leaves it."""
     from tests.test_openclaw_household_app import as_on_the_box, load
 
     app = load(ROOT / "scripts" / "openclaw-household-app.py", "verify_household_app")
     original = as_on_the_box()
-    config = app.patched(
+    config: dict[str, object] = app.patched(
         original,
         app.household_patch(
             original,
@@ -518,14 +448,34 @@ def test_migrated_gateway_checks_the_app_and_requires_telegram_off(
             peer_identity={},
         ),
     )
-    config["channels"]["telegram"]["enabled"] = telegram_enabled
+    return config
+
+
+@pytest.mark.parametrize("leftover", [None, "telegram", "family-room"])
+def test_verify_checks_the_app_and_fails_while_anything_telegram_left_remains(
+    tmp_path: Path, leftover: str | None
+) -> None:
+    config = migrated()
+    if leftover == "telegram":
+        config["channels"]["telegram"] = {"enabled": False}  # type: ignore[index]
+    elif leftover == "family-room":
+        config["plugins"]["entries"]["household-family-room"] = {"enabled": True}  # type: ignore[index]
     result = run_verify(tmp_path, "openclaw-gateway", GATEWAY_DIGEST, 3072, 250_000, config=config)
     label = "household app"
     expected = (
-        f"FAIL  {label:<32} expected ok, got" if telegram_enabled else f"PASS  {label:<32} ok"
+        f"PASS  {label:<32} ok"
+        if leftover is None
+        else f"FAIL  {label:<32} expected ok, got Telegram is retired and still in"
     )
     assert expected in result.stdout, result.stdout
-    assert "family group                     " not in result.stdout
+    assert "family group" not in result.stdout
+
+
+def test_verify_fails_a_gateway_with_no_app_channel(tmp_path: Path) -> None:
+    result = run_verify(
+        tmp_path, "openclaw-gateway", GATEWAY_DIGEST, 3072, 250_000, config={"channels": {}}
+    )
+    assert "FAIL  household app                    expected ok, got " in result.stdout
 
 
 OPENROUTER_ROUTES: dict[str, object] = {
@@ -668,26 +618,10 @@ def test_verify_fails_while_anything_still_routes_to_openai(
     assert expected in result.stdout, result.stdout
 
 
-SPEAK_TOOLS = {
-    "profile": "coding",
-    "alsoAllow": ["speak"],
-    "deny": ["codex", "memory-wiki", "onepassword"],
-}
 SPOKEN_REPLIES: dict[str, object] = {
-    "tools": SPEAK_TOOLS,
-    "session": {"dmScope": "per-channel-peer", "groupScope": "per-group"},
+    "tools": {"profile": "coding", "alsoAllow": ["image"]},
     "tts": {"auto": "off", "provider": "openrouter"},
-    "plugins": {
-        "load": {"paths": ["/opt/household-plugins/household-speech"]},
-        "entries": {
-            "household-speech": {
-                "enabled": True,
-                "hooks": {"allowConversationAccess": True},
-                "config": {"replyCharacters": 8000, "dayCharacters": 25000},
-            },
-            "telegram": {"enabled": True},
-        },
-    },
+    "channels": {"household": {"talkDailyCharacters": 20000}},
 }
 
 
@@ -696,9 +630,9 @@ SPOKEN_REPLIES: dict[str, object] = {
     [
         (SPOKEN_REPLIES, "PASS  spoken replies                   ok"),
         (
-            {**SPOKEN_REPLIES, "tools": {**SPEAK_TOOLS, "alsoAllow": ["speak", "tts"]}},
+            {**SPOKEN_REPLIES, "tools": {"profile": "coding", "alsoAllow": ["tts"]}},
             "FAIL  spoken replies                   expected ok, got "
-            "the assistant is still handed OpenClaw's own tts tool, which no ceiling covers",
+            "the assistant is handed OpenClaw's own tts tool, which no ceiling covers",
         ),
         (
             {**SPOKEN_REPLIES, "tts": {"auto": "always", "provider": "openrouter"}},
@@ -706,13 +640,27 @@ SPOKEN_REPLIES: dict[str, object] = {
             "tts.auto is always, so replies are spoken unasked and no ceiling covers them",
         ),
         (
+            {
+                **SPOKEN_REPLIES,
+                "plugins": {"entries": {"household-speech": {"enabled": True}}},
+            },
+            "FAIL  spoken replies                   expected ok, got "
+            "the retired household-speech plugin is still in plugins.entries.household-speech",
+        ),
+        (
             None,
             "FAIL  spoken replies                   expected ok, got unreadable:",
         ),
     ],
-    ids=["through-the-plugin", "built-in-tool-still-offered", "spoken-unasked", "no-config"],
+    ids=[
+        "asked-only",
+        "built-in-tool-offered",
+        "spoken-unasked",
+        "retired-plugin-left",
+        "no-config",
+    ],
 )
-def test_verify_fails_while_a_spoken_reply_can_go_around_the_speech_plugin(
+def test_verify_fails_while_anything_speaks_a_reply_unasked(
     tmp_path: Path, config: dict[str, object] | None, expected: str
 ) -> None:
     """The speech.py verdict is read from the same state directory as the rest."""

@@ -1,5 +1,7 @@
-// One-tap pairing for the app. A person sends /app to their assistant in Telegram and
-// gets back one setup code: OpenClaw's own single-use bootstrap token, which the gateway
+// One-tap pairing for the app. Whoever runs the box asks the gateway for a setup link
+// (household-app.pair), a paired phone asks for one for a new iPhone on Account, and the
+// owner may send /app in their own thread. Each is one setup code: OpenClaw's own
+// single-use bootstrap token, which the gateway
 // forgets after ten minutes, with this gateway's address for phones and who the code is
 // for. The app connects with it as a mobile node, OpenClaw pairs the phone by itself and
 // hands it a chat-only operator token, never admin, and from then on that phone's key
@@ -39,7 +41,7 @@ export async function issueSetupCode({ url, person, assistant, issue, profile })
 // Where the gateway serves the page a pairing link opens, on its own tailnet address.
 export const PAIR_PATH = "/household-app/pair";
 
-// A tap on the link opens this page in Telegram's browser, which hands the code to the
+// A tap on the link opens this page in the phone's browser, which hands the code to the
 // app. The code rides after the #, which a browser never sends, so the gateway serves
 // the same page to everyone and never sees a code in a request.
 export const PAIR_PAGE = `<!doctype html>
@@ -62,7 +64,7 @@ export const PAIR_PAGE = `<!doctype html>
   <h1>Steward AI</h1>
   <p id="say">Opening Steward AI to pair this iPhone.</p>
   <a id="open" href="#">Open Steward AI</a>
-  <p>No app yet? Install Steward AI from TestFlight first, then tap the link in Telegram again.</p>
+  <p>No app yet? Install Steward AI first, then tap the link again.</p>
 </main>
 <script>
   const code = location.hash.slice(1);
@@ -73,7 +75,7 @@ export const PAIR_PAGE = `<!doctype html>
     history.replaceState(null, "", location.pathname);
     location.replace(target);
   } else {
-    document.getElementById("say").textContent = "This link has no code in it. Send /app to your assistant in Telegram for a new one.";
+    document.getElementById("say").textContent = "This link has no code in it. Ask whoever runs your household's server for a new one.";
     open.remove();
   }
 </script>
@@ -88,7 +90,7 @@ export function pairLink(phoneUrl, code) {
 }
 
 // The link first, which opens the app already paired as the person who asked, then the
-// code alone in a code span, which Telegram copies with one tap, for pasting by hand.
+// code alone in a code span, which copies with one tap, for pasting by hand.
 export function setupReply({ code, link }) {
   return [
     "Tap to set up Steward AI on this iPhone:",

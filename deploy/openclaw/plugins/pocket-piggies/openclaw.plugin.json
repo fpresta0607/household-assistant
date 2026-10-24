@@ -1,7 +1,7 @@
 {
   "id": "pocket-piggies",
   "name": "Pocket Piggies",
-  "description": "Read the account owner's PocketPiggies finances, read-only, in their private Telegram chat and their own thread in the Steward AI app",
+  "description": "Read the account owner's PocketPiggies finances, read-only, in their own thread in the Steward AI app",
   "categories": ["tools"],
   "activation": { "onStartup": true },
   "contracts": {
@@ -31,15 +31,19 @@
   "configSchema": {
     "type": "object",
     "properties": {
-      "ownerTelegramId": { "type": "string", "pattern": "^[1-9][0-9]*$" },
-      "accountLabel": { "type": "string", "enum": ["corey", "denise"] },
       "ownerHouseholdPersonId": {
         "type": "string",
         "pattern": "^[a-z][a-z0-9-]{0,31}$",
-        "description": "The owner's person id in the household app channel, whose own thread there, started from a message the owner's phone signed, may read finance."
+        "description": "The owner's person id in the household app channel, whose own thread there, started from a message the owner's phone signed, may read finance. The key holder names the same owner."
+      },
+      "accountLabel": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+      "ownerTelegramId": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*$",
+        "description": "The Telegram chat a grant made before Telegram was retired is bound to. Only the key holder uses it; the plugin keeps it so that config still validates."
       }
     },
-    "required": ["ownerTelegramId", "accountLabel"],
+    "required": ["ownerHouseholdPersonId", "accountLabel"],
     "additionalProperties": false
   }
 }

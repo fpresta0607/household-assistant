@@ -69,7 +69,7 @@ struct ConnectorsPage: View {
     private func note(for state: ConnectorState, assistant: String) -> String? {
         switch state {
         case .connected:
-            return "Tap one for its accounts and what \(assistant) can do with it. Switching one off takes it away from \(assistant) at once, on Telegram too."
+            return "Tap one for its accounts and what \(assistant) can do with it. Switching one off takes it away from \(assistant) at once."
         case .available:
             return "Turning one on signs in with your own account."
         case .unavailable:

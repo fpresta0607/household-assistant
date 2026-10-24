@@ -79,8 +79,8 @@ test("the page hands the code from the # to the app and asks the server for noth
 });
 
 for (const [name, ctx, expected] of [
-  ["the owner in Telegram", { channel: "telegram", senderIsOwner: true }, true],
-  ["someone else in Telegram", { channel: "telegram", senderIsOwner: false }, false],
+  ["the owner in their own thread", { channel: "household", senderIsOwner: true }, true],
+  ["someone else in the family room", { channel: "household", senderIsOwner: false }, false],
   ["a sender OpenClaw says nothing about", { channel: "telegram" }, false],
   ["a gateway client with operator.admin", { channel: "webchat", gatewayClientScopes: ["operator.admin"] }, true],
   ["a gateway client with operator.pairing", { channel: "webchat", gatewayClientScopes: ["operator.pairing"] }, true],

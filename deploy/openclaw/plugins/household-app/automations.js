@@ -8,15 +8,12 @@
 // that posts in the family room: its name and when it runs, never what it tells the model.
 
 import { spokenSchedule } from "./approval-asks.js";
-import { familyGroupOf } from "./family-posts.js";
 
 const AGENT = "main";
-const TELEGRAM_CHAT = /^(?:(?:telegram|tg):)?(-?[1-9]\d*)$/i;
 
-// Whether a job's delivery is the family room: The Fam on Telegram, or the app's own room.
-function isFamilyDelivery(delivery, group) {
+// Whether a job's delivery is the app's family room.
+function isFamilyDelivery(delivery) {
   if (delivery?.mode !== "announce" || typeof delivery.to !== "string") return false;
-  if (delivery.channel === "telegram") return group !== undefined && TELEGRAM_CHAT.exec(delivery.to)?.[1] === group;
   return delivery.channel === "household" && delivery.to.trim().replace(/^household:/i, "").toLowerCase() === "family";
 }
 
@@ -29,10 +26,9 @@ function scheduleWords(schedule, timeZone) {
 
 // The enabled jobs of this gateway's assistant that post in the family room, each as the
 // note mirrors it: `{ job, name, schedule }`. A job with no schedule the note can say is left out.
-export function familyAutomations(jobs, { config, timeZone }) {
-  const group = familyGroupOf(config);
+export function familyAutomations(jobs, { timeZone } = {}) {
   return jobs
-    .filter((job) => job?.enabled !== false && (job?.agentId === undefined || job.agentId === AGENT) && isFamilyDelivery(job?.delivery, group))
+    .filter((job) => job?.enabled !== false && (job?.agentId === undefined || job.agentId === AGENT) && isFamilyDelivery(job?.delivery))
     .map((job) => ({ job: job.id, name: typeof job.name === "string" ? job.name : "", schedule: scheduleWords(job.schedule, timeZone) }))
     .filter((job) => typeof job.job === "string" && job.schedule !== undefined);
 }
@@ -40,9 +36,8 @@ export function familyAutomations(jobs, { config, timeZone }) {
 // How long a run of a reminder may take before its Time Sensitive window closes anyway.
 const REMINDER_RUN_MS = 10 * 60_000;
 
-// A reminder someone made, announced straight to the app since Telegram went off (issue #6),
-// is pushed Time Sensitive, as household-job-mirror's copies of it were, so it gets through a
-// Focus. A channel's send is not told which run it comes from, so this keeps which jobs are
+// A reminder someone made, announced straight to the app (issue #6), is pushed Time
+// Sensitive, so it gets through a Focus. A channel's send is not told which run it comes from, so this keeps which jobs are
 // reminders, a job with no declaration key that announces to the app, and while one runs its
 // sends to that conversation are marked. `target` is the app conversation: family, or a person.
 export function createReminderPushes({ now = Date.now } = {}) {

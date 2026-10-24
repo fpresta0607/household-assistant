@@ -3,11 +3,10 @@
 // household-app.today and the `today` event.
 //
 // The tool is offered in the same turns as household_brief (brief.js): the owner's own
-// thread, a family-room turn the owner started, the owner's private chat on Telegram, and
-// a scheduled run, which is how the morning's and the evening's are written
-// (scripts/openclaw-household-app.py adds that job). Never in anyone else's family-room
-// turn or a Telegram group: it comes from the owner's own day and shows on the owner's
-// phones alone.
+// thread, a family-room turn the owner started, and a scheduled run, which is how the
+// morning's and the evening's are written (scripts/openclaw-household-app.py adds that
+// job). Never in anyone else's family-room turn: it comes from the owner's own day and
+// shows on the owner's phones alone.
 //
 // Only the newest is kept, not one a day: the evening's carries tomorrow morning, and the
 // phone picks what is still ahead by its own clock. A write with no verse keeps the verse
@@ -127,9 +126,9 @@ function result(payload, isError = false) {
   return { content: [{ type: "text", text: JSON.stringify(payload) }], ...(isError ? { isError } : {}) };
 }
 
-// The tool for this turn, or null. `owners` is the gateway's `commands.ownerAllowFrom`.
-export function createTodayTool({ context, owner, owners, write }) {
-  if (!isOwnTurn({ context, owner, owners })) return null;
+// The tool for this turn, or null.
+export function createTodayTool({ context, owner, write }) {
+  if (!isOwnTurn({ context, owner })) return null;
   return {
     name: TODAY_TOOL,
     label: "Today card",
