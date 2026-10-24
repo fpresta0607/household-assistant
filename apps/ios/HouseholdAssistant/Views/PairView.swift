@@ -1,6 +1,6 @@
-// The Corey & Denise group, opened from its row on Chats or from the marker in the family
-// room: every step the two assistants took on their direct line, the oldest at the top and
-// the newest at the bottom, as a chat reads, with each day's name over its first line. Each
+// The Corey & Denise group, opened from its row on Chats: every step the two assistants
+// took on their direct line, the oldest at the top and the newest at the bottom, as a chat
+// reads, with each day's name over its first line. Each
 // step is one short line (PairEntryRow), and a burst of rows logged together is one.
 //
 // It is read-only, with no composer: the assistants write here and both parents watch. New

@@ -102,6 +102,32 @@ final class LighterChatsTests: XCTestCase {
         }
     }
 
+    func testTheAssistantsGroupOpensOnlyFromTheDashboard() {
+        // Arrange
+        let app = launch()
+        let row = app.buttons["pair.row"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        XCTAssertTrue(row.label.contains("Corey & Denise"))
+
+        // Act
+        app.buttons["pin.family"].tap()
+
+        // Assert
+        XCTAssertTrue(app.buttons["room.header"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["pair.marker"].exists)
+        keepPicture("family.without-pair-overlay")
+
+        // Act
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        keepPicture("chats.pair-entry")
+        row.tap()
+
+        // Assert
+        XCTAssertTrue(app.staticTexts["Only Corey and Denise write here."].waitForExistence(timeout: 10))
+        keepPicture("pair.from-dashboard")
+    }
+
     // MARK: - The way there
 
     /// The demo on Chats, with nothing playing over it.

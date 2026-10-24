@@ -21,10 +21,8 @@
 // and from the family room the other assistant's, which only shows her. Tapping an
 // assistant's @mention in any bubble opens that assistant's page too. In the family room
 // a message's menu can ask this phone's assistant about it: a reply quoting it, with the
-// assistant mentioned. While the two assistants' direct line moved within the hour, a small
-// pill near the top of the family room says so and opens their group (PairMarker). The
-// thread is drawn on the background Appearance chose, and on the night's navy it takes the
-// dark look. The tab bar steps aside while a conversation is open.
+// assistant mentioned. The thread is drawn on the background Appearance chose, and on the
+// night's navy it takes the dark look. The tab bar steps aside while a conversation is open.
 //
 // Whatever arrives at the bottom of the thread fades in, what this phone sends rises from
 // the composer, and nothing else moves. A picture
@@ -71,8 +69,6 @@ struct RoomView: View {
     @State private var zoomedMedia: String?
     @Namespace private var pictures
     @State private var assistantPage: AssistantPageKind?
-    /// Whether the Corey & Denise group is open over the family room, from its marker.
-    @State private var isPairOpen = false
     /// The call whose words are open.
     @State private var openedCall: RoomMessage?
     private struct Selection: Identifiable {
@@ -114,13 +110,8 @@ struct RoomView: View {
                     searchResults
                 }
                 .overlay(alignment: .top) {
-                    VStack(spacing: 8) {
-                        ConnectionBanner()
-                        if conversation == .family {
-                            PairMarker { isPairOpen = true }
-                        }
-                    }
-                    .padding(.top, 8)
+                    ConnectionBanner()
+                        .padding(.top, 8)
                 }
                 .environment(\.mediaZoom, pictures)
             .blur(radius: reacting == nil ? 0 : 14)
@@ -193,9 +184,6 @@ struct RoomView: View {
                 zoomedMedia = shown.id
             }
             .zoomTransition(from: zoomedMedia ?? media.id, in: pictures)
-        }
-        .navigationDestination(isPresented: $isPairOpen) {
-            PairView()
         }
         .navigationDestination(item: $assistantPage) { page in
             switch page {

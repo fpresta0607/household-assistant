@@ -1,5 +1,5 @@
 // The two assistants' faces overlapping, this phone's own in front, for the Corey & Denise
-// group: on its row in Chats, on its marker in the family room and at the top of the group.
+// group: on its row in Chats and at the top of the group.
 
 import SwiftUI
 

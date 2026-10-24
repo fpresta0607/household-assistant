@@ -167,10 +167,15 @@ final class ScreenshotTests: XCTestCase {
         for theme in AppTheme.allCases {
             gateway.model.settings.theme = theme
             for isDark in [false, true] {
-                gateway.model.today.open()
-                try await snap("chats.snapshot." + theme.rawValue + (isDark ? ".dark" : ".light"), dark: isDark) {
+                let id = "chats.snapshot." + theme.rawValue + (isDark ? ".dark" : ".light")
+                guard Self.isWanted(id) else { continue }
+                try await mount(dark: isDark) {
                     InboxView().environment(gateway.model).phonePreferences(gateway.model.settings)
                 }
+                gateway.model.today.open()
+                try await capture(id)
+                XCTAssertFalse(gateway.model.today.isFolded, id)
+                XCTAssertEqual(gateway.model.today.glance?.sections.count, 2, id)
             }
         }
         gateway.model.settings.revertAppearance()
@@ -180,7 +185,7 @@ final class ScreenshotTests: XCTestCase {
 
     /// The two assistants' direct line in the demo household (DemoPair): Corey's seedlings
     /// as one line, the library handoff seen, answered and done, and Denise's question he has
-    /// just seen, four minutes ago, which the family room's marker says too.
+    /// just seen, four minutes ago.
     func testCoreyAndDenise() async throws {
         let gateway = FixtureGateway()
         await gateway.connect { $0.room.isAvailable == true && !$0.pairLine.entries.isEmpty }

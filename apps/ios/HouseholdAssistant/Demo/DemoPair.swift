@@ -3,8 +3,8 @@
 // household-app plugin answers `household-app.line` with (notes.js timeline): Corey logs
 // three seedlings at once and corrects one, hands Denise a question that she sees, answers
 // and marks done, takes a question Leo asked them both, and Denise hands him one of
-// Rosa's, which he has just seen. Its last step is four minutes before the moment it is made,
-// so the family room's marker shows. Every word here is invented.
+// Rosa's, which he has just seen. Its last step is four minutes before the moment it is made.
+// Every word here is invented.
 
 import Foundation
 

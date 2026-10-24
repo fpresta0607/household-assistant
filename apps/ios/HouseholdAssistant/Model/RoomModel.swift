@@ -39,7 +39,7 @@ final class RoomModel {
     /// The family room's look, the same on both phones. Nil until anyone changes it.
     private(set) var familyLook: FamilyLook?
     /// When the two assistants' direct line last moved, in milliseconds, from the pages and
-    /// the plugin's `pair` event, for the family room's quiet marker. Nil before its first step.
+    /// the plugin's `pair` event, for the row on Chats. Nil before its first step.
     private(set) var pairLastAt: Int?
     /// The newest revision this phone has followed.
     private(set) var rev = 0

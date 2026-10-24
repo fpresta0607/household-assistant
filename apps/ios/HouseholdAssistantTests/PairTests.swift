@@ -1,8 +1,7 @@
 // The Corey & Denise group from the phone's side: `household-app.line`'s page, the plugin's
 // `pair` event and the `pair` mark on the room's pages in the shapes the plugin gives them,
-// the rule that folds a burst of rows into one line, what each line says, how long the
-// family room's marker shows, and the model reading the line a page at a time over a
-// scripted gateway.
+// the rule that folds a burst of rows into one line, what each line says, and the model
+// reading the line a page at a time over a scripted gateway.
 //
 // The pair fixtures were written by the plugin's own notes.js, driven the way
 // tests/js/household_app_notes.test.mjs drives it, with invented words.
@@ -256,30 +255,6 @@ final class PairTests: XCTestCase {
         }
     }
 
-    func testTheMarkerShowsForAnHourAfterTheLineLastMoved() async {
-        // Arrange
-        let lastAt = 1_792_505_832_000
-        let moment = Date(timeIntervalSince1970: 1_792_505_832)
-        let cases: [(seconds: TimeInterval, words: String?)] = [
-            (-30, "just now"),
-            (0, "just now"),
-            (59, "just now"),
-            (60, "1 min ago"),
-            (4 * 60 + 30, "4 min ago"),
-            (3_599, "59 min ago"),
-            (3_600, nil),
-            (86_400, nil),
-        ]
-
-        for (seconds, words) in cases {
-            // Act
-            let shown = PairRecency.words(lastAt: lastAt, now: moment.addingTimeInterval(seconds))
-
-            // Assert
-            XCTAssertEqual(shown, words, "\(seconds) s after")
-        }
-    }
-
     // MARK: - Reading the line
 
     func testTheNewestPageShowsWithABurstAsOneLine() async throws {
@@ -387,7 +362,7 @@ final class PairTests: XCTestCase {
         XCTAssertFalse(pair.hasOlder)
     }
 
-    // MARK: - The family room's marker
+    // MARK: - The latest activity
 
     func testTheRoomsPagesAndThePairEventSayWhenTheLineLastMovedOnlyEverLater() async throws {
         // Arrange

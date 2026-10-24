@@ -148,8 +148,6 @@ final class DemoRoom {
     /// many older messages in Leo's own thread first, for the hitch tests.
     init(now: @escaping () -> Date = Date.init, isFinished: Bool = true, longThread: Int = 0) {
         self.now = now
-        // On the phone's own clock, so the family room's marker shows however the demo's
-        // clock is set.
         pair = DemoPair(at: Date())
         let photoData = DemoMedia.photo()
         let voiceData = DemoMedia.voiceNote(seconds: 6)
