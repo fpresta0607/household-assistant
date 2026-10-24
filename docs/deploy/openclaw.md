@@ -1836,7 +1836,10 @@ An assistant's post to the family lands in the app's family room first, and Tele
   The phone opens the card on the first visit from 5 AM; an overnight visit cannot mark that morning read, and a verse arriving after a calendar-only card reopens it once.
   The plugin keeps only the newest card, which the phone reads with `household-app.today` and hears of through `plugin.household-app.today`, and keeps on the phone to show offline, picking what is still ahead by its own clock.
   Each card also writes the day's brief line, which the app builds from before the card still show.
-  Since 22 October the card draws its day clean rather than wordy, as the Overlord asked: the calendar mark of the day, the month in three letters over the day's number, beside the next thing and two more, each in bold with its time (`AgendaDayView`); each thing's helping line is in the whole day the card opens, and in what VoiceOver reads.
+  The daily snapshot shows at most the next three upcoming events, grouped by the phone's calendar day under Today or Tonight, Tomorrow, or a later weekday, with a matching calendar mark for each day (`AgendaDayView`).
+  The folded banner uses the next event's day as its heading, and the full schedule keeps the day groups, including all-day entries and past events.
+  Each event's helping line appears in the full schedule; VoiceOver also reads the next event's helping line on the card.
+  Calendar marks follow the [app-wide appearance contract](../ios/appearance-themes.md#app-wide-contract).
 - An assistant's answer carries a `did` list, one item for each change its run made, which the app shows as chips under the answer: an event added, moved, changed or deleted, a reminder set, moved, changed or deleted, the household cart changed, or an email drafted, with its title and when it is.
   The plugin reads each from the run's own tool calls as OpenClaw's `after_tool_call` hook reports them, a calendar or reminder the way `approval-asks.js` reads it to ask, and keeps only a call that worked; a read adds nothing (`did.js`).
   The turn names each run OpenClaw starts for it, as a handed-over turn does, so the list goes on that turn's reply, and the relay carries a family-room reply's list to the other gateway, which keeps only the items it can read.

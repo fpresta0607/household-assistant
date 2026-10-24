@@ -143,11 +143,49 @@ final class ScreenshotTests: XCTestCase {
         try await snap("chats.today.none", none)
     }
 
+    func testSnapshotDatesInEveryTheme() async throws {
+        // Arrange
+        let now = Date()
+        let calendar = Calendar.current
+        let tomorrow = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)))
+        let morning = try XCTUnwrap(calendar.date(bySettingHour: 8, minute: 0, second: 0, of: tomorrow))
+        let formatter = ISO8601DateFormatter()
+        let parts = calendar.dateComponents([.year, .month, .day], from: now)
+        let day = String(format: "%04d-%02d-%02d", try XCTUnwrap(parts.year), try XCTUnwrap(parts.month), try XCTUnwrap(parts.day))
+        let today: JSONValue = .object(["today": .object([
+            "day": .string(day), "at": .number(0),
+            "items": .array([
+                .object(["start": .string(formatter.string(from: now)), "title": .string("Family dinner")]),
+                .object(["start": .string(formatter.string(from: morning)), "title": .string("School drop off")]),
+            ]),
+        ])])
+        let gateway = FixtureGateway()
+        gateway.answers[DemoToday.method] = { try FixtureGateway.ok($0, today) }
+        await gateway.connect { $0.room.isAvailable == true && $0.today.glance != nil }
+
+        // Act and assert
+        for theme in AppTheme.allCases {
+            gateway.model.settings.theme = theme
+            for isDark in [false, true] {
+                let id = "chats.snapshot." + theme.rawValue + (isDark ? ".dark" : ".light")
+                guard Self.isWanted(id) else { continue }
+                try await mount(dark: isDark) {
+                    InboxView().environment(gateway.model).phonePreferences(gateway.model.settings)
+                }
+                gateway.model.today.open()
+                try await capture(id)
+                XCTAssertFalse(gateway.model.today.isFolded, id)
+                XCTAssertEqual(gateway.model.today.glance?.sections.count, 2, id)
+            }
+        }
+        gateway.model.settings.revertAppearance()
+    }
+
     // MARK: - Corey & Denise
 
     /// The two assistants' direct line in the demo household (DemoPair): Corey's seedlings
     /// as one line, the library handoff seen, answered and done, and Denise's question he has
-    /// just seen, four minutes ago, which the family room's marker says too.
+    /// just seen, four minutes ago.
     func testCoreyAndDenise() async throws {
         let gateway = FixtureGateway()
         await gateway.connect { $0.room.isAvailable == true && !$0.pairLine.entries.isEmpty }

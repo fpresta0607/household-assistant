@@ -35,13 +35,9 @@ final class DemoGateway: GatewayTransport {
     /// photo kept with no size, whose shape is known only once its picture is; a reply
     /// taller than the screen (ReplyArrivesWholeTests); and three tools done in a blink
     /// before a short reply (ToolStepsHoldTests). Each posts `<name>.<kind>.done` once all
-    /// of it has arrived. What Leo sends there is kept a moment later, as a gateway over
-    /// the network keeps it (SentMessageLandsSmoothlyTests).
+    /// of it has arrived.
     static let newRowsControlArgument = "StewardNewRowsControl"
     private static let newRowKinds = ["typing", "stream", "card", "photo", "longReply", "steps"]
-    /// How long a gateway over a slow network takes to keep a message: longer than a UI
-    /// test's tap on Send takes to come back, which waits for the app to settle.
-    private static let keepingSeconds = 2.0
     /// With `-StewardNetworkControl <name>`, the demo's link is cut on a UI test's cue
     /// `<name>.cut`, and opens again only after `<name>.restore` (NetworkCutTests).
     static let networkControlArgument = "StewardNetworkControl"
@@ -103,8 +99,31 @@ final class DemoGateway: GatewayTransport {
     private let threadLayoutControl = UserDefaults.standard.string(forKey: "StewardThreadLayoutControl")
     private var threadLayoutReply: (runId: String, text: String, chunks: [String])?
     private var threadLayoutIncomingMessageId: String?
+    private let sendControl: String?
+    private var pendingSends: [GatewayRequest] = []
 
-    init() {
+    init(sendControl: String? = UserDefaults.standard.string(forKey: "StewardSendControl")) {
+        self.sendControl = sendControl
+        if let sendControl {
+            CFNotificationCenterAddObserver(
+                CFNotificationCenterGetDarwinNotifyCenter(),
+                Unmanaged.passUnretained(self).toOpaque(),
+                { _, observer, _, _, _ in
+                    guard let observer else { return }
+                    let gateway = Unmanaged<DemoGateway>.fromOpaque(observer).takeUnretainedValue()
+                    Task { @MainActor in
+                        let requests = gateway.pendingSends
+                        gateway.pendingSends = []
+                        for request in requests {
+                            gateway.answer(request)
+                        }
+                    }
+                },
+                (sendControl + ".keep") as CFString,
+                nil,
+                .deliverImmediately
+            )
+        }
         if let newRowsControl = Self.newRowsControl {
             for kind in Self.newRowKinds {
                 CFNotificationCenterAddObserver(
@@ -302,6 +321,19 @@ final class DemoGateway: GatewayTransport {
             throw Closed()
         }
         let request = try JSONDecoder().decode(GatewayRequest.self, from: Data(text.utf8))
+        if let sendControl, request.method == "household-app.send" {
+            // Hold storage too, so history or a read notification cannot reveal it early.
+            pendingSends.append(request)
+            CFNotificationCenterPostNotification(
+                CFNotificationCenterGetDarwinNotifyCenter(),
+                CFNotificationName((sendControl + ".pending") as CFString), nil, nil, true
+            )
+            return
+        }
+        answer(request)
+    }
+
+    private func answer(_ request: GatewayRequest) {
         if request.method == "household-app.read", request.params["conversation"]?.stringValue == RoomConversation.direct.rawValue {
             hasOpenedDirect = true
             // RoomView marks the incoming message read only after observing its ID.
@@ -324,16 +356,8 @@ final class DemoGateway: GatewayTransport {
             return
         }
         let answer: JSONValue = .object(["type": .string("res"), "id": .string(request.id), "ok": .bool(true), "payload": payload])
-        if Self.newRowsControl != nil, request.method == "household-app.send" {
-            Task {
-                await pause(Self.keepingSeconds)
-                push(answer)
-                changed()
-            }
-            return
-        }
         push(answer)
-        if ["household-app.send", "household-app.react", "household-app.approval.answer", "household-app.cart.ordered", "household-app.look.set"].contains(request.method) {
+        if ["household-app.send", "household-app.react", "household-app.read", "household-app.approval.answer", "household-app.cart.ordered", "household-app.look.set"].contains(request.method) {
             changed()
         }
         if Self.isLongThreadRequested || DemoFlingThread.isRequested, request.method == "household-app.send",
@@ -515,6 +539,7 @@ final class DemoGateway: GatewayTransport {
     private func closed() {
         isOpen = false
         threadLayoutReply = nil
+        pendingSends = []
         inbox = []
         waiting?.resume(throwing: Closed())
         waiting = nil

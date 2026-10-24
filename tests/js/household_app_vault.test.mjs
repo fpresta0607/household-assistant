@@ -162,7 +162,11 @@ async function photo(stateDir, label) {
 
 const run = async (tool, args) => JSON.parse((await tool.execute("call-1", args)).content[0].text);
 const vaultTool = (channel, context) => channel.tools.find(({ options }) => options.names.includes("household_vault")).factory(context);
-const dayFromNow = (days) => new Date(Date.now() + days * DAY_MS).toLocaleDateString("en-CA");
+const dayFromNow = (days) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toLocaleDateString("en-CA");
+};
 
 test("through the plugin, a passport photographed in the owner's thread is kept there, its day in the note, its picture nowhere else", async () => {
   // Arrange
@@ -234,7 +238,15 @@ test("through the plugin, a family-room photo or a message with no picture is ne
   }
 });
 
-test("through the plugin, a document thirty days out is posted in the owner's own thread as the channel starts, once", async () => {
+test("through the plugin, a document thirty days out is posted in the owner's own thread as the channel starts, once, across fall DST", async (context) => {
+  const previousTimeZone = process.env.TZ;
+  process.env.TZ = "America/Chicago";
+  context.after(() => {
+    if (previousTimeZone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimeZone;
+  });
+  context.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-24T00:30:00-05:00") });
+
   // Arrange: the vault an earlier run left two days ago, with a made-up license that renews in
   // 30 days now.
   const stateDir = await mkdtemp(path.join(os.tmpdir(), "household-app-channel-"));
@@ -263,6 +275,7 @@ test("through the plugin, a document thirty days out is posted in the owner's ow
 
   // Assert
   assert.equal(posted.length, 1);
+  assert.equal(posted[0].text, "Your driver's license renews in 30 days, Mon, Nov 23, 2026. It is in your vault in Steward.");
   assert.equal(posted[0].author, "corey");
   assert.equal(again.length, 1, "a restart posts it no second time");
   assert.deepEqual((await (async () => {

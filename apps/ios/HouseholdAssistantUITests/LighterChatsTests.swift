@@ -74,6 +74,60 @@ final class LighterChatsTests: XCTestCase {
         XCTAssertFalse(card.exists)
     }
 
+    func testOpeningAConversationClearsItsUnreadCount() {
+        for conversation in ["family", "direct"] {
+            // Arrange
+            let app = launch()
+            let pin = app.buttons["pin.\(conversation)"]
+            let otherPin = app.buttons[conversation == "family" ? "pin.direct" : "pin.family"]
+            let unread = NSPredicate(format: "label CONTAINS %@", "2 unread")
+            expectation(for: unread, evaluatedWith: pin)
+            expectation(for: unread, evaluatedWith: otherPin)
+            waitForExpectations(timeout: 10)
+            keepPicture("chats.unread-count.\(conversation)")
+
+            // Act
+            pin.tap()
+            let back = app.navigationBars.buttons.element(boundBy: 0)
+            XCTAssertTrue(back.waitForExistence(timeout: 10))
+            back.tap()
+
+            // Assert
+            let read = NSPredicate(format: "exists == true AND NOT label CONTAINS %@", "unread")
+            expectation(for: read, evaluatedWith: pin)
+            waitForExpectations(timeout: 10)
+            XCTAssertTrue(unread.evaluate(with: otherPin))
+            keepPicture("chats.unread-cleared.\(conversation)")
+            app.terminate()
+        }
+    }
+
+    func testTheAssistantsGroupOpensOnlyFromTheDashboard() {
+        // Arrange
+        let app = launch()
+        let row = app.buttons["pair.row"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        XCTAssertTrue(row.label.contains("Corey & Denise"))
+
+        // Act
+        app.buttons["pin.family"].tap()
+
+        // Assert
+        XCTAssertTrue(app.buttons["room.header"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["pair.marker"].exists)
+        keepPicture("family.without-pair-overlay")
+
+        // Act
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        keepPicture("chats.pair-entry")
+        row.tap()
+
+        // Assert
+        XCTAssertTrue(app.staticTexts["Only Corey and Denise write here."].waitForExistence(timeout: 10))
+        keepPicture("pair.from-dashboard")
+    }
+
     // MARK: - The way there
 
     /// The demo on Chats, with nothing playing over it.

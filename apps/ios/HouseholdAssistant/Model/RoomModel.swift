@@ -39,7 +39,7 @@ final class RoomModel {
     /// The family room's look, the same on both phones. Nil until anyone changes it.
     private(set) var familyLook: FamilyLook?
     /// When the two assistants' direct line last moved, in milliseconds, from the pages and
-    /// the plugin's `pair` event, for the family room's quiet marker. Nil before its first step.
+    /// the plugin's `pair` event, for the row on Chats. Nil before its first step.
     private(set) var pairLastAt: Int?
     /// The newest revision this phone has followed.
     private(set) var rev = 0
@@ -849,8 +849,7 @@ final class RoomModel {
     /// Tells the gateway this phone has read up to the newest message somebody else wrote.
     func markRead(_ conversation: RoomConversation) async {
         guard
-            let latest = thread(conversation).messages.last(where: { $0.rev != nil }),
-            latest.author != me?.person,
+            let latest = thread(conversation).messages.last(where: { $0.rev != nil && $0.author != me?.person }),
             lastRead[conversation] != latest.id
         else {
             return
@@ -1194,6 +1193,11 @@ final class RoomModel {
                 self.update(waiting) { _ in }
             }
         }
+    }
+
+    func waitForArchive() async {
+        await keeping?.value
+        await waitingWrite?.value
     }
 
     /// Keeps a conversation's newest page, and writes the archive a moment later.

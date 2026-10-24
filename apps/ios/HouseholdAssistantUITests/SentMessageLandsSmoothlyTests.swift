@@ -1,8 +1,8 @@
 // What Leo sends lands in Corey's thread in one smooth movement: it rises out of its own
 // corner just above the composer and stays there, through the gateway keeping it a moment
 // later and "Delivered" showing under it. Nothing about it moves or changes size once it
-// has landed. The demo keeps what he sends two seconds later, as a gateway over a slow
-// network does (DemoGateway), so the test sees the message both before and after it is kept.
+// has landed. The demo keeps what he sends only on the test's cue (DemoGateway), so the
+// test sees the message both before and after it is kept, however long a snapshot takes.
 
 import XCTest
 
@@ -32,8 +32,9 @@ final class SentMessageLandsSmoothlyTests: XCTestCase {
     func testASentMessageLandsWithoutAJump() throws {
         // Arrange
         let app = XCUIApplication()
+        let control = "steward-sent-" + UUID().uuidString
         app.launchArguments = [
-            "-StewardDemo", "YES", "-StewardNewRowsControl", "steward-sent-" + UUID().uuidString, "-StewardThreadLog", "YES",
+            "-StewardDemo", "YES", "-StewardNewRowsControl", control, "-StewardSendControl", control, "-StewardThreadLog", "YES",
         ]
         app.launch()
         let pin = app.buttons["pin.direct"]
@@ -54,18 +55,31 @@ final class SentMessageLandsSmoothlyTests: XCTestCase {
         let delivered = app.staticTexts["Delivered"]
 
         // Act
+        let pending = XCTDarwinNotificationExpectation(notificationName: control + ".pending")
         app.buttons["Send"].tap()
         let tapped = Date()
+        XCTAssertEqual(XCTWaiter.wait(for: [pending], timeout: 10), .completed, "the send never reached the demo")
         var samples: [Sample] = []
-        while Date().timeIntervalSince(tapped) < 4 {
-            if let frame = try? sent.snapshot().frame, let fieldFrame = try? field.snapshot().frame {
+        for shouldKeep in [false, true] {
+            if shouldKeep {
+                XCTAssertFalse(delivered.exists, "the demo kept the message before the test's cue")
+                CFNotificationCenterPostNotification(
+                    CFNotificationCenterGetDarwinNotifyCenter(),
+                    CFNotificationName((control + ".keep") as CFString), nil, nil, true
+                )
+                XCTAssertTrue(delivered.waitForExistence(timeout: 10), "the demo never kept the message after the cue")
+            }
+            let samplingStarted = Date()
+            repeat {
+                let frame = try sent.snapshot().frame
+                let fieldFrame = try field.snapshot().frame
                 samples.append(Sample(
                     at: Date().timeIntervalSince(tapped),
                     gap: fieldFrame.minY - frame.maxY,
                     height: frame.height,
                     isDelivered: delivered.exists
                 ))
-            }
+            } while Date().timeIntervalSince(samplingStarted) < 2
         }
         let log = app.descendants(matching: .any)["debug.threadLog"].label
 

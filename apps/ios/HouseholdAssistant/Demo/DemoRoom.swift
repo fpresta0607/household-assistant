@@ -148,8 +148,6 @@ final class DemoRoom {
     /// many older messages in Leo's own thread first, for the hitch tests.
     init(now: @escaping () -> Date = Date.init, isFinished: Bool = true, longThread: Int = 0) {
         self.now = now
-        // On the phone's own clock, so the family room's marker shows however the demo's
-        // clock is set.
         pair = DemoPair(at: Date())
         let photoData = DemoMedia.photo()
         let voiceData = DemoMedia.voiceNote(seconds: 6)
@@ -409,7 +407,16 @@ final class DemoRoom {
                 react(to: messageId, by: Self.person, with: params["emoji"]?.stringValue, in: conversation)
             }
             return .object(["ok": .bool(true)])
-        case "household-app.read", "household-app.typing", "household-app.push.register", "household-app.location":
+        case "household-app.read":
+            guard
+                let conversation = params["conversation"]?.stringValue.flatMap(RoomConversation.init(rawValue:)),
+                let messageId = params["messageId"]?.stringValue
+            else {
+                return nil
+            }
+            read(messageId, by: Self.person, in: conversation)
+            return .object(["ok": .bool(true)])
+        case "household-app.typing", "household-app.push.register", "household-app.location":
             return .object(["ok": .bool(true)])
         case "household-app.location.live":
             guard let messageId = params["messageId"]?.stringValue else {

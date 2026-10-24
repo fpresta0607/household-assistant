@@ -24,10 +24,9 @@ Each phone pairs with one gateway, and the assistant's name and emoji come from 
 | `HouseholdAssistantTests` | unit tests; every fixture is decoded, the connection is driven by the captured frames, and `ScreenshotTests` renders every screen and state to `build/screenshots/` |
 | `HouseholdAssistantUITests` | launches the app and checks it stays in the foreground |
 
-**None of the Swift that needs SwiftUI or UIKit has been compiled yet.**
-There is no Mac in the fleet, so the first build on the Mac runner is the first build there has been.
+Native builds, UI tests and screenshot captures run on GitHub's hosted Macs; see the [TestFlight runbook](../../docs/testflight.md) for verification and release commands.
 
-`Protocol` and `Model` need neither, and they are compiled and tested on Linux:
+`Protocol` and `Model` need neither SwiftUI nor UIKit, and they are compiled and tested on Linux:
 
 ```bash
 # verified
@@ -87,6 +86,10 @@ Royal blue and gold are accents, shimmers and glimmers, never full fills (the ow
 They go on rims, highlights, small marks, the selected state's ring or lens, and the light running round a rim, always on the light rainbow glass.
 A surface, a card, a sheet, a button or a chip is glass or white, and its royal or gold is the edge, the glyph or the shimmer on it.
 The assistant's bubble is the model: a white fill with a rim that shimmers, the soft rainbow in the light and gold glass in the dark as the app ships.
-Settings → Appearance has exactly two controls: Theme (Default, Spring, Winter, Christmas), then Light, Dark or Auto. Every theme owns both appearances for the whole app, and Auto follows the iPhone without changing the selected theme. The chat preview follows the selected appearance. Existing seasonal choices migrate to their theme family. The former custom editor, arbitrary colors, background photos, material sliders and component overrides have been removed.
+Settings → Appearance has two controls: Theme, then Light, Dark or Auto, which follows the iPhone.
+The [appearance reference](../../docs/ios/appearance-themes.md) describes the theme collection and how each theme applies across the app.
+The chat preview follows the selected appearance.
+Existing seasonal choices migrate to their theme family.
+The former custom editor, arbitrary colors, background photos, material sliders and component overrides have been removed.
 The person's own message bubble keeps its royal fill as built, and nothing new is filled royal or gold.
 Every shimmer stands still under the app's Reduce Motion choice.
