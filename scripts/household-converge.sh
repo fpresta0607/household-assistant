@@ -43,6 +43,14 @@ while IFS=$'\t' read -r _ assistant _ _ _ _ env_file _; do
   fi
 done <<<"${members}"
 
+# The household's key for the publisher's push relay, made once, before the gateways are
+# made so each reads it from its env file. It prints the one line the household sends the
+# publisher, every time, until the publisher has let the household in.
+if python3 "${here}/household_file.py" has-push-relay; then
+  step "the household's key for the push relay"
+  python3 "${here}/household-push-key.py"
+fi
+
 step "the gateways, their skills and plugins"
 "${here}/openclaw-install.sh"
 

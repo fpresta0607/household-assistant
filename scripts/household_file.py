@@ -14,6 +14,7 @@ read the members through it too:
 
     python3 scripts/household_file.py members      # one tab-separated line per member
     python3 scripts/household_file.py has-members  # exits 0 when the file names them
+    python3 scripts/household_file.py has-push-relay  # exits 0 when it names a push relay
 """
 
 from __future__ import annotations
@@ -269,7 +270,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if command == ["has-members"]:
         return 0 if load_household(HOUSEHOLD_FILE).names_members else 1
-    print("usage: household_file.py members | has-members", file=sys.stderr)
+    if command == ["has-push-relay"]:
+        return 0 if load_household(HOUSEHOLD_FILE).push_relay else 1
+    print("usage: household_file.py members | has-members | has-push-relay", file=sys.stderr)
     return 2
 
 

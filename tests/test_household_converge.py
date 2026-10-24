@@ -33,6 +33,7 @@ STEPS = (
     "household-backup-lib.sh",
 )
 PY_STEPS = (
+    "household-push-key.py",
     "scripture-build.py",
     "openclaw-openrouter.py",
     "openclaw-memory.py",
@@ -121,14 +122,15 @@ def test_a_pass_runs_every_step_in_order_and_verifies_each_gateway(tmp_path: Pat
     assert "HOUSEHOLD CONVERGED" in result.stdout
     steps = [line.split(" CT=")[0].strip() for line in logged(tmp_path)]
     env_file = f"{tmp_path}/etc/openclaw-ada.env"
-    assert steps[:4] == [
+    assert steps[:5] == [
+        "household-push-key.py",
         "openclaw-install.sh",
         f"scripture-build.py --embed --env-file {env_file}",
         "openclaw-openrouter.py apply",
         "household-app-install.sh",
     ]
     for persona in ("ada", "rex"):
-        for script in PY_STEPS[2:]:
+        for script in PY_STEPS[3:]:
             assert f"{script} apply --gateway {persona}" in steps
     assert "tailscale serve --bg --https=18789 http://127.0.0.1:18789" in steps
     assert "tailscale serve --bg --https=18790 http://127.0.0.1:18790" in steps
@@ -230,3 +232,15 @@ def test_the_scripts_parse(script: str) -> None:
         [bash, "-n", (ROOT / script).as_posix()], capture_output=True, text=True, check=False
     )
     assert parsed.returncode == 0, parsed.stderr
+
+
+def test_a_household_without_a_push_relay_makes_no_key(tmp_path: Path) -> None:
+    env = box(tmp_path)
+    data = json.loads(NEW_EXAMPLE.read_text(encoding="utf-8"))
+    del data["pushRelay"]
+    household = tmp_path / "household.json"
+    household.write_text(json.dumps(data), encoding="utf-8")
+    env["HOUSEHOLD_FILE"] = household.as_posix()
+
+    assert converge(tmp_path, env).returncode == 0
+    assert not any(line.startswith("household-push-key.py") for line in logged(tmp_path))

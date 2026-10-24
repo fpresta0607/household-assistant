@@ -87,6 +87,8 @@ The box is up. What is left:
   2. Install Steward AI on each iPhone.
   3. For each adult, make a setup link and open it on their iPhone:
        python3 scripts/household-pair.py <their first name>
+  4. If the box printed a line starting "household" for the push relay above, send that
+     line to the app's publisher; the phones are notified once the publisher adds it.
 
 docs/deploy/new-household.md has the rest: connecting mail and calendars, and keeping the
 box current.

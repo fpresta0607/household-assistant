@@ -306,6 +306,7 @@ def test_the_shell_installers_read_the_members_from_the_command_line(
     ]
     assert lines[1][6] == "/etc/household-assistant/openclaw-rex.env"
     assert household_file.main(["has-members"]) == 0
+    assert household_file.main(["has-push-relay"]) == 0
     assert household_file.main(["something"]) == 2
 
 

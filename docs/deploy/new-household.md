@@ -72,7 +72,7 @@ A person with a paired iPhone makes the link for a new one in the app, on Accoun
 
 A phone is told about a new message through Apple, and only the app's publisher holds the key Apple asks for.
 So a household's box sends each notification through the publisher's push relay, already sealed with a key only that phone has: the relay, like Apple, sees that there is a new message and nothing of what it says.
-The household's box signs what it sends with a key of its own, made on the box; the public half goes to the publisher once, who adds the household to the relay.
+The household's box signs what it sends with a key of its own, made on the box by `household-converge.sh` when the publisher's relay is named in the household file; the box prints one line, `household <name> key <public key>`, which goes to the publisher once, who adds the household to the relay.
 [The push relay](push-relay.md) has both sides of that.
 
 Until the household is added, everything works but the phones are not notified.

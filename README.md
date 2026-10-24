@@ -109,8 +109,10 @@ The deployed gateways follow the owner-authorized exception in [the family room]
 
 - **One small private server** runs both gateways as OpenClaw containers, behind the household's private network.
   Models come through OpenRouter, and each owner can choose fallback models in Settings.
+- **Every household runs its own.** Another household rents its own server, sets it up with one script and pays OpenRouter with its own key ([A new household's box](docs/deploy/new-household.md)).
+  Its box takes the publisher's signed releases by itself ([Updates](docs/deploy/updates.md)), and its phones are notified through the publisher's push relay, which sees only that there is a new message ([The push relay](docs/deploy/push-relay.md)).
 - **The app is the channel.** Telegram is retired, and nothing on the gateways reads it any more.
-- **A relay on the host** carries the family room between the gateways, every message signed by the phone that sent it.
+- **The gateways read each other's half of the family room** from a read-only share, the moment it changes, every message signed by the phone that sent it.
 - **Key holders** answer for the house and for PocketPiggies over a local socket.
 - **Backups** run every night: both gateways' state, then a restore drill that opens what it just wrote.
 - **Rollouts** go one gateway at a time, each after a backup of its state.
@@ -131,13 +133,17 @@ A TestFlight release is one click, from main.
 | [deploy/openclaw/plugins/](deploy/openclaw/plugins) | The OpenClaw plugins: the app's channel and family room, memory, pictures, scripture, PocketPiggies |
 | [deploy/openclaw/skills/](deploy/openclaw/skills) | The skills both assistants get |
 | [household/](household) | The identity and privacy spine, the home and PocketPiggies key holders |
-| [scripts/](scripts) | The installers, relay, backup and checks, run as root on the box |
+| [scripts/](scripts) | The installers, backup, updates and checks, run as root on the box |
+| [deploy/push-relay/](deploy/push-relay) | The publisher's push relay, which notifies other households' phones |
 | [services/voicebox/](services/voicebox) | A local speech service that waits for a Mac to run on |
 | [docs/](docs) | Runbooks, plans and the Apple checklist |
 
 ## Read more
 
 - [OpenClaw on the server](docs/deploy/openclaw.md): reach it, restart it, back it up, roll it back, and how the family room works
+- [A new household's box](docs/deploy/new-household.md): set up another household's server, connect its phones, keep it current
+- [Updates](docs/deploy/updates.md): how the publisher signs a release and how a box takes it
+- [The push relay](docs/deploy/push-relay.md): notifications for households whose box holds no Apple push key
 - [PocketPiggies](docs/deploy/pocket-piggies.md): who can read finance, and how
 - [Retiring SIQsermon](docs/deploy/siqsermon-retirement.md): scripture in the gateways, and SIQsermon's containers stopped
 - [Retiring Telegram](docs/deploy/retiring-telegram.md): taking out what Telegram left, one gateway at a time
