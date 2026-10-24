@@ -28,7 +28,7 @@ git clone https://github.com/fpresta0607/household-assistant.git /opt/household-
 `new-household.sh` does, in order, skipping what is already done when it is run again:
 
 1. **Checks the box**: Ubuntu, and enough memory for two assistants.
-2. **Installs** Docker, Python, git, jq, ufw and qrencode from Ubuntu, and Tailscale from Tailscale's own repository.
+2. **Installs** Docker, Python, git, jq, ufw, qrencode and ssh-keygen from Ubuntu, and Tailscale from Tailscale's own repository.
 3. **Joins the tailnet.** `tailscale up` prints a link; open it on a device signed in to the household's Tailscale account.
 4. **Closes the box** to everything from the internet but SSH, with ufw.
    The phones come in over the tailnet, which Tailscale's own rules admit.
@@ -44,6 +44,7 @@ git clone https://github.com/fpresta0607/household-assistant.git /opt/household-
    - each gateway's address on the tailnet, with `tailscale serve`, and its trust in that proxy;
    - the nightly backup, with a restore drill of every backup it takes;
    - and `openclaw-verify.sh` on each gateway, which fails the whole pass if any check fails.
+7. **Turns on updates** from the publisher's signed releases, once the publisher signs them ([Keeping the box current](#keeping-the-box-current)).
 
 The setup takes about fifteen minutes, most of it Docker pulling the gateway's image.
 To answer the questions again, delete `/etc/household-assistant/household.json` and run `new-household.sh` again.
@@ -78,8 +79,10 @@ Until the household is added, everything works but the phones are not notified.
 
 ## Keeping the box current
 
-The box can keep itself current from the repository, taking only the releases the publisher signed: it backs up first, converges to the release, and rolls back if the release does not verify.
-[Updates](updates.md) says how to turn it on, pause it, and roll back by hand.
+The box keeps itself current from the repository, taking only the releases the publisher signed: every night it fetches the newest signed release, backs up, converges to it, and rolls back if the release does not verify.
+`new-household.sh` turns that on when the repository carries the publisher's signing key, `deploy/update/allowed_signers`, and says so when it does not yet.
+The box takes the key from that first checkout and no release can change it.
+[Updates](updates.md) says how to turn it on later, watch it, pause it and roll back by hand.
 
 ## Connections
 

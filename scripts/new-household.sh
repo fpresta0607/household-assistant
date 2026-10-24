@@ -7,10 +7,12 @@
 #   /opt/household-assistant/src/scripts/new-household.sh
 #
 # It installs what the box needs from Ubuntu's own packages (Docker, Python, git, jq, ufw,
-# qrencode) and Tailscale from Tailscale's, signs the box in to the household's tailnet,
-# lets in nothing from the internet but SSH, asks the household's answers once
-# (household-setup.py), and converges the box (household-converge.sh). Run again, it skips
-# what is already done. docs/deploy/new-household.md walks through it.
+# qrencode, and ssh-keygen to check a release's signature) and Tailscale from Tailscale's,
+# signs the box in to the household's tailnet, lets in nothing from the internet but SSH,
+# asks the household's answers once (household-setup.py), converges the box
+# (household-converge.sh), and, once the publisher signs releases, has the box take them
+# itself (household-update.py). Run again, it skips what is already done.
+# docs/deploy/new-household.md walks through it.
 set -euo pipefail
 
 [[ ${EUID} -eq 0 ]] || { echo "run as root" >&2; exit 1; }
@@ -35,7 +37,7 @@ step "packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq docker.io docker-compose-v2 git jq curl openssl python3 ufw qrencode \
-  ca-certificates >/dev/null
+  openssh-client ca-certificates >/dev/null
 systemctl enable --now docker >/dev/null
 
 step "Tailscale"
@@ -62,6 +64,20 @@ python3 "${here}/household-setup.py"
 
 step "the box, to this checkout"
 "${here}/household-converge.sh"
+
+# The publisher's signing key, which the repository carries once the publisher signs its
+# releases (docs/deploy/updates.md). The box takes the key from this first checkout only;
+# no release can change it afterwards.
+signers="${here}/../deploy/update/allowed_signers"
+if [[ -f ${signers} ]]; then
+  step "updates: the publisher's signed releases, every night"
+  remote="$(git -C "${here}/.." remote get-url origin)"
+  python3 "${here}/household-update.py" install --remote "${remote}" --signers "${signers}"
+else
+  echo
+  echo "Updates are off: the publisher has not published a signing key yet"
+  echo "(deploy/update/allowed_signers). docs/deploy/updates.md says how to turn them on."
+fi
 
 cat <<'NEXT'
 
