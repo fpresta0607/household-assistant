@@ -62,6 +62,21 @@ install -d -m 0755 "${BIN_DIR}" "${DENISE_BIN_DIR}"
 # The Bible the household-scripture plugin reads, mounted read-only into both gateways.
 # scripts/scripture-build.py writes bible.sqlite here; root owns it, as it owns the plugins.
 install -d -m 0755 -o root -g root "${SCRIPTURE_DIR}"
+# Each gateway writes its half of the family room into household-app/share in its own
+# state, and the other mounts that folder read-only (household-app's share.js and
+# peer-link.js). It is made before compose starts either container, since docker would
+# make a missing one as root, which the gateway could not write. It sits inside a directory
+# the assistant controls, so it is made as the gateways' own user rather than as root, and
+# anything but a plain folder in its place is refused.
+for state in "${STATE_DIR}" "${DENISE_STATE_DIR}"; do
+  share="${state}/household-app/share"
+  setpriv --reuid="${OC_UID}" --regid="${OC_GID}" --clear-groups \
+    sh -c 'umask 077 && mkdir -p "$1"' sh "${share}"
+  if [[ -L ${share} || ! -d ${share} ]]; then
+    echo "refusing: ${share} is not a plain folder" >&2
+    exit 1
+  fi
+done
 install -m 0644 "${compose_src}" "${APP_DIR}/docker-compose.yml"
 
 # --- gateway token ---------------------------------------------------------

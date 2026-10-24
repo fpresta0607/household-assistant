@@ -14,8 +14,8 @@
 //
 // It is kept like the household cart (cart.js). Each gateway keeps every step either
 // assistant took, adding, correcting or removing a line, in its own SQLite file beside the
-// room. It publishes its own steps in its outbox, the host relay carries them to the other
-// gateway with every delivery, and both replay the same steps in the same order, so the two
+// room. It publishes its own steps in its outbox, the other gateway reads them from its
+// share with every change, and both replay the same steps in the same order, so the two
 // notes agree, a correction made on both sides at once ends the same way on each, and a
 // gateway that lost its file gets the other's steps back with the next delivery. Nothing
 // removes a step: a correction is a later step, and a removed line stays in the file.

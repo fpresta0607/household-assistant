@@ -62,7 +62,7 @@ async function deliverFromCorey(channel, steps) {
   );
 }
 
-const outboxOf = async (channel) => JSON.parse(await readFile(path.join(channel.stateDir, "household-app", "outbox.json"), "utf8"));
+const outboxOf = async (channel) => JSON.parse(await readFile(path.join(channel.stateDir, "household-app", "share", "outbox.json"), "utf8"));
 
 test("a handoff from the other assistant is marked seen at once and answered in the line's own turn, posting nothing in the room", async () => {
   // Arrange: the turn OpenClaw runs answers with one final reply.
@@ -236,8 +236,8 @@ test("a family reminder Denise takes in the room's shared session is posted by h
     assert.deepEqual(set.lines.map(({ owner, for: forWho }) => ({ owner, forWho })), [{ owner: "Denise", forWho: "Franco" }]);
     const [posted] = (await channel.call("household-app.sync", { since: 0 })).payload.entries.filter((entry) => entry.kind === "message");
     assert.deepEqual(
-      { conversation: posted.conversation, author: posted.author, text: posted.text, handedOver: posted.handedOver },
-      { conversation: "family", author: "denise", text: "Reminder: Pack the bags for Sunday", handedOver: true },
+      { conversation: posted.conversation, author: posted.author, text: posted.text, handedOver: posted.handedOver, final: posted.final },
+      { conversation: "family", author: "denise", text: "Reminder: Pack the bags for Sunday", handedOver: true, final: true },
     );
     const next = new Date(ago.getFullYear(), ago.getMonth(), ago.getDate() + 7);
     const [line] = (await run(noteTool(channel, OWNERS_THREAD), { action: "view", topic: "Reminders" })).lines;

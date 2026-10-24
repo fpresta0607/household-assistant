@@ -43,7 +43,7 @@ const MENTION_RULE = {
 const BOUND_MS = 20_000;
 
 const stepsOut = async (channel) =>
-  JSON.parse(await readFile(path.join(channel.stateDir, "household-app", "outbox.json"), "utf8").catch(() => "{}")).notes ?? [];
+  JSON.parse(await readFile(path.join(channel.stateDir, "household-app", "share", "outbox.json"), "utf8").catch(() => "{}")).notes ?? [];
 
 test("a gateway that restarts inside the bound of a question it stood down from still takes it over, once", { timeout: 60_000 }, async () => {
   // Arrange: Gia asks both assistants, over the relay, and Corey stands down.

@@ -63,6 +63,10 @@ services:
       # The Bible the household-scripture plugin reads, which scripts/scripture-build.py
       # writes, root-owned and read-only here like the plugins.
       - /var/lib/household-assistant/scripture:/opt/household-scripture:ro
+      # Denise's half of the family room: the share folder her household-app plugin
+      # writes, read-only here, where Corey's reads it the moment it changes (peer-link.js).
+      # Nothing else of her state is in it. scripts/openclaw-install.sh makes it first.
+      - /var/lib/household-assistant/openclaw-denise/household-app/share:/opt/household-peer:ro
     ports:
       - "127.0.0.1:18789:18789"
     cap_drop:
@@ -137,6 +141,8 @@ services:
       # The same household plugins as Corey's gateway, read-only for the same reason.
       - /opt/household-assistant/plugins:/opt/household-plugins:ro
       - /var/lib/household-assistant/scripture:/opt/household-scripture:ro
+      # Corey's half of the family room, read-only, as Corey's gateway mounts hers.
+      - /var/lib/household-assistant/openclaw/household-app/share:/opt/household-peer:ro
     ports:
       - "127.0.0.1:18790:18789"
     cap_drop:

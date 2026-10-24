@@ -4,8 +4,8 @@
 //
 // Each gateway keeps every step either assistant took, adding, removing, changing a
 // quantity or an order's status, in its own SQLite file beside the room. It publishes all
-// of its own steps in its outbox, the host relay carries them to the other gateway with
-// every delivery, and both replay the same steps in the same order, so the two carts agree
+// of its own steps in its outbox, the other gateway reads them from its share with
+// every change, and both replay the same steps in the same order, so the two carts agree
 // without either reaching into the other's state, and a gateway that lost its file gets the
 // other's steps back with the next delivery. A step is a couple of hundred bytes, so years
 // of a household's shopping stay well inside the outbox's bound.

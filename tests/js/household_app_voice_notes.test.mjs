@@ -89,8 +89,8 @@ async function keepMedia(channel, bytes, id) {
   await writeFile(path.join(channel.stateDir, "household-app", "media", id), bytes);
 }
 
-// What the host relay and relay-in.mjs leave for the other gateway: the attachment under
-// its hash, then the batch in the plugin's inbox.
+// What the other gateway takes from this one's share: the attachment under its hash,
+// then the batch, here left in the plugin's inbox, which takes it as the peer link does.
 async function relay(channel, from, entries) {
   const inbox = path.join(channel.stateDir, "household-app", "inbox");
   await mkdir(inbox, { recursive: true });
@@ -147,7 +147,7 @@ for (const { said, answeredBy } of NOTES) {
         const isClaimed = /denise/i.test(said);
         assert.equal(/They asked Denise too, who leaves it to you/.test(turn.supplemental.groupSystemPrompt), isClaimed);
         if (isClaimed) {
-          const outbox = path.join(channel.stateDir, "household-app", "outbox.json");
+          const outbox = path.join(channel.stateDir, "household-app", "share", "outbox.json");
           await until("the claim in the outbox", async () => (await readFile(outbox, "utf8").catch(() => "")).includes('"claim"'));
           const { notes } = JSON.parse(await readFile(outbox, "utf8"));
           assert.deepEqual(notes.map((step) => [step.kind, step.message, step.for]), [["claim", message.id, "franco"]]);
@@ -316,7 +316,7 @@ test("a voice note's words come with the history page the phone reads, and stay 
     await until("the turn", () => channel.contexts.length === 1);
     const page = (await channel.call("household-app.history", { conversation: "family" })).payload;
     // The outbox is written a moment after each change, one write at a time.
-    const outbox = async () => JSON.parse(await readFile(path.join(channel.stateDir, "household-app", "outbox.json"), "utf8").catch(() => '{"entries":[]}')).entries;
+    const outbox = async () => JSON.parse(await readFile(path.join(channel.stateDir, "household-app", "share", "outbox.json"), "utf8").catch(() => '{"entries":[]}')).entries;
     await until("the note in the outbox", async () => (await outbox()).some((entry) => entry.id === message.id));
 
     // Assert

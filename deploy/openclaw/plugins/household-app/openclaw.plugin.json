@@ -158,6 +158,11 @@
             "pattern": "^[0-9]+-[a-z0-9]+\\.apps\\.googleusercontent\\.com$",
             "description": "The household's Google OAuth client of type iOS, the same id the app is built with. Not a secret. Without it, Connect Google from the app is refused."
           },
+          "peerShare": {
+            "type": "string",
+            "pattern": "^/[A-Za-z0-9._/-]+$",
+            "description": "Where the other gateway's share folder is mounted read-only in this container, which the family room's other half is read from. /opt/household-peer when unset."
+          },
           "approver": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]{0,31}$",

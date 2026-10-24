@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Install the app's family room on the IONOS box: the household-app plugin into the
-# read-only plugin mount, the host relay and the Spend page's spend job, and their systemd
-# units. Idempotent: run it again after a change and it replaces each in place.
+# read-only plugin mount, and the Spend page's spend job and its systemd units. Idempotent:
+# run it again after a change and it replaces each in place. The host relay that carried
+# the family room between the gateways until each read the other's share itself
+# (household-app's peer-link.js) is taken away, with its units.
 #
 #   scp -r scripts deploy root@<box>:/tmp/household-app-release/
 #   ssh root@<box> bash /tmp/household-app-release/scripts/household-app-install.sh
@@ -9,9 +11,8 @@
 # What it does NOT do: touch docker-compose.yml, either env file, either gateway's
 # config, or any container. No gateway loads the plugin until
 # scripts/openclaw-household-app.py names it in that gateway's config, one gateway at a
-# time, so installing changes nothing either assistant does. The relay starts here and
-# finds nothing to carry until a gateway writes its first outbox, and the spend job only
-# reads a gateway that answers and writes nothing until both have.
+# time, so installing changes nothing either assistant does. The spend job only reads a
+# gateway that answers and writes nothing until both have.
 set -euo pipefail
 
 RELEASE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -51,25 +52,29 @@ cp -r "${RELEASE}/deploy/openclaw/plugins/household-app" "${HOUSEHOLD_APP_PLUGIN
 chown -R root:root "${HOUSEHOLD_APP_PLUGINS}/household-app"
 chmod -R u=rwX,go=rX "${HOUSEHOLD_APP_PLUGINS}/household-app"
 
-echo "==> the relay into ${HOUSEHOLD_APP_TARGET}"
+echo "==> the spend job into ${HOUSEHOLD_APP_TARGET}"
 install -d -m 0755 "${HOUSEHOLD_APP_TARGET}"
-install -m 0755 "${RELEASE}/scripts/household-app-relay.py" "${HOUSEHOLD_APP_TARGET}/household-app-relay.py"
 install -m 0755 "${RELEASE}/scripts/household-spend.py" "${HOUSEHOLD_APP_TARGET}/household-spend.py"
 install -m 0644 "${RELEASE}/scripts/gateway_config.py" "${HOUSEHOLD_APP_TARGET}/gateway_config.py"
+rm -f "${HOUSEHOLD_APP_TARGET}/household-app-relay.py"
 
 echo "==> its state directory"
-# Where the relay keeps what it has carried and the spend job its ledger, root-only and
-# outside both containers.
+# Where the spend job keeps its ledger, root-only and outside both containers.
 install -d -m 0700 "${HOUSEHOLD_APP_STATE}/coordination"
 
 echo "==> systemd units"
 install -d -m 0755 "${HOUSEHOLD_APP_UNITS}"
-for unit in household-app-relay.service household-app-relay.path household-app-relay.timer \
-  household-spend.service household-spend.timer; do
+# The host relay's, from before the gateways read each other's share, go first.
+relay_units=(household-app-relay.path household-app-relay.timer household-app-relay.service)
+systemctl disable --now "${relay_units[@]}" 2>/dev/null || true
+for unit in "${relay_units[@]}"; do
+  rm -f "${HOUSEHOLD_APP_UNITS:?}/${unit}"
+done
+for unit in household-spend.service household-spend.timer; do
   install -m 0644 "${RELEASE}/deploy/household-app/${unit}" "${HOUSEHOLD_APP_UNITS}/${unit}"
 done
 systemctl daemon-reload
-systemctl enable --now household-app-relay.path household-app-relay.timer household-spend.timer
+systemctl enable --now household-spend.timer
 
 echo
 echo "household-app is installed. No gateway loads it until:"

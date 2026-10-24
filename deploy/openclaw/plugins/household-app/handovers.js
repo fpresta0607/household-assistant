@@ -1,5 +1,5 @@
 // Which family-room posts belong to a turn the other assistant's @mention started, so
-// every one of them is marked `handedOver` and starts nothing on the other gateway (see
+// every one of them is marked as that turn's own reply is, handed over or final (see
 // room.js). The turn's own reply is marked where it is delivered. A tool's post reaches
 // this channel's sender with no word of the turn that made it, so the turn names each
 // run OpenClaw starts for it, as it starts, and OpenClaw's tool hooks say which run each
@@ -8,17 +8,18 @@
 // after it.
 
 export function createHandovers() {
-  // The handed-over turns' runs, each with its tool calls under way.
+  // The handed-over turns' runs, each with its mark and its tool calls under way.
   const runs = new Map();
 
   return {
-    // Runs one handed-over turn. `work` is handed the function that names a run it starts.
-    async during(work) {
+    // Runs one handed-over turn, its posts marked `mark`, `true` or `"final"`. `work` is handed
+    // the function that names a run it starts.
+    async during(work, mark = true) {
       const named = new Set();
       try {
         return await work((runId) => {
           named.add(runId);
-          runs.set(runId, new Set());
+          runs.set(runId, { mark, calls: new Set() });
         });
       } finally {
         for (const runId of named) runs.delete(runId);
@@ -26,16 +27,20 @@ export function createHandovers() {
     },
 
     toolStarted(runId, toolCallId) {
-      runs.get(runId)?.add(toolCallId);
+      runs.get(runId)?.calls.add(toolCallId);
     },
 
     toolEnded(runId, toolCallId) {
-      runs.get(runId)?.delete(toolCallId);
+      runs.get(runId)?.calls.delete(toolCallId);
     },
 
-    // Whether a post to `conversation` now belongs to a handed-over turn.
+    // How a post to `conversation` is marked now: as a handed-over turn's, `true` or
+    // `"final"`, or `false` when it belongs to none. Final wins when two turns overlap.
     marks(conversation) {
-      return conversation === "family" && [...runs.values()].some((calls) => calls.size > 0);
+      if (conversation !== "family") return false;
+      const busy = [...runs.values()].filter((run) => run.calls.size > 0);
+      if (busy.some((run) => run.mark === "final")) return "final";
+      return busy.length > 0;
     },
   };
 }

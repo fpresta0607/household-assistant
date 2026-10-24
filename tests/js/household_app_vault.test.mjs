@@ -171,7 +171,7 @@ const dayFromNow = (days) => {
 test("through the plugin, a passport photographed in the owner's thread is kept there, its day in the note, its picture nowhere else", async () => {
   // Arrange
   const channel = await runningChannel(COREY);
-  const outbox = path.join(channel.stateDir, "household-app", "outbox.json");
+  const outbox = path.join(channel.stateDir, "household-app", "share", "outbox.json");
   try {
     const picture = await photo(channel.stateDir, `passport ${PASSPORT_NUMBER}`);
     const message = { conversation: "direct", id: "v-00000001", at: Date.now(), replyTo: null, text: "My passport, keep an eye on it", media: [picture] };

@@ -211,7 +211,8 @@ export function openRoomStore(file) {
             ...(signature ? { signature } : {}),
             ...(runId ? { runId } : {}),
             ...(approval ? { approval } : {}),
-            ...(handedOver === true ? { handedOver } : {}),
+            ...(handedOver === true || handedOver === "final" ? { handedOver: true } : {}),
+            ...(handedOver === "final" ? { final: true } : {}),
             ...(did?.length ? { did } : {}),
           },
           nextRev(),
@@ -449,7 +450,7 @@ export function openRoomStore(file) {
     },
 
     // What this gateway's own person and assistant did in the family room, newest
-    // `limit` of it, oldest first: the file the host relay hands to the other gateway.
+    // `limit` of it, oldest first: the outbox the other gateway reads (share.js).
     outbox(limit) {
       return statements.outbox.all(limit).map(toEntry).reverse();
     },

@@ -5,8 +5,8 @@
 //
 // Each phone already holds an Ed25519 key pair: the device identity it pairs with its
 // own gateway by. A family message travels from that gateway to the other one through
-// the host relay, and the file the relay reads sits in a directory the sending
-// assistant can write. So without a signature, an assistant that had been talked into
+// its share (share.js), and the share sits in a directory the sending assistant can
+// write. So without a signature, an assistant that had been talked into
 // it could put words in its own person's mouth for the other assistant, which then
 // answers with the other person's tools. The phone signs, the receiving gateway checks
 // against the keys the box pinned for that person when it set the room up, and an

@@ -75,8 +75,8 @@ const restrictsNothing = (policy) => policy === undefined || (policy.allow === u
 const pluginToolsOf = (channel, ctx) =>
   channel.tools.map(({ factory }) => factory(toolContextOf(ctx))).filter(Boolean).map((tool) => tool.name).sort();
 
-// The owner says it from their phone; the other person's words arrive over the relay, as
-// relay-in.mjs leaves them in the plugin's inbox.
+// The owner says it from their phone; the other person's words arrive as a batch in the
+// plugin's inbox, which takes them the way the peer link does.
 async function turnFor(channel, person, message) {
   const before = channel.contexts.length;
   if (person === FRANCO) {

@@ -14,8 +14,9 @@
 // room and on the phone.
 //
 // The phone talks to this through the gateway methods below, over the connection it
-// already pairs with. The other gateway's half of the family room arrives through the
-// host relay, which writes it into this plugin's inbox; see relay-in.mjs. The rules for
+// already pairs with. Each gateway shows the other its half of the family room in a share
+// folder (share.js), which the other's container mounts read-only and reads the moment it
+// changes (peer-link.js). The rules for
 // who may say what live in room.js, checklist ticks on the assistants' cards in cards.js,
 // where the owner is, while they share it, in location.js and the assistant's tool for it
 // in location-tool.js, the house's thermostat and music in home-tool.js, the household note both
@@ -120,12 +121,14 @@ import {
   setupReply,
 } from "./pairing.js";
 import { phoneMetricsLine } from "./phone-metrics.js";
+import { PEER_SHARE, createPeerLink } from "./peer-link.js";
 import { createPhones, removeThroughOpenClaw } from "./phones.js";
 import { createHttp2Transport, createPush } from "./push.js";
 import { REACT_TOOL, createReactTool } from "./react-tool.js";
 import { createRoom } from "./room.js";
 import { SEND_TOOL, createSendTool, createSends, refuseDirectSend } from "./send-tool.js";
 import { assistantPage, createSettings, nameOf } from "./settings.js";
+import { createShare } from "./share.js";
 import { openSettingsStore } from "./settings-store.js";
 import { isTextSignedBy } from "./signature.js";
 import { createSpeak } from "./speak.js";
@@ -335,13 +338,6 @@ function conversationFor(target, owner) {
   if (target === FAMILY) return FAMILY;
   if (target === owner) return "direct";
   return null;
-}
-
-async function writeAtomically(file, text) {
-  await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.${process.pid}.tmp`;
-  await writeFile(temporary, text, { mode: 0o600 });
-  await rename(temporary, file);
 }
 
 const KIND_OF_FACT = { voice: "audio", photo: "image", video: "video", file: "document" };
@@ -647,7 +643,7 @@ function startRoom(ctx) {
           onError: (error) => log.warn(`${PLUGIN_ID}: a reply in the ${conversation} conversation was not kept: ${error?.message ?? error}`),
         },
       });
-      const result = handedOver ? await handovers.during(dispatchTurn) : await dispatchTurn();
+      const result = handedOver ? await handovers.during(dispatchTurn, handedOver) : await dispatchTurn();
       if (result?.admission?.kind !== "dispatch") {
         log.info(`${PLUGIN_ID}: a ${conversation} turn was not started: ${result?.admission?.kind ?? "unknown"}`);
       }
@@ -742,7 +738,7 @@ function startRoom(ctx) {
     }
   }
 
-  let writing = Promise.resolve();
+  const share = createShare({ directory, mediaPath: media.path });
   const sessionKeys = { family: routeFor(FAMILY).sessionKey, direct: routeFor("direct").sessionKey };
   // Taken here, while the channel starts, so a phone's turn runs as the channel's, and
   // an approval the owner answers reaches OpenClaw as this channel's.
@@ -791,11 +787,11 @@ function startRoom(ctx) {
     store,
     media,
     emit,
-    // One write at a time, so an older snapshot can never land after a newer one.
+    // Into the share the other gateway reads, one write at a time, so an older snapshot can
+    // never land after a newer one.
     writeOutbox: (outbox) => {
       const text = JSON.stringify({ persona: assistant.id, ...outbox, ...appleSignIn.outbox(), ...cart.outbox(), ...notes.outbox(), ...wishes.outbox() });
-      writing = writing
-        .then(() => writeAtomically(path.join(directory, "outbox.json"), text))
+      share.write(text, outbox.entries)
         .catch((error) => log.warn(`${PLUGIN_ID}: the outbox could not be written: ${error?.message ?? error}`));
     },
     push,
@@ -867,7 +863,34 @@ function startRoom(ctx) {
   // Only the cart's own steps cross.
   const meals = createMeals({ file: path.join(directory, "meals.sqlite") });
 
-  // The other gateway's half of the family room, as relay-in.mjs leaves it.
+  // One batch of the other gateway's half of the family room: its entries, sign-ins and the
+  // steps its assistant took, each checked where it is accepted.
+  async function ingest(batch) {
+    const { accepted, refused } = await room.acceptPeer(batch);
+    if (refused) log.warn(`${PLUGIN_ID}: kept ${accepted} and refused ${refused} entries from the other gateway`);
+    await appleSignIn.acceptPeer(batch);
+    const steps = cart.acceptPeer(batch);
+    if (steps.refused) log.warn(`${PLUGIN_ID}: refused ${steps.refused} cart steps from the other gateway`);
+    const noted = notes.acceptPeer(batch);
+    if (noted.refused) log.warn(`${PLUGIN_ID}: refused ${noted.refused} household note steps from the other gateway`);
+    considerHandoffs(noted.handed);
+    const wished = wishes.acceptPeer(batch);
+    if (wished.refused) log.warn(`${PLUGIN_ID}: refused ${wished.refused} wishlist steps from the other gateway`);
+  }
+
+  // The other gateway's share, read the moment it changes (peer-link.js).
+  const peerLink = createPeerLink({
+    folder: config.peerShare ?? PEER_SHARE,
+    cursorFile: path.join(directory, "peer-cursor.json"),
+    peer: { person: peerPerson.id, assistant: peerAssistant.id },
+    owner: owner.id,
+    putMedia: (bytes, id) => media.putBytes(bytes, id),
+    ingest,
+    log,
+  });
+
+  // A batch left as a file in the inbox, as the host relay left them before the share took
+  // its place, and as a person replaying one by hand may.
   const inbox = path.join(directory, "inbox");
   let draining = Promise.resolve();
   const drain = () => {
@@ -885,16 +908,7 @@ function startRoom(ctx) {
           if (size > MAX_INBOX_FILE) throw new Error("over its size bound");
           const { from, batch } = JSON.parse(await readFile(file, "utf8"));
           if (from !== peerAssistant.id) throw new Error("not from the other gateway");
-          const { accepted, refused } = await room.acceptPeer(batch);
-          if (refused) log.warn(`${PLUGIN_ID}: kept ${accepted} and refused ${refused} entries from the other gateway`);
-          await appleSignIn.acceptPeer(batch);
-          const steps = cart.acceptPeer(batch);
-          if (steps.refused) log.warn(`${PLUGIN_ID}: refused ${steps.refused} cart steps from the other gateway`);
-          const noted = notes.acceptPeer(batch);
-          if (noted.refused) log.warn(`${PLUGIN_ID}: refused ${noted.refused} household note steps from the other gateway`);
-          considerHandoffs(noted.handed);
-          const wished = wishes.acceptPeer(batch);
-          if (wished.refused) log.warn(`${PLUGIN_ID}: refused ${wished.refused} wishlist steps from the other gateway`);
+          await ingest(batch);
         } catch (error) {
           log.warn(`${PLUGIN_ID}: an inbox file was refused: ${error?.message ?? error}`);
         } finally {
@@ -977,7 +991,7 @@ function startRoom(ctx) {
   });
 
   return {
-    room, media, store, inbox, drain, owner, peerPerson, pairing, nonces, appleSignIn, tick, location, approvals, cart, cartOrdered,
+    room, media, store, inbox, drain, peerLink, owner, peerPerson, pairing, nonces, appleSignIn, tick, location, approvals, cart, cartOrdered,
     notes, videos, images, stopBounds, sends, wishes, vault, meals,
     canEmail: Boolean(config.orderMail?.account),
     orderMail,
@@ -1151,7 +1165,7 @@ export const householdChannel = createChatChannelPlugin({
             for (const due of started.notes.dueReminders()) {
               started.notes.fired(due.id);
               if (due.isLate) continue;
-              void started.room.reply({ conversation: FAMILY, text: `Reminder: ${due.text}`, handedOver: true, isTimeSensitive: true })
+              void started.room.reply({ conversation: FAMILY, text: `Reminder: ${due.text}`, handedOver: "final", isTimeSensitive: true })
                 .catch((error) => ctx.log?.warn?.(`${PLUGIN_ID}: a family reminder was not posted: ${error?.message ?? error}`));
             }
           } catch (error) {
@@ -1198,10 +1212,13 @@ export const householdChannel = createChatChannelPlugin({
         const vaultTimer = setInterval(noticeDocuments, VAULT_MS);
         vaultTimer.unref();
         void started.drain();
+        const linking = new AbortController();
+        void started.peerLink.start(linking.signal);
         try {
           ctx.setStatus(channelReadyPatch({ accountId: ctx.accountId }));
           await waitUntilAbort(ctx.abortSignal);
         } finally {
+          linking.abort();
           watcher.close();
           clearInterval(sweep);
           clearTimeout(firstMail);

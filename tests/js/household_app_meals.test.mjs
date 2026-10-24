@@ -144,7 +144,7 @@ const run = async (tool, args) => JSON.parse((await tool.execute("call-1", args)
 test("through the plugin, an accepted plan fills the cart with each item once, and orders nothing", async () => {
   // Arrange: Franco's kitchen has rice and eggs, and the cart already has spaghetti.
   const channel = await runningChannel(COREY);
-  const outbox = path.join(channel.stateDir, "household-app", "outbox.json");
+  const outbox = path.join(channel.stateDir, "household-app", "share", "outbox.json");
   try {
     await run(toolOf(channel, "household_note", FRANCOS_THREAD), { action: "add", topic: "In the kitchen", rows: [{ text: "half a bag", item: "rice" }, { text: "a dozen", item: "eggs" }] });
     await run(toolOf(channel, "household_cart", FRANCOS_THREAD), { action: "add", name: "Spaghetti" });

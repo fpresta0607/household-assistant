@@ -1,5 +1,5 @@
 // The app's two conversations on one gateway, and the rules for each: the family room,
-// which this gateway shares with the other one through the host relay, and the owner's
+// which this gateway shares with the other one (share.js and peer-link.js), and the owner's
 // own thread with the assistant, which it shares with nobody.
 //
 // Who may say what:
@@ -22,9 +22,11 @@
 // its words, heard once on this gateway (voice-notes.js). The other assistant hands it a
 // request by @mentioning it, or puts a question to it by name (mentions.js), and that
 // starts one family-room turn whose sender is that assistant, never a person, so nothing
-// that answers only a person is reachable from it. What such a turn writes is marked `handedOver`, and a marked message,
-// one ten minutes old or older, or one already kept starts nothing, so the two can never
-// answer each other in a loop.
+// that answers only a person is reachable from it. What such a turn writes is marked
+// `handedOver`, and may start one answer back, the same way, from the assistant that asked;
+// what that answer writes is marked `final` as well, and starts nothing. A message ten
+// minutes old or older, or one already kept, starts nothing either, so the two answer each
+// other at most twice and never in a loop. A family reminder's post is `final` from the start.
 //
 // Who is on it: a person's message that asks both assistants gets one answer, from the asker's
 // own assistant, which claims it as its turn starts (a step of the household note, notes.js,
@@ -87,10 +89,10 @@ const MIME = /^[A-Za-z0-9.+-]+\/[A-Za-z0-9.+-]+$/;
 const DEVICE_TOKEN = /^[0-9a-fA-F]{32,200}$/;
 const MAX_MEDIA = 10;
 const MAX_PERSON_MESSAGE_UNITS = 64_000;
-// A message's attachments together, as their files on disk measure them, so the host
-// relay can carry any family message to the other gateway in one delivery. The relay
-// sends at most this much in one (MAX_BATCH_MEDIA_BYTES in scripts/household-app-relay.py),
-// and a message over it would hold up every message after it.
+// A message's attachments together, as their files on disk measure them, so the other
+// gateway can read any family message in one batch. It reads at most this much in one
+// (MAX_BATCH_MEDIA_BYTES in peer-link.js), and a message over it would hold up every
+// message after it.
 const MAX_MESSAGE_MEDIA_BYTES = 120 * 1024 * 1024;
 const MAX_WAVEFORM = 128;
 const DAY_MS = 86_400_000;
@@ -101,8 +103,10 @@ const NEWEST_MS = 5 * 60_000;
 // The other assistant's @mention starts a turn only while it is this fresh.
 const HANDOVER_WITHIN_MS = 10 * 60_000;
 // How long the assistant that stood down waits for a sign of the other's answer, and how far
-// back a sign counts, since the other side's typing can arrive a delivery before its claim.
-const CLAIM_BOUND_MS = 20_000;
+// back a sign counts, since the other side's typing can arrive a moment before its claim. The
+// other side's claim and typing reach this one as soon as they are written (peer-link.js), so
+// this is for a gateway that is down, not for a slow relay, as it was until the relay went.
+const CLAIM_BOUND_MS = 8000;
 const CLAIM_SIGN_MS = 5000;
 // How many of the family room's newest messages are searched for the other's answer.
 const ROOM_SIGN_MESSAGES = 50;
@@ -502,18 +506,18 @@ export function createRoom({
   }
 
   // The other assistant's family message, just kept: a fresh @mention of this assistant, or
-  // a question put to it by name, that no handed-over turn wrote starts one family-room
-  // turn, sent by that assistant. The turn's own messages are marked, so it can answer once
-  // and never start one back.
+  // a question put to it by name, starts one family-room turn, sent by that assistant, unless
+  // it is marked final. The turn's own messages are marked: handed over when the message was
+  // not, so the other side may answer once, and final when it was, so nothing answers that.
   function considerHandover(entry) {
-    if (entry.handedOver === true || now() - entry.at >= HANDOVER_WITHIN_MS) return;
+    if (entry.final === true || now() - entry.at >= HANDOVER_WITHIN_MS) return;
     const answersTo = new Set([assistant.name, ...assistantNames()]);
     if (![...answersTo].some((name) => isMentioned(entry.text, name) || isAskedByName(entry.text, name))) return;
     start({
       conversation: "family",
       message: entry,
       author: { id: entry.author, name: names()[entry.author], isAssistant: true },
-      handedOver: true,
+      handedOver: entry.handedOver === true ? "final" : true,
     });
   }
 
@@ -542,7 +546,7 @@ export function createRoom({
       origin: "peer",
       ...(isPerson ? { signature: raw.signature } : {}),
       ...(runId ? { runId } : {}),
-      ...(!isPerson && raw.handedOver === true ? { handedOver: true } : {}),
+      ...(!isPerson && raw.handedOver === true ? { handedOver: raw.final === true ? "final" : true } : {}),
       did: isPerson ? [] : cleanDid(raw.did ?? []),
     });
     if (!added) return;
@@ -691,8 +695,9 @@ export function createRoom({
 
     // What the assistant said: its words, and any files its reply carried, already
     // read through the gateway's own media policy by the caller. `handedOver` marks a
-    // reply from a turn the other assistant's @mention started, `did` is what its run
-    // changed, and `isTimeSensitive` marks a scheduled reminder's push.
+    // reply from a turn the other assistant's @mention started, `true` or `"final"`
+    // (considerHandover), `did` is what its run changed, and `isTimeSensitive` marks a
+    // scheduled reminder's push.
     async reply({ conversation, runId, text, files = [], handedOver = false, did = [], isTimeSensitive = false }) {
       const attachments = [];
       for (const file of files) {

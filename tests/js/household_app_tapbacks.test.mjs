@@ -95,7 +95,7 @@ function said(id, text, overrides = {}) {
 const signedBy = (person, message) => ({ ...message, signature: person.sign(message) });
 
 // What each gateway's own person and assistant said in the family room, carried to the
-// other one as the host relay carries it: the newest outbox's entries.
+// other one as it reads the share: the newest outbox's entries.
 async function relay(from, to) {
   return to.room.acceptPeer(from.seen.outboxes.at(-1));
 }

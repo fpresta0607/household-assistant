@@ -198,7 +198,7 @@ test("through the plugin, Gia's wish for herself reaches only the outbox, and le
     requesterSenderId: "gia",
     sessionKey: "agent:main:household:direct:gia",
   };
-  const outbox = path.join(channel.stateDir, "household-app", "outbox.json");
+  const outbox = path.join(channel.stateDir, "household-app", "share", "outbox.json");
   try {
     const tool = channel.tools.find(({ options }) => options.names.includes("household_wish")).factory(GIAS_THREAD);
 

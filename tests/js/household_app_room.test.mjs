@@ -1313,9 +1313,22 @@ for (const [label, text] of [
   });
 }
 
-test("a question by name that a handed-over turn wrote starts nothing, so the two answer each other once", async () => {
+test("a question by name that a handed-over turn wrote starts one answer, marked final", async () => {
   const { room, seen } = await setup();
   await room.acceptPeer({ entries: [fromDenise("a-00000020", "Corey, what do you have on your side?", { handedOver: true })] });
+  assert.equal(seen.dispatched.length, 1);
+  assert.equal(seen.dispatched[0].handedOver, "final");
+});
+
+test("a final message starts nothing, so the two answer each other at most twice", async () => {
+  const { room, seen } = await setup();
+  await room.acceptPeer({ entries: [fromDenise("a-00000020", "Corey, what do you have on your side?", { handedOver: true, final: true })] });
+  assert.equal(seen.dispatched.length, 0);
+});
+
+test("a handed-over message that does not name this assistant starts nothing", async () => {
+  const { room, seen } = await setup();
+  await room.acceptPeer({ entries: [fromDenise("a-00000020", "Gia's appointment is Thursday at three.", { handedOver: true })] });
   assert.equal(seen.dispatched.length, 0);
 });
 
@@ -1333,12 +1346,17 @@ for (const [label, text] of [
   });
 }
 
-test("a message a handed-over turn wrote never starts a turn here, and keeps its mark", async () => {
-  const { room, store, seen } = await setup();
-  const result = await room.acceptPeer({ entries: [fromDenise("a-00000020", "@Corey done, back to you", { handedOver: true })] });
-  assert.deepEqual(result, { accepted: 1, refused: 0 });
-  assert.equal(seen.dispatched.length, 0);
+test("a message a handed-over turn wrote keeps its mark, and a final one keeps both", async () => {
+  const { room, store } = await setup();
+  const result = await room.acceptPeer({ entries: [
+    fromDenise("a-00000020", "@Corey done, back to you", { handedOver: true }),
+    fromDenise("a-00000021", "@Corey thanks", { handedOver: true, final: true }),
+  ] });
+  assert.deepEqual(result, { accepted: 2, refused: 0 });
   assert.equal(store.message("a-00000020").handedOver, true);
+  assert.equal("final" in store.message("a-00000020"), false);
+  assert.equal(store.message("a-00000021").handedOver, true);
+  assert.equal(store.message("a-00000021").final, true);
 });
 
 test("only a mention under ten minutes old starts a turn", async () => {
@@ -1380,6 +1398,9 @@ test("a reply from a handed-over turn is marked for the other gateway, and any o
   assert.equal("handedOver" in ordinary, false);
   const relayed = Object.fromEntries(seen.outboxes.at(-1).entries.map((entry) => [entry.id, entry.handedOver]));
   assert.deepEqual(relayed, { [handed.id]: true, [ordinary.id]: undefined });
+  const final = await room.reply({ conversation: "family", runId: "run-3", text: "@Denise thanks.", handedOver: "final" });
+  assert.deepEqual([final.handedOver, final.final], [true, true]);
+  assert.equal(seen.outboxes.at(-1).entries.find((entry) => entry.id === final.id).final, true);
 });
 
 // MARK: - A call with the assistant, folded once it ends
@@ -1691,7 +1712,7 @@ test("a question the other person asks both assistants is left to theirs, and ta
 
   // Assert: Corey stands down, with a bound.
   assert.equal(seen.dispatched.length, 0);
-  assert.deepEqual(later.map(({ milliseconds }) => milliseconds), [20_000]);
+  assert.deepEqual(later.map(({ milliseconds }) => milliseconds), [8000]);
 
   // Act: the bound passes with no sign of Denise.
   later[0].task();
@@ -1735,11 +1756,11 @@ test("a question stood down from is kept until its bound is checked, and a resta
   const { claims, taken, standing } = claimsKept();
   const first = await setup({ peerAddressed: BOTH, claims, schedule: (task, milliseconds) => later.push({ task, milliseconds }) });
   await first.room.acceptPeer({ entries: [{ kind: "message", author: "gia", ...signedBy(GIA, said("m-00000020", "Corey and Denise, is church at ten?")) }] });
-  assert.deepEqual([...standing.values()], [{ message: "m-00000020", since: NOW - 5000, deadline: NOW + 20_000 }]);
+  assert.deepEqual([...standing.values()], [{ message: "m-00000020", since: NOW - 5000, deadline: NOW + 8000 }]);
 
-  // Act: the gateway restarts 15 seconds in, before the bound passes, on the same store.
+  // Act: the gateway restarts 3 seconds in, before the bound passes, on the same store.
   const resumed = [];
-  const second = await setup({ peerAddressed: BOTH, claims, store: first.store, now: () => NOW + 15_000, schedule: (task, milliseconds) => resumed.push({ task, milliseconds }) });
+  const second = await setup({ peerAddressed: BOTH, claims, store: first.store, now: () => NOW + 3000, schedule: (task, milliseconds) => resumed.push({ task, milliseconds }) });
   second.room.resumeStandDowns();
   resumed[0].task();
   second.room.resumeStandDowns();

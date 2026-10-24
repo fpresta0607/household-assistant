@@ -68,7 +68,7 @@ function gateways() {
     tick: (milliseconds = 1000) => {
       clock += milliseconds;
     },
-    // What the host relay carries: the source's own outbox section, as its batch.
+    // What the other gateway reads from the share: the source's own outbox section, as its batch.
     relay: (from, to) => to.acceptPeer({ cart: from.outbox().cart }),
   };
 }

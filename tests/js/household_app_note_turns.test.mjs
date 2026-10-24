@@ -94,7 +94,7 @@ test("a dated weigh-in saved by Denise's registered tool reaches Corey's family-
     const saved = await run(noteTool(denise, context), { action: "add", topic: "Kitten weights", day: "2026-10-17",
       rows: [{ item: "Mochi", text: "212 g" }, { item: "Pepper", text: "198 g" }] });
     assert.equal(saved.lines.length, 2);
-    const outbox = path.join(denise.stateDir, "household-app", "outbox.json");
+    const outbox = path.join(denise.stateDir, "household-app", "share", "outbox.json");
     await until("Denise's dated weigh-in in her outbox", async () => {
       batch = JSON.parse(await readFile(outbox, "utf8").catch((error) => {
         if (error.code === "ENOENT") return "{}";
@@ -127,7 +127,7 @@ test("a dated weigh-in saved by Denise's registered tool reaches Corey's family-
 test("a line crosses to the other gateway in the outbox, and the other gateway's lines come back through the inbox", async () => {
   // Arrange
   const channel = await runningChannel(CFG);
-  const outbox = path.join(channel.stateDir, "household-app", "outbox.json");
+  const outbox = path.join(channel.stateDir, "household-app", "share", "outbox.json");
   const fromDenise = {
     id: "ns-00000000-0000-4000-8000-000000000001",
     at: Date.now(),
@@ -220,7 +220,7 @@ test("Corey's automations that post in the family room reach Denise's family-roo
   const scheduler = { list: async () => structuredClone(jobs) };
   const abort = new AbortController();
   const corey = await runningChannel(cfg);
-  const outbox = path.join(corey.stateDir, "household-app", "outbox.json");
+  const outbox = path.join(corey.stateDir, "household-app", "share", "outbox.json");
   let mirrored;
   try {
     // Act: OpenClaw reconciles the scheduler as the gateway starts, and a job is later deleted.

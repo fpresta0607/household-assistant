@@ -24,3 +24,6 @@ apps/ios/Local.xcconfig
 .test-validation/
 .spotify-validation/
 uv.lock
+
+# Worktrees Claude Code makes for its agents.
+.claude/worktrees/

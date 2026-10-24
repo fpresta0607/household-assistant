@@ -66,16 +66,13 @@ def run_install(
     return completed, log, paths
 
 
-def test_it_installs_the_relay_the_spend_job_the_plugin_and_the_units_and_starts_them(
+def test_it_installs_the_spend_job_the_plugin_and_the_units_and_starts_them(
     tmp_path: Path,
 ) -> None:
     completed, log, paths = run_install(tmp_path)
     assert completed.returncode == 0, completed.stderr
 
     target = paths["HOUSEHOLD_APP_TARGET"]
-    assert (target / "household-app-relay.py").read_bytes() == (
-        ROOT / "scripts" / "household-app-relay.py"
-    ).read_bytes()
     assert (target / "household-spend.py").read_bytes() == (
         ROOT / "scripts" / "household-spend.py"
     ).read_bytes()
@@ -89,28 +86,20 @@ def test_it_installs_the_relay_the_spend_job_the_plugin_and_the_units_and_starts
         "media.js",
         "push.js",
         "signature.js",
-        "relay-in.mjs",
+        "share.js",
+        "peer-link.js",
         "spend.js",
         "spend-in.mjs",
         "openclaw.plugin.json",
     ):
         assert (plugin / name).exists(), name
-    for unit in (
-        "household-app-relay.service",
-        "household-app-relay.path",
-        "household-app-relay.timer",
-        "household-spend.service",
-        "household-spend.timer",
-    ):
+    for unit in ("household-spend.service", "household-spend.timer"):
         assert (paths["HOUSEHOLD_APP_UNITS"] / unit).read_bytes() == (UNITS / unit).read_bytes()
     assert (paths["HOUSEHOLD_APP_STATE"] / "coordination").is_dir()
 
     calls = log.read_text(encoding="utf-8").splitlines()
     assert "systemctl daemon-reload" in calls
-    assert (
-        "systemctl enable --now household-app-relay.path household-app-relay.timer"
-        " household-spend.timer"
-    ) in calls
+    assert "systemctl enable --now household-spend.timer" in calls
     assert not [call for call in calls if call.startswith("docker")], (
         "installing never reaches a container"
     )
@@ -146,24 +135,33 @@ def test_it_refuses_a_root_it_could_not_safely_replace_under(tmp_path: Path, roo
     assert not log.exists() or "systemctl" not in log.read_text(encoding="utf-8")
 
 
-def test_the_service_runs_the_installed_relay_and_both_triggers_start_it() -> None:
-    service = configparser.ConfigParser(strict=False, interpolation=None)
-    service.read(UNITS / "household-app-relay.service", encoding="utf-8")
-    assert service["Service"]["ExecStart"] == (
-        "/usr/bin/python3 /opt/household-assistant/app-relay/household-app-relay.py tick"
-    )
-    assert service["Service"]["Type"] == "oneshot"
-    path_unit = (UNITS / "household-app-relay.path").read_text(encoding="utf-8")
-    assert (
-        "PathChanged=/var/lib/household-assistant/openclaw/household-app/outbox.json" in path_unit
-    )
-    assert (
-        "PathChanged=/var/lib/household-assistant/openclaw-denise/household-app/outbox.json"
-        in path_unit
-    )
-    timer = configparser.ConfigParser(strict=False, interpolation=None)
-    timer.read(UNITS / "household-app-relay.timer", encoding="utf-8")
-    assert timer["Timer"]["Unit"] == "household-app-relay.service"
+def test_the_host_relay_that_the_share_replaced_is_taken_away(tmp_path: Path) -> None:
+    """Until the gateways read each other's share, a host relay carried the family room."""
+    units = tmp_path / "etc" / "systemd" / "system"
+    units.mkdir(parents=True)
+    for unit in (
+        "household-app-relay.service",
+        "household-app-relay.path",
+        "household-app-relay.timer",
+    ):
+        (units / unit).write_text("[Unit]\n", encoding="utf-8")
+    target = tmp_path / "opt" / "household-assistant" / "app-relay"
+    target.mkdir(parents=True)
+    (target / "household-app-relay.py").write_text("old", encoding="utf-8")
+
+    completed, log, paths = run_install(tmp_path)
+
+    assert completed.returncode == 0, completed.stderr
+    assert sorted(path.name for path in paths["HOUSEHOLD_APP_UNITS"].iterdir()) == [
+        "household-spend.service",
+        "household-spend.timer",
+    ]
+    assert not (paths["HOUSEHOLD_APP_TARGET"] / "household-app-relay.py").exists()
+    calls = log.read_text(encoding="utf-8").splitlines()
+    assert calls.index(
+        "systemctl disable --now household-app-relay.path household-app-relay.timer"
+        " household-app-relay.service"
+    ) < calls.index("systemctl daemon-reload")
 
 
 def test_the_spend_job_runs_the_installed_script_every_ten_minutes_on_the_clock() -> None:

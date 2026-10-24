@@ -57,7 +57,7 @@ async function bothGateways() {
   return { corey, denise };
 }
 
-test("a tool's post during a handed-over turn is marked and starts nothing on the other gateway", async () => {
+test("a tool's post during a handed-over turn is marked, and starts at most one final answer on the other gateway", async () => {
   const { corey, denise } = await bothGateways();
   const handovers = createHandovers();
   let post;
@@ -68,6 +68,21 @@ test("a tool's post during a handed-over turn is marked and starts nothing on th
     handovers.toolEnded("run-1", "call-1");
   });
   assert.equal(post.handedOver, true);
+  await relayed(corey, denise);
+  assert.deepEqual(denise.dispatched.map((turn) => turn.handedOver), ["final"]);
+});
+
+test("a tool's post during a final turn is final, and starts nothing on the other gateway", async () => {
+  const { corey, denise } = await bothGateways();
+  const handovers = createHandovers();
+  let post;
+  await handovers.during(async (named) => {
+    named("run-1");
+    handovers.toolStarted("run-1", "call-1");
+    post = await toolPost(corey, handovers, "@Denise thanks, it is on the calendar.");
+    handovers.toolEnded("run-1", "call-1");
+  }, "final");
+  assert.deepEqual([post.handedOver, post.final], [true, true]);
   await relayed(corey, denise);
   assert.equal(denise.dispatched.length, 0);
 });
