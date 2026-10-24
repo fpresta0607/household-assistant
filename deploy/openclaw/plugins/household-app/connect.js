@@ -202,7 +202,6 @@ export function createConnect({
     for (const connector of connectors().filter((one) => one.signIn === "password" && one.envSignIn)) {
       const kept = await typedSignIn(connector.id).catch(() => null);
       put(connector.envSignIn, kept?.secret ?? boxEnv[connector.envSignIn]);
-      if (connector.envUsername) put(connector.envUsername, kept?.username ?? boxEnv[connector.envUsername]);
     }
   }
 

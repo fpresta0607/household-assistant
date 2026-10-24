@@ -1,0 +1,29 @@
+{
+  "id": "household-scripture",
+  "name": "Household scripture",
+  "description": "The Bible in every household's gateway: verses, search by meaning, cross references, word studies, and the household's sermons and study plans.",
+  "enabledByDefault": false,
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": ["scripture"]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "bibleFile": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500,
+        "description": "The Bible database scripts/scripture-build.py writes; /opt/household-scripture/bible.sqlite when unset."
+      },
+      "edition": {
+        "type": "string",
+        "enum": ["BSB", "KJV", "ASV", "NIV"],
+        "description": "The edition the household reads: every scripture card's Open in Bible link opens it."
+      }
+    }
+  }
+}

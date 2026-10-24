@@ -1,7 +1,7 @@
 // The household's month on the Spend page, and the figures the box builds it from.
 //
 // Both gateways share one OpenRouter key with whatever else holds it (SIQsermon's backend
-// does), so neither gateway can tell on its own what each assistant spent of it, and a
+// did until it was retired), so neither gateway can tell on its own what each assistant spent of it, and a
 // plugin cannot ask OpenClaw's `usage.cost` for its own answers, since 2026.9.4 refuses an
 // external plugin's in-process gateway request. The box's spend job
 // (scripts/household-spend.py) asks both gateways every ten minutes, for `figures` and for

@@ -84,6 +84,8 @@ GROUP_TOOLS = [
     "household_react",
     # Only the household note both assistants keep, which both people read, in the app.
     "household_note",
+    # Only the Bible and the household's kept sermons, read in the gateway (household-scripture).
+    "scripture",
 ]
 GUARD_UNITS = [
     "household-pocketpiggies-guard.service",

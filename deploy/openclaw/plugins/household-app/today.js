@@ -31,7 +31,7 @@ const STILL_AHEAD_MS = 15 * 60 * 1000;
 const NOT_ONE_LINE = /[\p{Cc}\p{Zl}\p{Zp}]/u;
 // ISO 8601 to the minute or the second, with its offset, as the phone reads it.
 const START = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(:\d{2})?(Z|[+-]\d{2}:\d{2})$/;
-// The scripture skill's links, which open the passage in the Bible app.
+// The scripture tool's links, which open the passage in the Bible app.
 const BIBLE_LINK = /^https:\/\/www\.bible\.com\/[^\s]+$/;
 
 // `brief` is the brief it writes beside it, and `changed` is told each new one.
@@ -142,7 +142,7 @@ export function createTodayTool({ context, owner, owners, write }) {
       'helps, such as "Leave by 7:30, the roads are light". Mark something that lasts the whole day allDay. Use ' +
       "where someone is only from what they share with you in Steward right now, and another person's plans only " +
       "from what they told you or said in the family room. Give the verse with its words, its reference exactly as " +
-      "the scripture skill prints it and its bible.com link. Leave it out later in the day to keep the morning's. " +
+      "the scripture tool prints it and the link of its card. Leave it out later in the day to keep the morning's. " +
       "Plain text, no Markdown. A new card replaces the last. It is shown in the app and messages nobody.",
     parameters: {
       type: "object",
@@ -170,7 +170,7 @@ export function createTodayTool({ context, owner, owners, write }) {
           properties: {
             text: { type: "string", minLength: 1, maxLength: MAX_VERSE },
             reference: { type: "string", minLength: 1, maxLength: MAX_REFERENCE },
-            link: { type: "string", description: "The scripture skill's bible.com link to the passage." },
+            link: { type: "string", description: "The bible.com link of the scripture tool's card for the passage." },
           },
         },
       },

@@ -1,0 +1,6 @@
+From Verse	To Verse	Votes	#www.openbible.info CC-BY 2026-10-01
+John.3.16	Rom.5.8	120
+John.3.16	Prov.8.22-Prov.8.30	41
+John.3.16	Gen.1.1	-3
+Gen.1.1	John.1.1-John.1.3	393
+Nope.1.1	Gen.1.1	5

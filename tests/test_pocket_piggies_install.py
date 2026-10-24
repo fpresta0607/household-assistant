@@ -32,6 +32,7 @@ GROUP_TOOLS = [
     "household_home",
     "household_react",
     "household_note",
+    "scripture",
 ]
 FINANCE_TOOLS = ["pocketpiggies_catalog", "pocketpiggies_read", "pocketpiggies_records"]
 

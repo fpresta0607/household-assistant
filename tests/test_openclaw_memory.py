@@ -46,6 +46,7 @@ GROUP_TOOLS = [
     "household_home",
     "household_react",
     "household_note",
+    "scripture",
 ]
 MEMORY = "/opt/household-plugins/household-memory"
 

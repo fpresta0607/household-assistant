@@ -11,15 +11,6 @@
 #
 # Lives at /opt/household-assistant/docker-compose.yml on the box.
 
-# SIQsermon's own compose network, joined so the `scripture` skill can reach
-# `deploy-backend-1:8000` and the `verses` collection on `deploy-qdrant-1:6333`.
-# Joining an external network changes nothing about it or its members: no
-# published port, no Caddy route, nothing internet-facing. Declared external
-# because SIQsermon creates and owns it; this stack must never define it.
-networks:
-  deploy_default:
-    external: true
-
 services:
   openclaw-gateway:
     image: openclaw/openclaw:2026.9.4@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101
@@ -69,11 +60,9 @@ services:
       # the host and read-only here: they run inside the gateway, so nothing the
       # assistant runs may rewrite them. openclaw.json loads each from this path.
       - /opt/household-assistant/plugins:/opt/household-plugins:ro
-    # `default` must be listed: naming any network opts the service out of the
-    # implicit one, and dropping it would cut the gateway off from this stack.
-    networks:
-      - default
-      - deploy_default
+      # The Bible the household-scripture plugin reads, which scripts/scripture-build.py
+      # writes, root-owned and read-only here like the plugins.
+      - /var/lib/household-assistant/scripture:/opt/household-scripture:ro
     ports:
       - "127.0.0.1:18789:18789"
     cap_drop:
@@ -147,9 +136,7 @@ services:
       - /var/lib/household-assistant/openclaw-denise-himalaya:/home/node/.config/himalaya
       # The same household plugins as Corey's gateway, read-only for the same reason.
       - /opt/household-assistant/plugins:/opt/household-plugins:ro
-    networks:
-      - default
-      - deploy_default
+      - /var/lib/household-assistant/scripture:/opt/household-scripture:ro
     ports:
       - "127.0.0.1:18790:18789"
     cap_drop:

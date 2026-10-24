@@ -1,0 +1,12 @@
+{
+  "name": "household-scripture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Bible in the gateway: verses, search by meaning, cross references, word studies and the household's sermons",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

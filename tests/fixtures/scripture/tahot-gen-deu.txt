@@ -1,0 +1,6 @@
+TAHOT Gen-Deu - Translators Amalgamated Hebrew OT -  STEPBible.org CC BY 4.0
+Eng (Heb) Ref & Type	Hebrew	Transliteration	Translation	dStrongs	Grammar						Expanded Strong tags
+Gen.1.1#01=L	בְּ/רֵאשִׁ֖ית	be./re.Shit	in/ beginning	H9003/{H7225G}	HR/Ncfsa			H7225G			H9003=ב=in/{H7225G=רֵאשִׁית=: beginning»first:1_beginning}
+Gen.1.1#02=L	בָּרָ֣א	ba.Ra'	he created	{H1254A}	HVqp3ms			H1254A			{H1254A=בָּרָא=to create}
+Gen.1.1#04=L	אֵ֥ת	'et	<obj.>	{H0853}	HTo			H0853_A			{H0853=אֵת=[Obj.]}
+Gen.1.1#05=L	הַ/שָּׁמַ֖יִם	ha./sha.Ma.yim	the/ heavens	H9009/{H8064}	HTd/Ncmpa			H8064			H9009=ה=the/{H8064=שָׁמַיִם=heaven}

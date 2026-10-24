@@ -15,7 +15,7 @@ import { ConnectorError, TOOLS, errorResult, redact } from "./tools.mjs";
  */
 export const SAFE_GROUP_TOOLS = [
   "web_search", "web_fetch", "speak", "family_history", "picture", "video", "household_location",
-  "household_cart", "household_home", "household_react", "household_note",
+  "household_cart", "household_home", "household_react", "household_note", "scripture",
 ];
 const CONNECT_URL = /^https:\/\/pocketpiggies\.app\/assistant\/connect\?request=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /**

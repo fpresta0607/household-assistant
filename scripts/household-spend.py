@@ -2,9 +2,9 @@
 """The household's OpenRouter spend this month, for the Spend page in the Steward app.
 
 Both gateways share one OpenRouter key with whatever else holds it (SIQsermon's backend
-does), so neither gateway can tell on its own what each assistant spent of it. This runs
-on the host every ten minutes on the clock (household-spend.timer) and asks each gateway
-two things through its own CLI:
+did until it was retired), so neither gateway can tell on its own what each assistant
+spent of it. This runs on the host every ten minutes on the clock (household-spend.timer)
+and asks each gateway two things through its own CLI:
 
 - the household-app plugin's figures (``household-app.spend.figures``): the key's usage as
   OpenRouter reports it, this assistant's name, and what its voice and its pictures and

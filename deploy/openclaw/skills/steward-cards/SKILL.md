@@ -308,11 +308,11 @@ The family room sees only that the items left the cart, and a sentence from you 
 
 ### scripture
 
-Only text the scripture skill returned, with its reference and translation exactly as it printed them, one entry per verse.
-For daily sermons and devotionals, use the scripture skill's `ref "Book chapter:verse-range" --card` command and include its returned block unchanged before the teaching.
+Only text the scripture tool returned, with its reference and translation exactly as it printed them, one entry per verse.
+For daily sermons and devotionals, call the scripture tool with `{"action": "ref", "reference": "Book chapter:verse-range", "card": true}` and include its returned block unchanged before the teaching.
 This applies equally to Corey and Denise and to scheduled deliveries into Steward. A Markdown quotation alone has no Open in Bible button.
 Keep the commentary and prayer in prose; a newly written devotional is not an archive `sermon` card.
-`link` opens the passage in the Bible app, in the edition the household reads: copy it from the scripture skill's `--card` block and never build it yourself. It has the form `https://www.bible.com/bible/<edition id>/<book>.<chapter>.<verses>.<edition>`, as in `https://www.bible.com/bible/111/JHN.3.16-17.NIV`.
+`link` opens the passage in the Bible app, in the edition the household reads: copy it from the scripture tool's card block and never build it yourself. It has the form `https://www.bible.com/bible/<edition id>/<book>.<chapter>.<verses>.<edition>`, as in `https://www.bible.com/bible/111/JHN.3.16-17.NIV`.
 
 ```steward-card
 {"type":"scripture","reference":"John 3:16-17","translation":"BSB","verses":[{"n":16,"text":"For God so loved the world that He gave His one and only Son, that everyone who believes in Him shall not perish but have eternal life."},{"n":17,"text":"For God did not send His Son into the world to condemn the world, but to save the world through Him."}],"link":"https://www.bible.com/bible/111/JHN.3.16-17.NIV","skill":"scripture"}
@@ -320,7 +320,7 @@ Keep the commentary and prayer in prose; a newly written devotional is not an ar
 
 ### sermon
 
-Only a sermon the scripture skill's `sermons` command returned, with its title as it printed it.
+Only a sermon the scripture tool's `sermons` action returned, with its title as it printed it.
 `quote` is one line from it, in its own words, and `minutes` how long it runs, only when the sermon says.
 `quote`, `minutes` and `link` are optional, and `link` must be an `https` page the family can open.
 

@@ -64,7 +64,7 @@ test("every connector has a category, a plain summary and an icon the app has", 
     assert.match(connector.summary, /^[A-Z][^\n;]{2,60}$/, connector.id);
     assert.equal(connector.summary.includes(String.fromCharCode(0x2014)), false, connector.id);
     assert.ok(
-      LOGOS.includes(connector.icon) || ["pocketpiggies", "siqsermon", "zai"].includes(connector.icon) || /^symbol:[a-z0-9.]+$/.test(connector.icon),
+      LOGOS.includes(connector.icon) || ["pocketpiggies", "zai"].includes(connector.icon) || /^symbol:[a-z0-9.]+$/.test(connector.icon),
       `${connector.id}: ${connector.icon}`,
     );
   }
@@ -83,10 +83,12 @@ test("each gateway shows only the connectors it has, as read from both on 15 Oct
   assert.ok(denise.includes("himalaya") && !corey.includes("himalaya"));
 });
 
-test("SIQsermon and PocketPiggies use the household's own icons", () => {
+test("scripture is the gateway's own Bible tool and PocketPiggies keeps the household's icon", () => {
   const byId = Object.fromEntries(CONNECTORS.map((connector) => [connector.id, connector]));
-  assert.equal(byId.scripture.name, "SIQsermon");
-  assert.equal(byId.scripture.icon, "siqsermon");
+  assert.equal(byId.scripture.name, "Scripture");
+  assert.equal(byId.scripture.icon, "symbol:book");
+  assert.deepEqual(byId.scripture.tools, ["scripture"]);
+  assert.equal(byId.scripture.signIn, undefined);
   assert.equal(byId["pocket-piggies"].icon, "pocketpiggies");
 });
 

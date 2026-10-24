@@ -25,6 +25,7 @@ DENISE_STATE_DIR="${STATE_ROOT}/openclaw-denise"
 DENISE_SECRET_DIR="${STATE_ROOT}/openclaw-denise-auth-secrets"
 DENISE_CODEX_DIR="${STATE_ROOT}/codex-denise"
 DENISE_BIN_DIR="${STATE_ROOT}/bin-denise"
+SCRIPTURE_DIR="${STATE_ROOT}/scripture"
 # The image runs as the `node` user, uid/gid 1000.
 OC_UID=1000
 OC_GID=1000
@@ -58,6 +59,9 @@ install -d -m 0700 "${STATE_DIR}" "${SECRET_DIR}" "${CODEX_DIR}" \
 chown "${OC_UID}:${OC_GID}" "${STATE_DIR}" "${SECRET_DIR}" "${CODEX_DIR}" \
   "${DENISE_STATE_DIR}" "${DENISE_SECRET_DIR}" "${DENISE_CODEX_DIR}"
 install -d -m 0755 "${BIN_DIR}" "${DENISE_BIN_DIR}"
+# The Bible the household-scripture plugin reads, mounted read-only into both gateways.
+# scripts/scripture-build.py writes bible.sqlite here; root owns it, as it owns the plugins.
+install -d -m 0755 -o root -g root "${SCRIPTURE_DIR}"
 install -m 0644 "${compose_src}" "${APP_DIR}/docker-compose.yml"
 
 # --- gateway token ---------------------------------------------------------
@@ -134,12 +138,20 @@ fi
 # A running gateway picks a workspace skill up without a restart, so this step
 # needs no recreate of its own. The `compose up` below recreates anyway when
 # the compose file or an env file has changed.
+#
+# Each skill the repository ships is replaced whole, so a file a new version
+# dropped goes with the old one (the scripture skill's SIQsermon client did).
+# Skills an assistant wrote itself, which the repository does not ship, stay.
 skills_src="${here}/../deploy/openclaw/skills"
 if [[ -d ${skills_src} ]]; then
   for workspace in "${STATE_DIR}/workspace" "${DENISE_STATE_DIR}/workspace"; do
     install -d -m 0700 "${workspace}"
     install -d -m 0700 "${workspace}/skills"
-    cp -r "${skills_src}/." "${workspace}/skills/"
+    for skill in "${skills_src}"/*/; do
+      name="$(basename "${skill}")"
+      rm -rf "${workspace:?}/skills/${name:?}"
+      cp -r "${skill%/}" "${workspace}/skills/${name}"
+    done
     chown "${OC_UID}:${OC_GID}" "${workspace}"
     chown -R "${OC_UID}:${OC_GID}" "${workspace}/skills"
   done

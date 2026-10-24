@@ -238,7 +238,7 @@ const did = createDid();
 // The sign-ins the box's env file gave this gateway, read once as the process starts and
 // before any sign-in from a phone goes into the environment (connect.js).
 const BOX_ENV = Object.fromEntries(
-  [...CONNECTORS.flatMap((connector) => [connector.envSignIn, connector.envUsername]).filter(Boolean), ...MICROSOFT_ENV]
+  [...CONNECTORS.map((connector) => connector.envSignIn).filter(Boolean), ...MICROSOFT_ENV]
     .map((name) => [name, process.env[name]]),
 );
 // The plugin's own settings and spend, opened on first use and kept until the plugin's

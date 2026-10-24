@@ -1,0 +1,7 @@
+Word & Type	Greek	English translation	dStrongs = Grammar	Dictionary form =  Gloss
+Mat.1.1#01=NKO	Βίβλος (Biblos)	[The] book	G0976=N-NSF	βίβλος=book	NA28+NA27
+Jhn.3.16#01=NKO	Οὕτως (Houtōs)	thus	G3779=ADV	οὕτω, οὕτως=thus(-ly)	NA28
+Jhn.3.16#03=NKO	ἠγάπησεν (ēgapēsen)	loved	G0025=V-AAI-3S	ἀγαπάω=to love	NA28
+Jhn.3.16#04=NKO	ὁ (ho)	-	G3588=T-NSM	ὁ=the/this/who	NA28
+Jhn.3.16#05=K	κύριος (kurios)	Lord	G2962=N-NSM	κύριος=lord	TR
+Jhn.3.16#06=NKO	κόσμον (kosmon)	world	G2889=N-ASM	κόσμος=world	NA28

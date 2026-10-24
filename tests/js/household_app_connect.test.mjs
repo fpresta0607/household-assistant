@@ -26,7 +26,6 @@ const BOX_ACCOUNT = { email: "franco.work@example.com", scopes: [GMAIL], created
 const BOX_ID = "gog:box:" + "0".repeat(8);
 // The env names the skills read their sign-ins from, each named once apart from any value.
 const ICLOUD_VARIABLE = "APPLECAL_PASSWORD";
-const SIQSERMON_VARIABLE = "SIQSERMON_PASSWORD";
 const YAHOO_VARIABLE = "YAHOO_APP_PASSWORD_GIA";
 
 function phone() {
@@ -412,14 +411,11 @@ test("an iCloud app password typed on the phone goes where the calendar skill re
   assert.deepEqual(await accountIds(setup1, "icloud"), ["icloud:box"]);
 });
 
-test("a SIQsermon sign-in typed on the phone sets both the username and the password its skill reads", async (context) => {
+test("scripture needs no sign-in: it reads the Bible in the gateway", async (context) => {
   const setup1 = await setup(context);
 
-  await setup1.connect.connect(asParams({ connector: "scripture", named: { username: "gia@example.com", secret: "abcd-efgh-ijkl-mnop" } }));
-
-  assert.equal(setup1.env.SIQSERMON_USERNAME, "gia@example.com");
-  assert.equal(setup1.env[SIQSERMON_VARIABLE], "abcd-efgh-ijkl-mnop");
-  assert.equal((await setup1.connect.readBack(setup1.byId("scripture"))).signInKind, "password");
+  assert.equal((await setup1.connect.readBack(setup1.byId("scripture"))).signInKind, null);
+  assert.equal("SIQSERMON_USERNAME" in setup1.env || "SIQSERMON_PASSWORD" in setup1.env, false);
 });
 
 test("a typed sign-in kept from before is put back where its skill reads it when the gateway starts", async (context) => {

@@ -128,7 +128,7 @@ A TestFlight release is one click, from main.
 | Folder | What is in it |
 |---|---|
 | [apps/ios/](apps/ios) | The Steward AI app, as a text XcodeGen spec ([its README](apps/ios/README.md)) |
-| [deploy/openclaw/plugins/](deploy/openclaw/plugins) | The OpenClaw plugins: the app's channel, family room, memory, pictures, speech, job mirror, PocketPiggies |
+| [deploy/openclaw/plugins/](deploy/openclaw/plugins) | The OpenClaw plugins: the app's channel, family room, memory, pictures, speech, scripture, job mirror, PocketPiggies |
 | [deploy/openclaw/skills/](deploy/openclaw/skills) | The skills both assistants get |
 | [household/](household) | The identity and privacy spine, the home and PocketPiggies key holders |
 | [scripts/](scripts) | The installers, relay, backup and checks, run as root on the box |
@@ -139,6 +139,7 @@ A TestFlight release is one click, from main.
 
 - [OpenClaw on the server](docs/deploy/openclaw.md): reach it, restart it, back it up, roll it back, and how the family room works
 - [PocketPiggies](docs/deploy/pocket-piggies.md): who can read finance, and how
+- [Retiring SIQsermon](docs/deploy/siqsermon-retirement.md): scripture in the gateways, and SIQsermon's containers stopped
 - [The app-only rollout](docs/household-app-only-rollout.md): how the app replaced Telegram
 - [Apple activation checklist](docs/apple-activation-checklist.md): everything only the owner can do, in order
 - [TestFlight](docs/testflight.md) and [Apple signing](docs/apple-signing.md)

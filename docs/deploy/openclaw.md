@@ -79,7 +79,7 @@ The provider-side steps and measurements are in the household's private ops note
 The gateway refuses proxied traffic from an address it has not been told is a proxy.
 With serve alone, every WebSocket upgrade over the tailnet was answered `403 proxy_attribution_required` while `/healthz` still answered 200, which is why the phone sat on "Connecting".
 
-Every host-side connection reaches the container through docker-proxy, so the gateway sees it coming from the host's address on a bridge network: `172.18.0.1` on `deploy_default` today, or `172.19.0.1` on `household-assistant_default` if docker ever maps the port through the gateways' own network.
+Every host-side connection reaches the container through docker-proxy, so the gateway sees it coming from the host's address on a bridge network: `172.18.0.1` on `deploy_default` while the gateways were on SIQsermon's network, or `172.19.0.1` on `household-assistant_default`, the gateways' own network, which docker maps the port through once they are off SIQsermon's (see [Retiring SIQsermon](siqsermon-retirement.md)).
 Both gateways trust exactly those two addresses, set on 2026-09-24:
 
 ```
@@ -178,7 +178,7 @@ No systemd unit was added, because one would duplicate a restart policy that alr
 | `/var/lib/household-assistant/codex` | the Codex harness's working state: goals, memories, queue, skills | `1000:1000`, mode 0700 |
 | `/var/lib/household-assistant/bin` | binaries the bundled skills need, mounted at `~/.local/bin`; `gog` today | `root`, mode 0755 |
 | `/var/lib/household-assistant/openclaw/pylocal` | the Python packages [the calendar skill](#icloud-through-apple-cal-anywhere) imports, inside the state directory so a recreated container and the backup both keep them | `1000:1000` |
-| `/etc/household-assistant/openclaw.env` | the gateway token, the OpenRouter key, the Telegram bot token, the gog keyring password and the [scripture skill's SIQsermon credentials](#the-environment-variables) | `root`, mode 0600 |
+| `/etc/household-assistant/openclaw.env` | the gateway token, the OpenRouter key, the Telegram bot token, the gog keyring password, and until SIQsermon is retired the SIQsermon credentials its export reads | `root`, mode 0600 |
 | `/etc/household-assistant/household.json` | the household's own identifiers: the family group, each person's Telegram account, the box's tailnet name, the app's Google client, the shared calendar and the Bible edition the scripture cards link, which the repository does not hold; read by the `openclaw-*.py` installers and the coordination relay through `load_household` in `gateway_config.py`, shaped like [`deploy/household.example.json`](../../deploy/household.example.json) | `root`, mode 0600 |
 
 All three state directories are bind-mounted into the container, so replacing the image never loses memory.
@@ -834,8 +834,8 @@ docker exec openclaw-gateway node dist/index.js models auth list --provider open
 docker exec openclaw-gateway node dist/index.js models auth logout <profile id from the list>
 ```
 
-SIQsermon runs on this box too, and this repository cannot see its config.
-The scripture skill's verse search goes through SIQsermon's backend, so before the account closes, check whether SIQsermon itself calls OpenAI.
+SIQsermon ran on this box too, and this repository cannot see its config.
+The scripture skill's verse search went through SIQsermon's backend until the household-scripture plugin replaced it, so before the account closes, check whether SIQsermon itself calls OpenAI.
 `grep -c '^OPENAI' /etc/siqsermon/runtime.env` counts the lines without printing any value.
 
 ### Speaking
@@ -1301,99 +1301,56 @@ Her Telegram setup is covered in [The channels](#the-channels).
 
 ---
 
-## The scripture skill
+## Scripture
 
-Both agents answer biblical questions out of SIQsermon's database rather than out of the model's memory.
-It is the same data the preaching app uses: all 31,105 verses, their cross-references, original-language word studies, and the household's own sermons and study projects.
-
-The skill lives at `deploy/openclaw/skills/scripture/` in this repository and is installed into both workspaces by `scripts/openclaw-install.sh`.
-It is a `SKILL.md` and one stdlib-only Python file; the image has no package manager and is never rebuilt here, so the script may not have dependencies.
-
-A scripture card's **Open in Bible** link opens the edition the household reads, `bibleVersion` in `/etc/household-assistant/household.json`, whatever translation the stored text is.
-`scripts/openclaw-scripture.py apply` writes it into each gateway's `skills.entries.scripture.env.HOUSEHOLD_BIBLE_VERSION`, which OpenClaw hands the skill on every run, with no restart; `check` reads both gateways back.
-The card still names the translation of its text, so a card with BSB verses can open the NIV.
-The household file must name `bibleVersion` before any installer or the coordination relay from this version runs, with the edition the household reads (`"bibleVersion": "NIV"`).
-A household file without it stops them with `has no bibleVersion`.
-`apply` refuses, and `check` reports, an edition the skill cannot link; the skill's own `BIBLE_VERSIONS` table in `scripture.py` is the list.
+Both assistants read the Bible through the `scripture` tool of the household-scripture plugin, never from the model's memory.
+It replaced the SIQsermon skill on 24 October 2026: SIQsermon is no longer an app, and the only things the assistants still used it for were its functions, which now run in the gateway itself.
 
 | | |
 |---|---|
-| in the repository | `deploy/openclaw/skills/scripture/` |
-| installed at | `/var/lib/household-assistant/openclaw{,-denise}/workspace/skills/scripture/`, owned `1000:1000` |
-| Corey signs in as | the Overlord's SIQsermon account |
-| Denise signs in as | Gia's own SIQsermon account |
-| reads | `http://deploy-backend-1:8000` and `http://deploy-qdrant-1:6333` |
-| writes | nothing, ever |
+| plugin | `deploy/openclaw/plugins/household-scripture/`, loaded from `/opt/household-plugins/household-scripture` |
+| tool | `scripture`: `ref` (with `card` for the app), `search` (by meaning), `study`, `sermons`, `plans`, `save` |
+| the Bible | `/var/lib/household-assistant/scripture/bible.sqlite`, root-owned, mounted read-only at `/opt/household-scripture` |
+| the archive | `household-scripture/archive.sqlite` in each gateway's state: the household's sermons and study plans, in the nightly backup |
+| the skill | `deploy/openclaw/skills/scripture/SKILL.md`, which tells the model when to use the tool and how to hand the app a card |
+| needs | nothing to sign in to; OpenRouter only for the meaning of a search question |
 
-### The network attachment
+### What the Bible database holds
 
-Both gateway services join SIQsermon's compose network, `deploy_default`, alongside their own.
-That is the whole of the reach change, and it is declared `external: true` because SIQsermon creates and owns that network.
+`scripts/scripture-build.py` writes it from public sources, once, with nothing to keep running:
 
-Joining an external network changes nothing about it or its members: no published port, no Caddy route, nothing internet-facing, and the four `deploy-*` containers are not restarted.
-Listing any network on a service opts it out of the implicit one, so `default` is listed explicitly too; dropping it would cut the gateways off from this stack.
+- every verse of the Berean Standard Bible (public domain), the translation SIQsermon showed first, and the word index the tool falls back to;
+- OpenBible.info's cross references (CC BY);
+- each verse's Hebrew or Greek words with Strong's numbers, transliterations and glosses, from STEPBible's TAHOT and TAGNT (Tyndale House, Cambridge, CC BY 4.0), read at a pinned commit;
+- with `--embed`, one meaning vector per verse from OpenRouter's `openai/text-embedding-3-small`, the model memory search uses, cut to 512 numbers.
+  Embedding every verse costs a few cents, once.
 
-### The environment variables
+```
+# as root on the box
+python3 scripts/scripture-build.py --embed --env-file /etc/household-assistant/openclaw.env
+```
 
-| variable | in | what it is |
-|---|---|---|
-| `SIQSERMON_USERNAME` | both env files | the SIQsermon account the skill signs in as |
-| `SIQSERMON_PASSWORD` | both env files | its password |
+It writes to a temporary file, checks it, and moves it into place, so a running gateway never reads half a file; the tool opens the new file the next time a gateway starts.
+`--embed-only` adds vectors to a database built without them.
+Until the vectors exist, `search` matches words rather than meaning and says so.
 
-They live only in `/etc/household-assistant/openclaw.env` and `openclaw-denise.env`, at mode 0600, and are read as environment variables.
-They are deliberately not in this document, not in the repository, and not in the skill file.
-The values come from `AUTH_USERS` in `/etc/siqsermon/runtime.env`, which is root-only and is the authority for SIQsermon accounts.
-Note that `AUTH_USERNAME`/`AUTH_PASSWORD` in that same file are a stale fallback that the app ignores whenever `AUTH_USERS` is set, so do not copy from them.
+### The card's link
 
-Adding these variables is why both gateway containers were recreated on 2026-09-19; an `env_file` change only reaches a container that is replaced.
-SIQsermon was not touched.
+A scripture card's **Open in Bible** link opens the edition the household reads, `bibleVersion` in `/etc/household-assistant/household.json`, whatever translation the card's text is.
+`scripts/openclaw-scripture.py apply` writes it into each gateway's `plugins.entries.household-scripture.config.edition`, which the gateway takes in process; `check` reads both back.
+The card still names the translation of its text, so a card with BSB verses can open the NIV.
+`apply` refuses, and `check` reports, an edition the plugin cannot link: the `edition` enum in the plugin's manifest is the list.
 
-### Signing in
+### In the family room
 
-SIQsermon closes every route except `/health`, `/session`, `/login` and `/logout`, so even verse search needs an account.
-The session is a signed cookie, `siqsermon_session`, good for 30 days and carrying no server-side state.
+`scripture` is on The Fam's tool list and the family room's, and on PocketPiggies' list of tools safe in a group, so a Bible question in the room gets the Bible too.
+The SIQsermon skill could not do that: it ran a script, and the room has no shell.
 
-**The cookie is marked `Secure` and the call is plain `http` inside the docker network.**
-A cookie jar therefore refuses to send it back and every call returns 401.
-The skill replays the cookie as a bare `Cookie:` header instead, which is what makes this work at all, and `tests/test_scripture_skill.py` fails if that ever regresses.
+### Retiring SIQsermon
 
-### Why lookup by reference does not go through the backend
+The order matters, because the export reads SIQsermon over its network and the new compose file takes the gateways off it.
+[docs/deploy/siqsermon-retirement.md](siqsermon-retirement.md) has the commands.
 
-`POST /search` is semantic, over Qdrant.
-Asked for `John 3:16` it returns Matthew 3:15, Acts 19:4 and John 1:6, because it matches meaning and a reference label carries almost none.
-Asked for the verse's wording it returns John 3:16 first, at 0.813.
-
-SIQsermon has no lookup-by-reference read, so the skill computes the verse's point id and reads that one point from Qdrant with a single GET.
-That couples the skill to two SIQsermon internals: the collection name `verses`, and the `BBCCCVVV` id scheme from `ingestion/books.verse_id` along with its 1-66 book order, which `scripture.py` mirrors.
-All 66 book numbers were checked against the live collection when this was written.
-
-**This is a deliberate stopgap.**
-SIQsermon should grow a verses-by-reference read, and the skill should switch to it at SIQsermon's next redeploy, at which point the mirrored table goes.
-Adding that endpoint now would have meant redeploying `deploy-backend-1`, which the assistants do not do to a live site.
-
-### It only works on a model that honours the skill catalog
-
-The gateway puts every skill's name, description and location in the system prompt and tells the model to read the matching one and obey.
-**A model that ignores that instruction answers from memory, and for scripture that is exactly the failure this skill exists to prevent.**
-
-Measured on 2026-09-19 with the same question, `What does John 3:16 say, and where is it?`:
-
-| agent | model | used the skill | answer |
-|---|---|---|---|
-| Corey | `openai/gpt-5.6-luna` (his default) | **yes** | BSB, the database's wording |
-| Denise | `openrouter/z-ai/glm-5.3-flash` (her primary since 19 September) | **yes** | BSB, the database's wording |
-| Denise | `openrouter/deepseek/deepseek-v4-flash-0731:free` (her primary until then) | **no**, zero tool calls | NIV, from memory, labelled "(NIV)" |
-
-The free model is not weak at tools; told explicitly to run a command, it runs it.
-It simply does not consult the catalog for a question it believes it already knows, which is the worst case: a confident answer in a translation the database does not even hold.
-
-Corey's model was unaffected in that measurement.
-Denise answers correctly the moment she is on any of the paid rungs of her own fallback chain.
-
-That measurement drove Denise's primary-model change on 19 September.
-See [The model backend](#the-model-backend) for the current shared chain and key setup.
-
----
 
 ## The calendars
 
@@ -1500,7 +1457,7 @@ Then `NOTION_OAUTH_CLIENT_ID`, `NOTION_OAUTH_CLIENT_SECRET` and `NOTION_OAUTH_RE
 Either way the token is kept sealed with the keyring password, and the plugin puts it in the gateway's environment as `NOTION_API_TOKEN`, where the bundled notion skill and the commands it runs read it.
 Outlook signs in from the phone through the household's Microsoft app, the public client in Corey's env file (`MS_GRAPH_CLIENT_ID`, `MS_GRAPH_TENANT_ID`), whose mobile redirect `steward://connector/outlook` the Overlord added on 15 October, with PKCE and no secret (`microsoft-connect.js`).
 The kept sign-in goes into `MS_GRAPH_REFRESH_TOKEN`, where the assistant already makes its Graph tokens from (USER.md), and the box's own comes back on a disconnect.
-A typed sign-in from the phone (iCloud, Email, SIQsermon) goes the same way, into the env names its skill already reads (`APPLECAL_PASSWORD`, `YAHOO_APP_PASSWORD_GIA`, `SIQSERMON_USERNAME` and `SIQSERMON_PASSWORD`), and on a disconnect the value from the box's env file, if it had one, comes back.
+A typed sign-in from the phone (iCloud, Email) goes the same way, into the env names its skill already reads (`APPLECAL_PASSWORD`, `YAHOO_APP_PASSWORD_GIA`), and on a disconnect the value from the box's env file, if it had one, comes back. Scripture needs no sign-in.
 
 ---
 
@@ -1832,7 +1789,7 @@ An assistant's post to the family lands in the app's family room first, and Tele
 - Push goes through Apple once the push key is on the box.
   Apple sees only "New message"; who said what is sealed with AES-256-GCM under a key each phone hands its own gateway, and the phone's notification extension opens it.
 - The Today card at the top of Chats is written by each person's own assistant with the plugin's `household_today` tool, in its owner's own turns only, never in the family room or a group (`today.js`).
-  The `household-app:daily-brief` job writes it at 4:45 in the gateway's household time zone (America/Chicago in this deployment), before the phone's 5 AM morning reset, and at 16:45 for tonight and tomorrow morning, with the next things ahead and a verse for the day from the devotional, or one the assistant chooses with the scripture skill where there is none, as Denise does. It chooses a fresh verse immediately when a later devotional has not run yet.
+  The `household-app:daily-brief` job writes it at 4:45 in the gateway's household time zone (America/Chicago in this deployment), before the phone's 5 AM morning reset, and at 16:45 for tonight and tomorrow morning, with the next things ahead and a verse for the day from the devotional, or one the assistant chooses with the scripture tool where there is none, as Denise does. It chooses a fresh verse immediately when a later devotional has not run yet.
   The phone opens the card on the first visit from 5 AM; an overnight visit cannot mark that morning read, and a verse arriving after a calendar-only card reopens it once.
   The plugin keeps only the newest card, which the phone reads with `household-app.today` and hears of through `plugin.household-app.today`, and keeps on the phone to show offline, picking what is still ahead by its own clock.
   Each card also writes the day's brief line, which the app builds from before the card still show.

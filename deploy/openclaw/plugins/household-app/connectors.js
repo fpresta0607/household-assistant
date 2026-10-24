@@ -27,9 +27,10 @@ export const CONNECTORS = [
     tools: ["pocketpiggies_catalog", "pocketpiggies_read", "pocketpiggies_records"],
     capabilities: ["Reads your budgets, balances and spending", "Answers money questions in your own chat only"],
   },
-  { id: "scripture", name: "SIQsermon", category: "faith", icon: "siqsermon", summary: "Scripture, sermons and word studies", skills: ["scripture"],
-    signIn: "password", envSignIn: "SIQSERMON_PASSWORD", envUsername: "SIQSERMON_USERNAME",
-    capabilities: ["Looks up scripture and sermons", "Does word studies"] },
+  // The Bible, in the gateway itself (household-scripture): nothing to sign in to.
+  { id: "scripture", name: "Scripture", category: "faith", icon: "symbol:book", summary: "The Bible, sermons and word studies",
+    skills: ["scripture"], tools: ["scripture"],
+    capabilities: ["Reads and searches the Bible", "Shows cross references and the Hebrew and Greek words", "Keeps the household's sermons and study plans"] },
   {
     id: "icloud",
     name: "iCloud",
