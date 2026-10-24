@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Database-consistent backup of the stateful services on the shared VPS:
-# the SIQsermon stack, the assistant state once OpenClaw is installed, and the
-# coordination relay's own database, which lives outside both gateways.
+# the SIQsermon stack, the assistant state once OpenClaw is installed, and, where a
+# box still has it, the retired coordination relay's database, outside both gateways.
 #
 # ponytail: the destination is still /var/backups/siqsermon/<stamp>/ because
 # Phase 0 named it when SIQsermon was the only service and the Phase 0 runbook

@@ -89,7 +89,6 @@ def node_or_skip() -> str:
         "household_app_video.test.mjs",
         "household_app_vision.test.mjs",
         "household_family_room.test.mjs",
-        "household_job_mirror.test.mjs",
         "household_memory.test.mjs",
         "household_openrouter_video.test.mjs",
         "household_pictures.test.mjs",
@@ -114,7 +113,6 @@ def test_each_plugin_passes_its_own_tests(tests: str) -> None:
     "plugin",
     [
         "household-family-room",
-        "household-job-mirror",
         "household-openrouter-video",
         "household-pictures",
         "household-scripture",

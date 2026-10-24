@@ -1,9 +1,10 @@
 """The coordination block of scripts/household-backup-lib.sh, which both backup scripts source.
 
-The script itself needs root, docker and the SIQsermon paths, so nothing here runs it.
-What runs is the `PYBACKUP` program lifted out of the shipped file, against real
-databases in a temporary directory, so the copy-and-verify step that decides whether the
-off switch survives a restore is executed rather than read.
+The scripts themselves need root, docker and the SIQsermon paths, so nothing here runs
+them whole. What runs is the `PYBACKUP` program lifted out of the shipped file, against
+real databases in a temporary directory, so the copy-and-verify step that decides whether
+the off switch survives a restore is executed rather than read. The block around it is
+run once, sourced, for the box that never had the relay's database.
 
 The databases are built by the relay's own storage layer rather than by hand, so the
 fixture carries the WAL journal mode and the schema of migration 0003 and cannot drift
@@ -19,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from household.db import Database, migrate
+from tests.capabilities import POSIX_BASH, needs_posix_bash
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "household-backup-lib.sh"
 PAGE_SIZE = 4096
@@ -159,3 +161,43 @@ def test_a_torn_source_fails(
 
     assert result.returncode != 0
     assert "integrity_check" in result.stderr
+
+
+@needs_posix_bash
+def test_a_box_without_the_relay_database_skips_it_and_backs_up_cleanly(
+    tmp_path: Path, destination: Path
+) -> None:
+    """The relay was retired with Telegram, so a new box never has its database.
+
+    The block runs as the backup scripts run it, sourced under `set -euo pipefail`, and
+    has to record the copy as not installed, leave the failure flag alone and write
+    nothing, or every nightly backup on such a box would stop short of its drill.
+    """
+    program = (
+        "set -euo pipefail\n"
+        'source "$1"\n'
+        'COORDINATION_DB="$2"\n'
+        'dest="$3"\n'
+        "openclaw_failed=0\n"
+        "archive_coordination\n"
+        'printf "%s %s\\n" "${coordination_archive}" "${openclaw_failed}"\n'
+    )
+    assert POSIX_BASH is not None
+    result = subprocess.run(
+        [
+            POSIX_BASH,
+            "-c",
+            program,
+            "bash",
+            SCRIPT.as_posix(),
+            (tmp_path / "coordination" / "coordination.db").as_posix(),
+            destination.as_posix(),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[-1] == "none 0"
+    assert list(destination.iterdir()) == []

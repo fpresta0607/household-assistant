@@ -24,6 +24,5 @@ ExecStart=/usr/bin/python3 /opt/household-assistant/app-relay/household-app-rela
 # DELIVERY_TIMEOUT_SECONDS: 2400 seconds is the worst case, and this is the backstop
 # for a run that stopped making progress, not the budget for one that works.
 TimeoutStartSec=2500
-# SIQsermon is this host's primary tenant, so the relay yields CPU under contention,
-# as the coordination relay does.
+# SIQsermon is this host's primary tenant, so the relay yields CPU under contention.
 Nice=10

@@ -67,12 +67,11 @@ PREFERRED_WEEKDAYS = (4, 5)
 # propose that same Friday.
 #
 # Nothing in this module reads it, on purpose. The rule is applied by the caller that
-# owns the clock: scripts/coordination-daemon.py passes ``horizon_start=now +
-# PLANNING_LEAD`` into :func:`free_windows`, and that script ships in the deployment
-# change one pull request after this one. This is the shape migration 0003 already
-# used, which created taste_signal a pull request ahead of the writer that fills it.
-# ``free_windows`` takes the horizon it is given and does not second-guess it, so a
-# caller asking for this evening gets this evening.
+# owns the clock, which passes ``horizon_start=now + PLANNING_LEAD`` into
+# :func:`free_windows`. That caller was scripts/coordination-daemon.py, retired with
+# Telegram, so nothing calls the planner now. ``free_windows`` takes the horizon it is
+# given and does not second-guess it, so a caller asking for this evening gets this
+# evening.
 PLANNING_LEAD = timedelta(hours=24)
 
 # The whole research budget. One turn a day, cached; the assistants' own model
@@ -1028,8 +1027,8 @@ def compose_proposal(
     ``candidates`` must be non-empty. The message it composes states a window and then
     asks for a number, so a run with nothing to offer is not a proposal at all and is
     not this function's to word. Deciding there is nothing to propose belongs to the
-    caller that owns the research turn: scripts/coordination-daemon.py checks the
-    candidates it got back and says so itself rather than reaching here.
+    caller that owns the research turn, which checks the candidates it got back and
+    says so itself rather than reaching here.
     """
     ranked = taste.ranked()
     ordered = rank_candidates(candidates, taste.scores())
