@@ -75,24 +75,31 @@ final class LighterChatsTests: XCTestCase {
     }
 
     func testOpeningAConversationClearsItsUnreadCount() {
-        // Arrange
-        let app = launch()
-        let pin = app.buttons["pin.direct"]
-        expectation(for: NSPredicate(format: "label CONTAINS %@", "2 unread"), evaluatedWith: pin)
-        waitForExpectations(timeout: 10)
-        keepPicture("chats.unread-count")
+        for conversation in ["family", "direct"] {
+            // Arrange
+            let app = launch()
+            let pin = app.buttons["pin.\(conversation)"]
+            let otherPin = app.buttons[conversation == "family" ? "pin.direct" : "pin.family"]
+            let unread = NSPredicate(format: "label CONTAINS %@", "2 unread")
+            expectation(for: unread, evaluatedWith: pin)
+            expectation(for: unread, evaluatedWith: otherPin)
+            waitForExpectations(timeout: 10)
+            keepPicture("chats.unread-count.\(conversation)")
 
-        // Act
-        pin.tap()
-        let back = app.navigationBars.buttons.element(boundBy: 0)
-        XCTAssertTrue(back.waitForExistence(timeout: 10))
-        back.tap()
+            // Act
+            pin.tap()
+            let back = app.navigationBars.buttons.element(boundBy: 0)
+            XCTAssertTrue(back.waitForExistence(timeout: 10))
+            back.tap()
 
-        // Assert
-        let read = NSPredicate(format: "exists == true AND NOT label CONTAINS %@", "unread")
-        expectation(for: read, evaluatedWith: pin)
-        waitForExpectations(timeout: 10)
-        keepPicture("chats.unread-cleared")
+            // Assert
+            let read = NSPredicate(format: "exists == true AND NOT label CONTAINS %@", "unread")
+            expectation(for: read, evaluatedWith: pin)
+            waitForExpectations(timeout: 10)
+            XCTAssertTrue(unread.evaluate(with: otherPin))
+            keepPicture("chats.unread-cleared.\(conversation)")
+            app.terminate()
+        }
     }
 
     // MARK: - The way there

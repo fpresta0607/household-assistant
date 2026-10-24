@@ -849,8 +849,7 @@ final class RoomModel {
     /// Tells the gateway this phone has read up to the newest message somebody else wrote.
     func markRead(_ conversation: RoomConversation) async {
         guard
-            let latest = thread(conversation).messages.last(where: { $0.rev != nil }),
-            latest.author != me?.person,
+            let latest = thread(conversation).messages.last(where: { $0.rev != nil && $0.author != me?.person }),
             lastRead[conversation] != latest.id
         else {
             return

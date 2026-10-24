@@ -1307,27 +1307,53 @@ final class RoomModelTests: XCTestCase {
         XCTAssertEqual(room.isAvailable, false)
     }
 
-    func testReadingMarksTheLatestMessageOnceAndOnlyWhenSomeoneElseWroteIt() async {
-        let gateway = Gateway()
-        standardAnswers(gateway)
-        gateway.answers["household-app.read"] = { Self.ok($0, #"{"entry":null}"#) }
-        await connected(gateway)
-        let room = makeModel(gateway)
-        await room.refresh()
+    func testReadingMarksTheLatestKeptIncomingMessageOnceInEitherConversation() async {
+        let scenarios: [(authors: [String], expectedMessageId: String?)] = [
+            ([], nil),
+            (["franco"], nil),
+            (["corey"], "message-1"),
+            (["corey", "corey", "franco"], "message-2"),
+        ]
+        for conversation in RoomConversation.allCases {
+            for scenario in scenarios {
+                let gateway = Gateway()
+                defer { gateway.connection.stop() }
+                let entries = scenario.authors.enumerated().map { index, author in
+                    Self.messageEntry("message-\(index + 1)", rev: index + 1, author: author, conversation: conversation.rawValue)
+                }.joined(separator: ",")
+                gateway.answers["household-app.history"] = { Self.ok($0, Self.emptyHistory) }
+                gateway.answers["household-app.sync"] = { Self.ok($0, Self.syncPage(rev: scenario.authors.count, entries: "[\(entries)]")) }
+                gateway.answers["household-app.read"] = { Self.ok($0, #"{"entry":null}"#) }
+                await connected(gateway)
+                let room = makeModel(gateway)
+                await room.refresh()
 
-        await room.markRead(.family)
-        await room.markRead(.family)
+                await room.markRead(conversation)
+                await room.markRead(conversation)
 
-        let reads = gateway.requests("household-app.read")
-        XCTAssertEqual(reads.count, 1)
-        XCTAssertEqual(reads.first?.params["messageId"]?.stringValue, room.thread(.family).messages.last?.id)
+                let reads = gateway.requests("household-app.read")
+                if let expectedMessageId = scenario.expectedMessageId {
+                    XCTAssertEqual(reads.count, 1)
+                    XCTAssertEqual(reads.first?.params["messageId"]?.stringValue, expectedMessageId)
+                    XCTAssertEqual(reads.first?.params["conversation"]?.stringValue, conversation.rawValue)
+                } else {
+                    XCTAssertTrue(reads.isEmpty)
+                }
+            }
+        }
     }
 
     #if DEBUG && canImport(UIKit)
     func testReadingADemoConversationClearsOnlyItsUnreadCountAndKeepsItsReadMarker() async throws {
         for conversation in RoomConversation.allCases {
             let transport = DemoGateway()
-            let latest = transport.room.say("A new unread message", by: DemoRoom.assistant, in: conversation)
+            let unreadMedia = conversation == .family ? transport.room.voiceNote : transport.room.permissionSlip
+            let latest = try XCTUnwrap(transport.room.entries.first { entry in
+                entry.media.contains { $0.id == unreadMedia.id }
+            })
+            if conversation == .direct {
+                transport.room.say("I will sign it tonight.", by: DemoRoom.person, in: .direct)
+            }
             let connection = GatewayConnection(
                 transport: transport,
                 credentials: MemoryCredentialStore(deviceToken: StoredDeviceToken(token: "t")),
@@ -1344,11 +1370,14 @@ final class RoomModelTests: XCTestCase {
             ))
             await eventually("demo connected") { connection.state == .connected }
             await room.refresh()
-            XCTAssertEqual(room.summary(conversation).unread, 3)
+            XCTAssertEqual(room.summary(conversation).unread, 2)
+            XCTAssertEqual(room.thread(conversation).messages.last?.author, DemoRoom.person)
             let otherConversation: RoomConversation = conversation == .family ? .direct : .family
             let otherSummary = room.summary(otherConversation)
             let otherReads = room.thread(otherConversation).reads
+            let readCount = transport.room.entries.filter { $0.kind == "read" }.count
 
+            await room.markRead(conversation)
             await room.markRead(conversation)
 
             await eventually("demo unread count cleared for \(conversation.rawValue)") {
@@ -1357,6 +1386,7 @@ final class RoomModelTests: XCTestCase {
             XCTAssertEqual(room.thread(conversation).reads[DemoRoom.person], latest.id)
             XCTAssertEqual(room.summary(otherConversation), otherSummary)
             XCTAssertEqual(room.thread(otherConversation).reads, otherReads)
+            XCTAssertEqual(transport.room.entries.filter { $0.kind == "read" }.count, readCount + 1)
             let history = try await connection.roomHistory(conversation, before: nil)
             XCTAssertEqual(history.reads.first { $0.author == DemoRoom.person }?.messageId, latest.id)
         }
