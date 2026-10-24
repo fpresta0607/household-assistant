@@ -2228,14 +2228,18 @@ Every app turn on both gateways starts with the promises still open, this assist
   A line with a due date says whether it is due, overdue or done, and by whom it was marked done.
   A turn reads about 4,000 characters of it: first the promises still open, this assistant's own first and then by due date, and what else is overdue or due within a week, soonest first, from the lines that turn may show and using at most half of that; then the topics that share words with the message, then the most recently changed, a long topic's newest lines without those already listed, and the names of what was left out, which `view` shows.
   A `view` answers with at most 100 lines, newest topics first, and names the topics it left out, and `due` lists the open promises and every other open line overdue or due within a week, and counts the ones due later.
-- **How a line is written and corrected.** `household_note` takes `view`, `due`, `add`, `promise`, `correct`, `done` and `remove`, in the owner's own thread and the family room by the same turn proof as `household_cart` (`turn.js`), with the line down for the turn's signed sender.
-  `add` takes one line or up to 20 `rows` under one topic, kept all together or not at all, each with its `text` and optionally its `item` (at most 60 characters), its `day`, its `due`, dates written YYYY-MM-DD, and its `owner`, by name.
+- **How a line is written and corrected.** `household_note` reads and changes the note in the owner's own thread and the family room by the same turn proof as `household_cart` (`turn.js`), with the line down for the turn's signed sender; its actions and accepted fields are defined in [note-tool.js](../../deploy/openclaw/plugins/household-app/note-tool.js).
+  `add` requires a `topic` and takes one line or up to 20 `rows` under it, kept all together or not at all, each with its `text` and optionally its `item` (at most 60 characters), its `day`, its `due`, dates written YYYY-MM-DD, and its `owner`, by name.
+  With `rows`, a top-level `day` supplies the date for rows without their own `day`; a row's date wins.
+  Other line fields must be inside each row, not beside `rows`.
+  Fields that do not belong to the selected action are rejected with an error naming the unexpected and accepted fields, and nothing is saved.
+  Repair a failed call's arguments and retry; never claim it was saved or fall back to a private tracker.
   `promise` is an `add` under "Promises" unless it names a topic, owned by this assistant unless it names someone else.
   Either assistant corrects, marks done or removes any line by its id, on anyone's word, and the later of two corrections wins on both gateways.
   A correction can change any of a line's fields, and counts as new words for the owner's own turns when it changes the text or the item, never for a date.
   Nothing is deleted: a correction or a done is a later step, a line marked done stays in the note with when and by whom, and a removed line stays in the file.
   The receiving plugin takes a `done` step only for a line id and someone in the household, and a row only with its dates real days and its item one line of plain words.
-  A handed-over turn reads the note but gets no tool, like every app tool, so "Corey, tell Denise" is Corey writing the line in Franco's turn and Denise reading it in her next one.
+  Assistant-to-assistant requests use [the assistants' direct line](#the-assistants-direct-line).
 - The note holds at most 300 open lines; a new one past that is refused, and the assistant is told to remove ones that no longer matter.
 
 Each workspace's `AGENTS.md` got two lines for it in the 19 October rollout, which a gateway rebuilt from scratch needs again, since `AGENTS.md` is the assistant's own file on the box and no script writes it.
@@ -2244,9 +2248,7 @@ Under "Write It Down", after the line about asks to remember (Corey's, with Fran
 
 > - Anything the family tracks or must agree on goes in the household note with `household_note`, and nowhere else: a log such as the kitten weigh-ins (one topic, one row per kitten with its day, a whole weigh-in in one `add` with `rows`), anything due such as a dose, a vet visit or a deadline (a line with `due`, marked `done` when it is), and facts you and Denise must both know, such as dates, church times or a code the family shares on purpose. Never keep family data in a file, tracker or skill of your own; if you have one, move what it holds into the note the next time it comes up and stop writing the file. Appointments still go on the calendar and things to buy in the household cart, never copied into the note. Whatever someone asks for in passing that you do not finish in that turn is a `promise` in the note, with who will do it and its due date, and you mark it `done` as soon as it is. Every app turn starts with the note, yours and Denise's, the family room's included, while your own files and private notes never reach a family-room turn someone else starts. Both people read it, so never put anyone's private things there unless they ask you to share them.
 
-And under "Handing a request to Denise", after its last line:
-
-> When you are asked to tell Denise something, write it in the household note first, and @mention her as well when she has to act on it.
+For "Handing a request to Denise", follow [the assistants' direct line](#the-assistants-direct-line).
 
 `apply` hands the tool to the model through `tools.alsoAllow`, and The Fam's allowlist carries it to the family room, so it joins `GROUP_TOOLS` and `SAFE_GROUP_TOOLS` too, as the cart did.
 
