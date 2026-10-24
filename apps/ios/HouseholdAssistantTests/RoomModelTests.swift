@@ -1323,6 +1323,46 @@ final class RoomModelTests: XCTestCase {
         XCTAssertEqual(reads.first?.params["messageId"]?.stringValue, room.thread(.family).messages.last?.id)
     }
 
+    #if DEBUG && canImport(UIKit)
+    func testReadingADemoConversationClearsOnlyItsUnreadCountAndKeepsItsReadMarker() async throws {
+        for conversation in RoomConversation.allCases {
+            let transport = DemoGateway()
+            let latest = transport.room.say("A new unread message", by: DemoRoom.assistant, in: conversation)
+            let connection = GatewayConnection(
+                transport: transport,
+                credentials: MemoryCredentialStore(deviceToken: StoredDeviceToken(token: "t")),
+                signer: DeviceSigner(deviceId: "device-1", publicKey: "public-key") { _ in "connect-signature" }
+            )
+            defer { connection.stop() }
+            let room = RoomModel(connection: connection, sign: { _ in "phone-signature" })
+            connection.onEvent = { [weak room] in room?.handle($0) }
+            connection.start(GatewayConnection.Configuration(
+                url: try XCTUnwrap(URL(string: "ws://demo.steward.invalid")),
+                client: .stewardPhone(displayName: "test", version: "0.1.0"),
+                scopes: OperatorScope.chat,
+                locale: "en-US"
+            ))
+            await eventually("demo connected") { connection.state == .connected }
+            await room.refresh()
+            XCTAssertEqual(room.summary(conversation).unread, 3)
+            let otherConversation: RoomConversation = conversation == .family ? .direct : .family
+            let otherSummary = room.summary(otherConversation)
+            let otherReads = room.thread(otherConversation).reads
+
+            await room.markRead(conversation)
+
+            await eventually("demo unread count cleared for \(conversation.rawValue)") {
+                room.summary(conversation).unread == 0
+            }
+            XCTAssertEqual(room.thread(conversation).reads[DemoRoom.person], latest.id)
+            XCTAssertEqual(room.summary(otherConversation), otherSummary)
+            XCTAssertEqual(room.thread(otherConversation).reads, otherReads)
+            let history = try await connection.roomHistory(conversation, before: nil)
+            XCTAssertEqual(history.reads.first { $0.author == DemoRoom.person }?.messageId, latest.id)
+        }
+    }
+    #endif
+
     func testTypingInTheFamilyRoomIsSaidOnceRepeatedAfterTenSecondsAndStoppedOnce() async {
         // Arrange
         let gateway = Gateway()

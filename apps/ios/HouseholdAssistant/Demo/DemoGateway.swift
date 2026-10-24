@@ -333,7 +333,7 @@ final class DemoGateway: GatewayTransport {
             return
         }
         push(answer)
-        if ["household-app.send", "household-app.react", "household-app.approval.answer", "household-app.cart.ordered", "household-app.look.set"].contains(request.method) {
+        if ["household-app.send", "household-app.react", "household-app.read", "household-app.approval.answer", "household-app.cart.ordered", "household-app.look.set"].contains(request.method) {
             changed()
         }
         if Self.isLongThreadRequested || DemoFlingThread.isRequested, request.method == "household-app.send",

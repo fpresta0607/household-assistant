@@ -409,7 +409,16 @@ final class DemoRoom {
                 react(to: messageId, by: Self.person, with: params["emoji"]?.stringValue, in: conversation)
             }
             return .object(["ok": .bool(true)])
-        case "household-app.read", "household-app.typing", "household-app.push.register", "household-app.location":
+        case "household-app.read":
+            guard
+                let conversation = params["conversation"]?.stringValue.flatMap(RoomConversation.init(rawValue:)),
+                let messageId = params["messageId"]?.stringValue
+            else {
+                return nil
+            }
+            read(messageId, by: Self.person, in: conversation)
+            return .object(["ok": .bool(true)])
+        case "household-app.typing", "household-app.push.register", "household-app.location":
             return .object(["ok": .bool(true)])
         case "household-app.location.live":
             guard let messageId = params["messageId"]?.stringValue else {
