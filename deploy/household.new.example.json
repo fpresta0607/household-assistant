@@ -20,7 +20,7 @@
     "name": "Family Calendar",
     "appleId": "marina@example.com"
   },
-  "bibleVersion": "ESV",
+  "bibleVersion": "BSB",
   "timezone": "America/New_York",
   "pushRelay": {
     "url": "https://push.example.com",

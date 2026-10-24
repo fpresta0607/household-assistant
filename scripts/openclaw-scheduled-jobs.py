@@ -227,6 +227,13 @@ def check(gateways: Sequence[Gateway], run: Runner) -> int:
 
 
 def apply(gateway: Gateway, *, run: Runner, dry_run: bool) -> int:
+    if not SHARED_CALENDAR:
+        print(
+            f"{gateway.persona}: refused, nothing written: the household file names no shared "
+            "calendar (sharedCalendar), which every one of these jobs reads",
+            file=sys.stderr,
+        )
+        return 1
     try:
         jobs = _jobs(gateway, run)
         written = 0

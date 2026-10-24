@@ -112,6 +112,7 @@ def run_verify(
     state_owner: int | None = None,
     state_files: tuple[str, ...] = (),
     state_links: dict[str, str] | None = None,
+    box: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run openclaw-verify.sh with the one gateway's docker and cgroup in place.
 
@@ -233,6 +234,7 @@ def run_verify(
             "COMPOSE": compose.as_posix(),
             "CGROUP": (tmp_path / "cgroup").as_posix(),
             **({"STATE_OWNER": str(state_owner)} if state_owner is not None else {}),
+            **(box or {}),
         },
         capture_output=True,
         text=True,
@@ -429,6 +431,25 @@ def test_verify_fails_while_the_calendar_skill_cannot_import_its_library(
     )
 
     assert expected in result.stdout, result.stdout
+
+
+def test_a_box_that_holds_only_the_households_gateways_is_held_to_its_own_rules(
+    tmp_path: Path,
+) -> None:
+    """A second household's box serves no web sites and connects calendars through the app."""
+    result = run_verify(
+        tmp_path,
+        "openclaw-gateway",
+        GATEWAY_DIGEST,
+        3072,
+        250_000,
+        box={"WORLD_PORTS": "", "UFW_RULES": "22/tcp", "CALENDAR_LIBRARY": "skip"},
+    )
+
+    assert "PASS  no new world-listener" in result.stdout, result.stdout
+    assert "expected 22/tcp, got" in result.stdout, result.stdout
+    assert "SKIP  calendar library" in result.stdout, result.stdout
+    assert "import requests" not in result.stdout
 
 
 def migrated() -> dict[str, object]:

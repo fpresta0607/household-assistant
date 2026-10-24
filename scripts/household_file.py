@@ -29,8 +29,9 @@ from typing import Any
 
 HOUSEHOLD_FILE = Path(os.environ.get("HOUSEHOLD_FILE", "/etc/household-assistant/household.json"))
 # Where each gateway's root-only env file lives, and its state, one of each per member.
-ENV_ROOT = Path("/etc/household-assistant")
-STATE_ROOT = Path("/var/lib/household-assistant")
+# Both overridable, as the household file is, so the tests can point them at a scratch tree.
+ENV_ROOT = Path(os.environ.get("HOUSEHOLD_ENV_ROOT", "/etc/household-assistant"))
+STATE_ROOT = Path(os.environ.get("HOUSEHOLD_STATE_ROOT", "/var/lib/household-assistant"))
 # The first gateway's port on the box's loopback; each member after it takes the next one.
 FIRST_PORT = 18789
 MEMBERS = 2
@@ -38,6 +39,11 @@ MEMBERS = 2
 # 4 GB box room for both and the system.
 MEMORY = "1536M"
 TIMEZONE = "America/Chicago"
+# The network a household's gateways share on a box whose file names its members, on a
+# subnet docker's default pools do not hand out, so the host's address on it, which each
+# gateway trusts as the tailnet proxy in front of it, is known before they start.
+GATEWAY_SUBNET = "172.31.240.0/24"
+GATEWAY_BRIDGE = "172.31.240.1"
 
 ID = re.compile(r"[a-z][a-z0-9-]{0,31}")
 NAME = re.compile(r"[A-Za-z][A-Za-z .'-]{0,39}")
@@ -210,16 +216,21 @@ def load_household(path: Path = HOUSEHOLD_FILE) -> Household:
     approver = loaded.get("approver", members[0].person)
     if approver not in [member.person for member in members]:
         raise UnsupportedConfig(f"{path}: the approver {approver!r} is not a member")
-    calendar = loaded.get("sharedCalendar")
+    # The family's shared iCloud calendar, which only the scheduled jobs read; a household
+    # that connects its calendars through the app may leave it out.
+    calendar = loaded.get("sharedCalendar", {"name": "", "appleId": ""})
     if not isinstance(calendar, dict):
-        raise UnsupportedConfig(f"{path} has no sharedCalendar")
+        raise UnsupportedConfig(f"{path}: sharedCalendar is not an object")
+    if calendar != {"name": "", "appleId": ""}:
+        _text(calendar, "name", path)
+        _text(calendar, "appleId", path)
     return Household(
         members=members,
         approver=approver,
         gateway_host=_text(loaded, "gatewayHost", path),
         google_client_id=_text(loaded, "googleClientId", path),
-        shared_calendar=_text(calendar, "name", path),
-        shared_calendar_apple_id=_text(calendar, "appleId", path),
+        shared_calendar=str(calendar.get("name", "")),
+        shared_calendar_apple_id=str(calendar.get("appleId", "")),
         bible_version=_text(loaded, "bibleVersion", path),
         timezone=_matching(loaded.get("timezone", TIMEZONE), ZONE, "a time zone", path),
         push_relay=_push_relay(loaded.get("pushRelay"), path),

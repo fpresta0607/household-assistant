@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Every night: both gateways' state and, on a box that still has it, the retired
+# Every night: every gateway's state and, on a box that still has it, the retired
 # coordination relay's database, each through SQLite's online backup API, then a
 # restore drill of what was written, then the oldest backups beyond the newest --keep
 # complete ones removed.
@@ -31,18 +31,27 @@ chmod 700 "${BACKUP_ROOT}" "${dest}"
 echo "backup destination ${dest}"
 
 openclaw_failed=0
-archive_assistant openclaw openclaw-gateway "${OPENCLAW_STATE}" "${OPENCLAW_SECRETS}" "${OPENCLAW_CODEX}"
-archive_assistant denise openclaw-denise "${DENISE_STATE}" "${DENISE_SECRETS}" "${DENISE_CODEX}"
+gateways="$(household_gateways)" || { echo "the household file cannot be read; nothing was archived" >&2; exit 1; }
+labels=()
+while IFS=$'\t' read -r label container state secrets codex; do
+  archive_assistant "${label}" "${container}" "${state}" "${secrets}" "${codex}" </dev/null
+  labels+=("${label}")
+done <<<"${gateways}"
 archive_coordination
 
-cat > "${dest}/MANIFEST.tsv" <<EOF
-taken_at_utc	${stamp}
-openclaw_archive	${openclaw_archive}
-codex_archive	${openclaw_codex_archive}
-denise_archive	${denise_archive}
-denise_codex_archive	${denise_codex_archive}
-coordination_archive	${coordination_archive}
-EOF
+# The first household's Corey keeps the keys every backup before this one wrote:
+# openclaw_archive and codex_archive.
+{
+  printf 'taken_at_utc\t%s\n' "${stamp}"
+  for label in "${labels[@]}"; do
+    archive_of="${label}_archive"
+    codex_of="${label}_codex_archive"
+    codex_key="${codex_of}"
+    [[ ${label} == openclaw ]] && codex_key=codex_archive
+    printf '%s\t%s\n%s\t%s\n' "${archive_of}" "${!archive_of}" "${codex_key}" "${!codex_of}"
+  done
+  printf 'coordination_archive\t%s\n' "${coordination_archive}"
+} >"${dest}/MANIFEST.tsv"
 ( cd "${dest}" && sha256sum ./* > "${dest}.sums" && mv "${dest}.sums" SHA256SUMS && chmod 600 SHA256SUMS )
 ls -l "${dest}"
 

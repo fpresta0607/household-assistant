@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prove a household backup restores, without touching either live gateway.
+# Prove a household backup restores, without touching any live gateway.
 #
 # Each gateway's archive goes through OpenClaw's own `backup restore`, which verifies
 # the manifest, links and every SQLite database before it writes, into a scratch
@@ -13,7 +13,9 @@
 set -euo pipefail
 
 src="${1:?usage: household-restore-drill.sh <backup-dir>}"
-OPENCLAW_COMPOSE=/opt/household-assistant/docker-compose.yml
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=household-backup-lib.sh
+source "${here}/household-backup-lib.sh"
 WORK="$(mktemp -d /var/tmp/household-drill.XXXXXX)"
 trap 'rm -rf "${WORK}"' EXIT
 
@@ -31,9 +33,10 @@ fi
 
 # The drill is for the day the runtime is damaged, so fall back to the image the
 # compose file pins when the gateway is gone.
-image="$(docker inspect -f '{{.Config.Image}}' openclaw-gateway 2>/dev/null || true)"
+first_gateway="$(household_gateways 2>/dev/null | head -n 1 | cut -f2)" || first_gateway=""
+image="$(docker inspect -f '{{.Config.Image}}' "${first_gateway:-openclaw-gateway}" 2>/dev/null || true)"
 if [[ -z ${image} && -f ${OPENCLAW_COMPOSE} ]]; then
-  image="$(awk '$1=="image:"{print $2; exit}' "${OPENCLAW_COMPOSE}" || true)"
+  image="$(grep -oE "${GATEWAY_IMAGE}" "${OPENCLAW_COMPOSE}" | head -n 1 || true)"
 fi
 
 # drill_gateway <label>: restore <label>_archive and read it back.
@@ -102,8 +105,12 @@ OPENS
   fi
 }
 
-drill_gateway openclaw
-drill_gateway denise
+# Every gateway the backup holds, as its manifest names them: each `<label>_archive` but
+# the codex and coordination archives.
+for label in $(awk -F'\t' '$1 ~ /_archive$/ && $1 != "codex_archive" && $1 != "coordination_archive" &&
+  $1 !~ /_codex_archive$/ { sub(/_archive$/, "", $1); print $1 }' "${src}/MANIFEST.tsv" 2>/dev/null); do
+  drill_gateway "${label}"
+done
 
 echo "--- coordination ---"
 coordination="$(manifest coordination_archive)"

@@ -17,6 +17,14 @@ STATE_OWNER=${STATE_OWNER:-1000}
 COMPOSE=${COMPOSE:-/opt/household-assistant/docker-compose.yml}
 # Where the kernel publishes the container's own cgroup, read for the footprint.
 CGROUP=${CGROUP:-/sys/fs/cgroup/system.slice}
+# What else the box may show the world. The first household's box also serves its web
+# sites through Caddy on 80 and 443; a box that holds only the household's gateways
+# listens to the world on nothing and lets in only SSH, and household-converge.sh says so.
+WORLD_PORTS=${WORLD_PORTS-80 443}
+UFW_RULES=${UFW_RULES-22/tcp 80/tcp 443/tcp}
+# The first household's calendar skill imports requests from pylocal in the state; a box
+# whose household connects its calendars through the app sets this to skip.
+CALENDAR_LIBRARY=${CALENDAR_LIBRARY:-required}
 [[ -f ${COMPOSE} ]] || { echo "missing ${COMPOSE}" >&2; exit 1; }
 
 # Two gateway services share that file, so every read of it has to be scoped
@@ -51,9 +59,9 @@ echo "=== loopback only ==="
 # The published port must be bound to 127.0.0.1, never 0.0.0.0 or [::].
 check "published bindings" "127.0.0.1:${PORT}" \
   "$(docker inspect -f '{{range $p, $b := .NetworkSettings.Ports}}{{range $b}}{{.HostIp}}:{{.HostPort}} {{end}}{{end}}' "${CT}" | tr -s ' ' | sed 's/ $//')"
-check "no new world-listener" "80 443" \
+check "no new world-listener" "${WORLD_PORTS}" \
   "$(docker ps --format '{{.Ports}}' | grep -oE '(0\.0\.0\.0|\[::\]):[0-9]+' | sed -E 's/.*://' | sort -un | tr '\n' ' ' | sed 's/ $//')"
-check "ufw rules unchanged" "22/tcp 80/tcp 443/tcp" \
+check "ufw rules unchanged" "${UFW_RULES}" \
   "$(ufw status | awk '/ALLOW/ {print $1}' | sort -uV | tr '\n' ' ' | sed 's/ $//')"
 
 echo
@@ -175,8 +183,12 @@ echo "=== the calendar skill can load ==="
 # PYTHONPATH in the env file points there. Until 9 October Corey's copy held requests
 # without urllib3 or idna, so every calendar read died on this import. The last line
 # of a failed import names the module that is missing.
-library="$(docker exec "${CT}" python3 -c 'import requests; print("ok")' 2>&1 | tail -n 1)" || true
-check "calendar library" ok "${library:-unreadable}"
+if [[ ${CALENDAR_LIBRARY} == skip ]]; then
+  printf 'SKIP  %-32s %s\n' "calendar library" "this household's calendars come through the app"
+else
+  library="$(docker exec "${CT}" python3 -c 'import requests; print("ok")' 2>&1 | tail -n 1)" || true
+  check "calendar library" ok "${library:-unreadable}"
+fi
 
 echo
 echo "=== footprint against the declared limit ==="

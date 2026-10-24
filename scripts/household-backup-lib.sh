@@ -11,10 +11,35 @@ DENISE_STATE=/var/lib/household-assistant/openclaw-denise
 DENISE_SECRETS=/var/lib/household-assistant/openclaw-denise-auth-secrets
 DENISE_CODEX=/var/lib/household-assistant/codex-denise
 COORDINATION_DB=/var/lib/household-assistant/coordination/coordination.db
+# The gateways' pinned image, as the compose file names it, quoted or not.
+GATEWAY_IMAGE='openclaw/openclaw:[^"[:space:]]+'
 # The household plugins, which each config names by their path in the container.
 # Without them OpenClaw calls the config invalid and `backup create` refuses, so the
 # archive container gets them read-only where the gateway has them.
 PLUGINS=/opt/household-assistant/plugins
+
+# household_gateways: one tab-separated line for each gateway the household file names:
+# its label, container, state, secrets and codex directories. The label names the
+# gateway's archives in the manifest: the first household's Corey is `openclaw` and Denise
+# `denise`, as every backup before this called them, and any other gateway is named by
+# its assistant. Installed without household_file.py beside it, as the first household's
+# backup directory was, it lists those two.
+household_gateways() {
+  local here members assistant container state_name state secrets codex label
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ ! -f ${here}/household_file.py ]]; then
+    printf '%s\t%s\t%s\t%s\t%s\n' openclaw openclaw-gateway "${OPENCLAW_STATE}" "${OPENCLAW_SECRETS}" "${OPENCLAW_CODEX}"
+    printf '%s\t%s\t%s\t%s\t%s\n' denise openclaw-denise "${DENISE_STATE}" "${DENISE_SECRETS}" "${DENISE_CODEX}"
+    return
+  fi
+  members="$(python3 "${here}/household_file.py" members)" || return 1
+  while IFS=$'\t' read -r _ assistant container state_name _ state _ secrets codex _; do
+    # A label is also a shell variable's name, so an assistant's hyphens become underscores.
+    label="${assistant//-/_}"
+    [[ ${state_name} == openclaw ]] && label=openclaw
+    printf '%s\t%s\t%s\t%s\t%s\n' "${label}" "${container}" "${state}" "${secrets}" "${codex}"
+  done <<<"${members}"
+}
 
 # --- assistant state -------------------------------------------------------
 # OpenClaw keeps everything in SQLite, which must never be backed up by copying
@@ -24,8 +49,7 @@ PLUGINS=/opt/household-assistant/plugins
 # half-installed or failing to archive is recorded in the manifest, sets
 # `openclaw_failed`, and is reported by the caller's exit code at the very end.
 #
-# Corey and Denise are two gateways with the same shape, so one function
-# archives each: the OpenClaw state through `backup create`, then the Codex
+# Every gateway has the same shape, so one function archives each: the OpenClaw state through `backup create`, then the Codex
 # harness directory beside it, which `backup create` does not cover, through the
 # same online backup API with an integrity_check on every copy.
 
@@ -50,7 +74,7 @@ archive_assistant() {
     # failure rather than aborting when neither can name an image.
     image="$(docker inspect -f '{{.Config.Image}}' "${container}" 2>/dev/null || true)"
     if [[ -z ${image} && -f ${OPENCLAW_COMPOSE} ]]; then
-      image="$(awk '$1=="image:"{print $2; exit}' "${OPENCLAW_COMPOSE}" || true)"
+      image="$(grep -oE "${GATEWAY_IMAGE}" "${OPENCLAW_COMPOSE}" | head -n 1 || true)"
     fi
     [[ -n ${image} ]] \
       || echo "${label}: no image, the gateway is gone and no compose file names one" >&2

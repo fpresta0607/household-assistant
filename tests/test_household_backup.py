@@ -8,6 +8,7 @@ runs the coordination copy. The units are read as systemd reads them.
 """
 
 import configparser
+import os
 import shutil
 import subprocess
 import sys
@@ -148,9 +149,83 @@ def test_each_backup_ends_with_a_restore_drill_of_what_it_wrote() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
     assert '"${here}/household-restore-drill.sh" "${dest}"' in text
     drill = DRILL.read_text(encoding="utf-8")
-    for label in ("openclaw", "denise"):
-        assert f"drill_gateway {label}" in drill
+    assert 'drill_gateway "${label}"' in drill
     assert "coordination_flag" in drill
+
+
+def gateways_of(household: Path) -> list[list[str]]:
+    bash = shutil.which("bash")
+    assert bash is not None
+    listed = subprocess.run(
+        [bash, "-c", f'source "{LIBRARY.as_posix()}" && household_gateways'],
+        env={**os.environ, "HOUSEHOLD_FILE": household.as_posix()},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return [line.split("\t") for line in listed.stdout.splitlines()]
+
+
+@needs_posix_bash
+def test_the_first_households_gateways_keep_the_labels_every_backup_had() -> None:
+    root = "/var/lib/household-assistant"
+    assert gateways_of(ROOT / "deploy" / "household.example.json") == [
+        [
+            "openclaw",
+            "openclaw-gateway",
+            f"{root}/openclaw",
+            f"{root}/openclaw-auth-secrets",
+            f"{root}/codex",
+        ],
+        [
+            "denise",
+            "openclaw-denise",
+            f"{root}/openclaw-denise",
+            f"{root}/openclaw-denise-auth-secrets",
+            f"{root}/codex-denise",
+        ],
+    ]
+
+
+@needs_posix_bash
+def test_a_new_households_gateways_are_labelled_by_their_assistants() -> None:
+    labels = [line[:2] for line in gateways_of(ROOT / "deploy" / "household.new.example.json")]
+    assert labels == [["ada", "openclaw-ada"], ["rex", "openclaw-rex"]]
+
+
+@needs_posix_bash
+def test_the_drill_restores_every_gateway_its_manifest_names(tmp_path: Path) -> None:
+    bash = shutil.which("bash")
+    assert bash is not None
+    backup = tmp_path / "20261024T043000Z"
+    backup.mkdir()
+    (backup / "MANIFEST.tsv").write_text(
+        "taken_at_utc\t20261024T043000Z\n"
+        "ada_archive\tnone\nada_codex_archive\tmissing\n"
+        "rex_archive\tnone\nrex_codex_archive\tmissing\n"
+        "coordination_archive\tnone\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        "sha256sum ./* > SHA256SUMS", shell=True, cwd=backup, check=True, capture_output=True
+    )
+
+    drilled = subprocess.run(
+        [bash, DRILL.as_posix(), backup.as_posix()],
+        env={
+            **os.environ,
+            "HOUSEHOLD_FILE": (ROOT / "deploy" / "household.new.example.json").as_posix(),
+            "TMPDIR": tmp_path.as_posix(),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert "--- ada ---" in drilled.stdout, drilled.stdout + drilled.stderr
+    assert "--- rex ---" in drilled.stdout
+    assert "--- codex ---" not in drilled.stdout
+    assert "DRILL PASSED" in drilled.stdout
 
 
 @pytest.mark.parametrize("script", [SCRIPT, LIBRARY, SIQSERMON, DRILL])

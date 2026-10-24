@@ -1,6 +1,7 @@
 # OpenClaw on the shared VPS
 
 This is the runtime layer only: the box, the container, its state, its limits, and its backup.
+It describes the first household's box; another household's box is set up and kept current as [A new household's box](new-household.md) says, from the same scripts.
 The [Phase 1 household service](../../README.md#phase-1---identity-and-privacy-spine) defines authenticated identity and scopes; the deployed gateways' family-room access and tool context are described in [What a family-room turn may use](#what-a-family-room-turn-may-use).
 
 The initial deployment was verified on the IONOS box on 2026-09-18; later changes are dated in their sections.
@@ -346,6 +347,9 @@ The service runs `/opt/household-assistant/backup/household-backup.sh --keep 14`
 A failed run fails the unit, so `systemctl --failed` and `journalctl -u household-backup.service` show it.
 On 14 October a run took 161 seconds and 282 MB (Corey's archive 101 MB, Denise's 178 MB), so 14 backups come to about 4 GB.
 
+The gateways it archives are the household file's members (`household_gateways` in the library), which on this box are Corey, recorded as `openclaw`, and Denise, as `denise`, as every backup before them was; installed without `household_file.py` beside it, the job archives those two.
+The drill restores every gateway its backup's `MANIFEST.tsv` names.
+
 To drill any backup by hand:
 
 ```
@@ -357,7 +361,7 @@ To install or update it from a checkout copied to the box, as root:
 ```
 install -d -m 0755 /opt/household-assistant/backup
 install -m 0755 scripts/household-backup.sh scripts/household-restore-drill.sh /opt/household-assistant/backup/
-install -m 0644 scripts/household-backup-lib.sh /opt/household-assistant/backup/
+install -m 0644 scripts/household-backup-lib.sh scripts/household_file.py /opt/household-assistant/backup/
 install -m 0644 deploy/backup/household-backup.service deploy/backup/household-backup.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl start household-backup.service    # one run now, drill included

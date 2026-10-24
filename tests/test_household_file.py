@@ -45,7 +45,7 @@ def test_the_tests_read_the_example() -> None:
     [
         (lambda data: data.pop("gatewayHost"), "has no gatewayHost"),
         (lambda data: data.update(googleClientId=7), "has no googleClientId"),
-        (lambda data: data.pop("sharedCalendar"), "has no sharedCalendar"),
+        (lambda data: data.update(sharedCalendar="Family"), "sharedCalendar is not an object"),
         (lambda data: data["sharedCalendar"].pop("appleId"), "has no appleId"),
         (lambda data: data.pop("bibleVersion"), "has no bibleVersion"),
     ],
@@ -307,3 +307,14 @@ def test_the_shell_installers_read_the_members_from_the_command_line(
     assert lines[1][6] == "/etc/household-assistant/openclaw-rex.env"
     assert household_file.main(["has-members"]) == 0
     assert household_file.main(["something"]) == 2
+
+
+def test_a_household_that_connects_its_calendars_through_the_app_names_none(
+    tmp_path: Path,
+) -> None:
+    data = json.loads(NEW_EXAMPLE.read_text(encoding="utf-8"))
+    del data["sharedCalendar"]
+
+    household = load_household(written(tmp_path, data))
+
+    assert (household.shared_calendar, household.shared_calendar_apple_id) == ("", "")
