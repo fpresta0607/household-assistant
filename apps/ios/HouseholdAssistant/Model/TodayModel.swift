@@ -69,6 +69,10 @@ final class TodayModel {
             && !hasUnreadVerse && !isOpened
     }
 
+    var sections: [TodayGlance.DaySection] {
+        TodayGlance.sections(of: lines, at: displayedAt, calendar: calendar)
+    }
+
     /// Its person has seen the whole card, leaving Chats with it on screen, or checked it
     /// off: it is a banner for the rest of the day.
     func markSeen() {

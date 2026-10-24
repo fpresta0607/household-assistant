@@ -111,8 +111,7 @@ struct InboxView: View {
                                 }
                             }
                             .frame(maxWidth: .infinity)
-                            // Room for the bubble that sits over a face.
-                            .padding(.top, 44)
+                            .padding(.top, 16)
                             if model.room.pairLastAt != nil || !model.pairLine.entries.isEmpty {
                                 PairRow { isPairOpen = true }
                                     .padding(.horizontal, 16)
@@ -237,8 +236,7 @@ private struct Entering: ViewModifier {
     }
 }
 
-/// One conversation as a big face, with an unread dot, and above the face either the
-/// typing dots or, while there is something unread, its latest line.
+/// One conversation as a big face, with an unread count in its corner and typing dots above.
 ///
 /// It reads the conversation's summary, never its thread, so a reply streaming in there
 /// does not redraw it.
@@ -259,11 +257,15 @@ private struct PinnedConversation: View {
                     .shadow(color: Palette.shadow, radius: 12, y: 6)
                     .overlay(alignment: .topTrailing) {
                         if unread > 0 {
-                            Circle()
-                                .fill(Palette.highlight)
-                                .frame(width: 16, height: 16)
-                                .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-                                .offset(x: -2, y: 2)
+                            Text(unread.formatted())
+                                .font(.caption2.weight(.bold))
+                                .monospacedDigit()
+                                .foregroundStyle(Palette.highlight)
+                                .padding(.horizontal, 6)
+                                .frame(minWidth: 24, minHeight: 24)
+                                .background(CardStyle.panel, in: Capsule())
+                                .overlay(Capsule().strokeBorder(Palette.highlight.opacity(0.3)))
+                                .offset(x: 4, y: -4)
                         }
                     }
                     .overlay(alignment: .top) {
@@ -273,19 +275,6 @@ private struct PinnedConversation: View {
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
                                     .rainbowGlass(in: Capsule())
-                                    .transition(Motion.popTransition(reduced: reduceMotion))
-                            } else if unread > 0, summary.latestId != nil {
-                                RoomPreview(summary: summary, conversation: conversation)
-                                    .font(.caption)
-                                    .foregroundStyle(Palette.text)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .rainbowGlass(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                    // Wider than the face, and no wider than its words need.
-                                    .frame(width: 120)
-                                    .fixedSize(horizontal: false, vertical: true)
                                     .transition(Motion.popTransition(reduced: reduceMotion))
                             }
                         }
@@ -527,32 +516,6 @@ private struct SharedTile: View {
             return "From \(authorName)"
         case .photo:
             return "Photo"
-        }
-    }
-}
-
-/// A conversation's latest line: words, or an icon for what was sent, after the speaker's
-/// name in the family room. Whoever shows it sets its font and colour.
-struct RoomPreview: View {
-    @Environment(AppModel.self) private var model
-    let summary: ConversationSummary
-    let conversation: RoomConversation
-
-    var body: some View {
-        HStack(spacing: 4) {
-            if conversation == .family, let author = summary.latestAuthor, author != model.room.me?.person,
-               let name = model.room.participant(author)?.name {
-                Text("\(name):")
-                    .fontWeight(.semibold)
-            }
-            if let symbol = summary.previewSymbol {
-                Image(systemName: symbol)
-                if !summary.preview.isEmpty {
-                    Text(summary.preview)
-                }
-            } else {
-                Text(summary.preview)
-            }
         }
     }
 }

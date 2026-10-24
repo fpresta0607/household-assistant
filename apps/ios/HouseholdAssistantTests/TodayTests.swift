@@ -186,7 +186,8 @@ final class TodayTests: XCTestCase {
         XCTAssertEqual(glance.heading, .tonight)
         XCTAssertEqual(glance.next?.title, "Soccer pickup")
         XCTAssertEqual(glance.next?.time, "5:45")
-        XCTAssertEqual(glance.more.map(\.time), ["Fri 8:00"])
+        XCTAssertEqual(glance.more.map(\.time), ["8:00"])
+        XCTAssertEqual(glance.sections.map(\.title), ["Tonight", "Tomorrow"])
     }
 
     func testOnlyTheDaysOwnVerseShows() async throws {
@@ -232,7 +233,8 @@ final class TodayTests: XCTestCase {
         // Assert
         XCTAssertEqual(evening.next?.title, "Trash day")
         XCTAssertNil(evening.next?.time, "all of today needs no time")
-        XCTAssertEqual(evening.more.first?.time, "Fri")
+        XCTAssertNil(evening.more.first?.time)
+        XCTAssertEqual(evening.sections.map(\.title), ["Tonight", "Tomorrow"])
         XCTAssertEqual(lines.map(\.isPast), [false, false])
     }
 

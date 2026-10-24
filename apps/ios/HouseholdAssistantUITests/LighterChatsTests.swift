@@ -74,6 +74,27 @@ final class LighterChatsTests: XCTestCase {
         XCTAssertFalse(card.exists)
     }
 
+    func testOpeningAConversationClearsItsUnreadCount() {
+        // Arrange
+        let app = launch()
+        let pin = app.buttons["pin.direct"]
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "2 unread"), evaluatedWith: pin)
+        waitForExpectations(timeout: 10)
+        keepPicture("chats.unread-count")
+
+        // Act
+        pin.tap()
+        let back = app.navigationBars.buttons.element(boundBy: 0)
+        XCTAssertTrue(back.waitForExistence(timeout: 10))
+        back.tap()
+
+        // Assert
+        let read = NSPredicate(format: "exists == true AND NOT label CONTAINS %@", "unread")
+        expectation(for: read, evaluatedWith: pin)
+        waitForExpectations(timeout: 10)
+        keepPicture("chats.unread-cleared")
+    }
+
     // MARK: - The way there
 
     /// The demo on Chats, with nothing playing over it.

@@ -37,7 +37,7 @@ final class ConversationSummaryTests: XCTestCase {
         return thread
     }
 
-    func testTheSummaryIsTheNewestKeptMessageAndWhatIsUnreadForThisPerson() throws {
+    func testTheSummaryCountsWhatIsUnreadForThisPerson() throws {
         // Arrange
         var family = thread([
             try entry("m-1", rev: 1, author: "franco", text: "Who is picking up?"),
@@ -50,10 +50,6 @@ final class ConversationSummaryTests: XCTestCase {
         let summary = ConversationSummary(family, readBy: "franco", isTyping: true)
 
         // Assert
-        XCTAssertEqual(summary.latestId, "m-3")
-        XCTAssertEqual(summary.latestAuthor, "denise")
-        XCTAssertEqual(summary.preview, "Soccer ends at 6")
-        XCTAssertNil(summary.previewSymbol)
         XCTAssertEqual(summary.unread, 1)
         XCTAssertTrue(summary.isTyping)
         XCTAssertEqual(ConversationSummary(family, readBy: nil, isTyping: false).unread, 0, "nobody to count for until the room says who")
@@ -73,17 +69,17 @@ final class ConversationSummaryTests: XCTestCase {
         XCTAssertEqual(ConversationSummary(family, readBy: "franco", isTyping: false), before)
     }
 
-    func testAnEmptyConversationHasNoLatestLine() {
+    func testAnEmptyConversationHasNoUnreadMessages() {
         // Act
         let summary = ConversationSummary(RoomThread(.direct), readBy: "franco", isTyping: false)
 
         // Assert
         XCTAssertEqual(summary, .empty)
-        XCTAssertNil(summary.latestId)
-        XCTAssertEqual(summary.preview, "")
+        XCTAssertEqual(summary.unread, 0)
+        XCTAssertFalse(summary.isTyping)
     }
 
-    func testALatestMessageWithNoWordsSaysWhatItCarries() throws {
+    func testUnreadMessagesIncludeMediaAndLocationsWithoutWords() throws {
         // Arrange
         let media: (String, [String: JSONValue]) -> JSONValue = { kind, extra in
             var members: [String: JSONValue] = [
@@ -105,21 +101,20 @@ final class ConversationSummaryTests: XCTestCase {
             }
             return .object(members)
         }
-        let cases: [(RoomEntry, String?, String)] = [
-            (try entry("m-1", rev: 1, text: "", extra: ["media": .array([media("photo", [:])])]), "photo", ""),
-            (try entry("m-2", rev: 2, text: " ", extra: ["media": .array([media("voice", ["durationMs": .number(64_000)])])]), "waveform", "1:04"),
-            (try entry("m-3", rev: 3, text: "", extra: ["location": location(false)]), "location.fill", "Location"),
-            (try entry("m-4", rev: 4, text: "", extra: ["location": location(true)]), "location.fill", "Live location"),
-            (try entry("m-5", rev: 5, text: "Look", extra: ["media": .array([media("photo", [:])])]), nil, "Look"),
+        let cases: [RoomEntry] = [
+            try entry("m-1", rev: 1, text: "", extra: ["media": .array([media("photo", [:])])]),
+            try entry("m-2", rev: 2, text: " ", extra: ["media": .array([media("voice", ["durationMs": .number(64_000)])])]),
+            try entry("m-3", rev: 3, text: "", extra: ["location": location(false)]),
+            try entry("m-4", rev: 4, text: "", extra: ["location": location(true)]),
+            try entry("m-5", rev: 5, text: "Look", extra: ["media": .array([media("photo", [:])])]),
         ]
 
-        for (message, symbol, preview) in cases {
+        for message in cases {
             // Act
             let summary = ConversationSummary(thread([message]), readBy: "franco", isTyping: false)
 
             // Assert
-            XCTAssertEqual(summary.previewSymbol, symbol, message.id)
-            XCTAssertEqual(summary.preview, preview, message.id)
+            XCTAssertEqual(summary.unread, 1, message.id)
         }
     }
 

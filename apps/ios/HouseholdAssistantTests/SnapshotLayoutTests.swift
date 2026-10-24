@@ -79,12 +79,78 @@ final class SnapshotLayoutTests: XCTestCase {
         let glance = try XCTUnwrap(TodayGlance(card: today, at: now, calendar: calendar))
 
         // Act
-        let day = glance.agendaDay(at: now, calendar: calendar)
+        let day = try XCTUnwrap(glance.sections.first).day
 
         // Assert
         XCTAssertEqual(day.mark, CalendarMark(day: "2026-10-15"))
         XCTAssertEqual(day.events.map(\.title), ["School drop off", "Dentist", "Lunch with a friend"])
         XCTAssertEqual(day.events.map(\.time), glance.more.reduce([glance.next?.time]) { $0 + [$1.time] })
         XCTAssertTrue(day.events.allSatisfy { $0.time != nil })
+    }
+
+    func testAnEveningSnapshotDoesNotPutTomorrowUnderTonightsDate() throws {
+        // Arrange
+        let today = try JSONDecoder().decode(TodayCard.self, from: Data(#"""
+            {"day":"2026-10-15","at":0,"items":[
+            {"start":"2026-10-15T19:00:00-05:00","title":"Dinner"},
+            {"start":"2026-10-16T08:00:00-05:00","title":"School drop off"}]}
+            """#.utf8))
+        let now = Date(timeIntervalSince1970: 1_792_040_400 + 18 * 3_600)
+        let glance = try XCTUnwrap(TodayGlance(card: today, at: now, calendar: calendar))
+
+        // Act
+        let tonight = try XCTUnwrap(glance.sections.first).day
+        let tomorrow = try XCTUnwrap(glance.sections.last).day
+
+        // Assert
+        XCTAssertEqual(tonight.mark, CalendarMark(day: "2026-10-15"))
+        XCTAssertEqual(tonight.events.map(\.title), ["Dinner"])
+        XCTAssertEqual(glance.sections.map(\.title), ["Tonight", "Tomorrow"])
+        XCTAssertEqual(tomorrow.mark, CalendarMark(day: "2026-10-16"))
+        XCTAssertEqual(tomorrow.events, [AgendaCard.Event(title: "School drop off", time: "8:00")])
+    }
+
+    func testATomorrowOnlySnapshotNeverCallsItsEventsTonight() throws {
+        // Arrange
+        let today = try JSONDecoder().decode(TodayCard.self, from: Data(#"""
+            {"day":"2026-10-15","at":0,"items":[
+            {"start":"2026-10-16T08:00:00-05:00","title":"School drop off"}]}
+            """#.utf8))
+
+        for hour in [8, 18, 23] {
+            // Act
+            let now = Date(timeIntervalSince1970: 1_792_040_400 + Double(hour) * 3_600)
+            let glance = try XCTUnwrap(TodayGlance(card: today, at: now, calendar: calendar))
+
+            // Assert
+            XCTAssertEqual(glance.sections.map(\.title), ["Tomorrow"])
+            XCTAssertEqual(glance.sections.first?.day.mark, CalendarMark(day: "2026-10-16"))
+        }
+    }
+
+    func testDayHeadingsMoveAtMidnightAndRespectDaylightSavingTime() throws {
+        // Arrange
+        var central = calendar
+        central.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Chicago"))
+        let formatter = ISO8601DateFormatter()
+        for (now, event, title) in [
+            ("2026-03-07T23:45:00-06:00", "2026-03-08T08:00:00-05:00", "Tomorrow"),
+            ("2026-03-08T00:00:00-06:00", "2026-03-08T08:00:00-05:00", "Today"),
+            ("2026-10-31T23:45:00-05:00", "2026-11-01T08:00:00-06:00", "Tomorrow"),
+            ("2026-11-01T00:00:00-05:00", "2026-11-01T08:00:00-06:00", "Today"),
+            ("2026-10-15T18:00:00-05:00", "2026-10-17T08:00:00-05:00", "Saturday"),
+        ] {
+            let today = try JSONDecoder().decode(TodayCard.self, from: Data("""
+                {"day":"\(now.prefix(10))","at":0,"items":[{"start":"\(event)","title":"Breakfast"}]}
+                """.utf8))
+
+            // Act
+            let glance = try XCTUnwrap(TodayGlance(card: today, at: XCTUnwrap(formatter.date(from: now)), calendar: central))
+
+            // Assert
+            XCTAssertEqual(glance.sections.map(\.title), [title], now)
+            XCTAssertEqual(glance.sections.first?.day.mark, CalendarMark(day: String(event.prefix(10))), now)
+            XCTAssertEqual(glance.sections.first?.day.events.first?.time, "8:00", now)
+        }
     }
 }

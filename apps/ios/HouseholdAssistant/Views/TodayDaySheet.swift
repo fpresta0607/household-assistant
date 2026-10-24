@@ -11,25 +11,27 @@ struct TodayDaySheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ForEach(Array(model.today.lines.enumerated()), id: \.offset) { _, line in
-                        HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            Text(verbatim: line.time ?? "All day")
-                                .font(.subheadline)
-                                .monospacedDigit()
-                                .foregroundStyle(Palette.secondaryText)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(verbatim: line.title)
-                                    .foregroundStyle(Palette.text)
-                                if let detail = line.detail {
-                                    Text(verbatim: detail)
-                                        .font(.subheadline)
-                                        .foregroundStyle(Palette.secondaryText)
+                ForEach(model.today.sections, id: \.date) { section in
+                    Section(section.title) {
+                        ForEach(Array(section.lines.enumerated()), id: \.offset) { _, line in
+                            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                Text(verbatim: line.time ?? "All day")
+                                    .font(.subheadline)
+                                    .monospacedDigit()
+                                    .foregroundStyle(Palette.secondaryText)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(verbatim: line.title)
+                                        .foregroundStyle(Palette.text)
+                                    if let detail = line.detail {
+                                        Text(verbatim: detail)
+                                            .font(.subheadline)
+                                            .foregroundStyle(Palette.secondaryText)
+                                    }
                                 }
                             }
+                            .opacity(line.isPast ? 0.45 : 1)
+                            .accessibilityElement(children: .combine)
                         }
-                        .opacity(line.isPast ? 0.45 : 1)
-                        .accessibilityElement(children: .combine)
                     }
                 }
                 if let verse = model.today.glance?.verse {
@@ -39,7 +41,7 @@ struct TodayDaySheet: View {
                 }
             }
             .accessibilityIdentifier("today.day")
-            .navigationTitle(model.today.glance?.heading == .tonight ? "Tonight" : "Today")
+            .navigationTitle("Daily snapshot")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

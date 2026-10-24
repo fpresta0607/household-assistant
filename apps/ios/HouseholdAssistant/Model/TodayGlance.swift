@@ -1,5 +1,5 @@
 // What the Today card shows at one moment: the next thing still ahead first, two more at
-// most, Today or Tonight over them, and the day's verse at the bottom. Worked out on the
+// most, grouped by day, and the day's verse at the bottom. Worked out on the
 // phone from the card its assistant last wrote, so it moves on by the phone's own clock as
 // the day passes, offline too, without asking the gateway again (CFO notes section 21c).
 
@@ -15,12 +15,18 @@ struct TodayGlance: Equatable, Sendable {
     struct Line: Equatable, Sendable {
         let title: String
         let detail: String?
-        /// "9:00", or "Sat 8:00" on another day. For something all day, nil today and the
-        /// day's name on another.
+        /// The local time without the day, which is named by its section; nil all day.
         let time: String?
         let start: Date
         /// Whether it is over, or under way long enough to be no longer what is next.
         let isPast: Bool
+    }
+
+    struct DaySection: Equatable, Sendable {
+        let date: Date
+        let title: String
+        let lines: [Line]
+        let day: AgendaCard.Day
     }
 
     let heading: Heading
@@ -28,6 +34,7 @@ struct TodayGlance: Equatable, Sendable {
     let next: Line?
     /// Up to two after it.
     let more: [Line]
+    let sections: [DaySection]
     let verse: TodayCard.Verse?
 
     /// How long after it starts something is still what is next: a dentist at 9:00 is still
@@ -51,18 +58,34 @@ struct TodayGlance: Equatable, Sendable {
         heading = calendar.component(.hour, from: now) >= Self.eveningHour ? .tonight : .today
         next = ahead.first
         more = Array(ahead.dropFirst().prefix(Self.mostMore))
+        sections = Self.sections(of: Array(ahead.prefix(Self.mostMore + 1)), at: now, calendar: calendar)
         self.verse = verse
     }
 
-    /// The card's day as the snapshot draws it (AgendaDayView): the calendar mark of the day
-    /// the next thing is on, or of today when nothing is, and a row for each thing shown, its
-    /// time as the card says it, nil all day.
-    func agendaDay(at now: Date, calendar: Calendar) -> AgendaCard.Day {
-        let shown = [next].compactMap { $0 } + more
-        return AgendaCard.Day(
-            mark: CalendarMark(date: next?.start ?? now, calendar: calendar),
-            events: shown.map { AgendaCard.Event(title: $0.title, time: $0.time) }
-        )
+    static func sections(of lines: [Line], at now: Date, calendar: Calendar) -> [DaySection] {
+        let today = calendar.startOfDay(for: now)
+        return Dictionary(grouping: lines) { calendar.startOfDay(for: $0.start) }
+            .sorted { $0.key < $1.key }
+            .map { date, lines in
+                let title: String
+                switch calendar.dateComponents([.day], from: today, to: date).day {
+                case 0:
+                    title = calendar.component(.hour, from: now) >= eveningHour ? "Tonight" : "Today"
+                case 1:
+                    title = "Tomorrow"
+                default:
+                    title = date.formatted(Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone).weekday(.wide))
+                }
+                return DaySection(
+                    date: date,
+                    title: title,
+                    lines: lines,
+                    day: AgendaCard.Day(
+                        mark: CalendarMark(date: date, calendar: calendar),
+                        events: lines.map { AgendaCard.Event(title: $0.title, time: $0.time) }
+                    )
+                )
+            }
     }
 
     /// Everything in `card` as the card says it, the soonest first, what has gone by marked.
@@ -75,7 +98,7 @@ struct TodayGlance: Equatable, Sendable {
             return Line(
                 title: item.title,
                 detail: item.detail,
-                time: label(start, isAllDay: item.allDay, at: now, calendar: calendar),
+                time: item.allDay ? nil : label(start, calendar: calendar),
                 start: from,
                 isPast: end(of: item, from: from, calendar: calendar) <= now
             )
@@ -122,19 +145,13 @@ struct TodayGlance: Equatable, Sendable {
         item.allDay ? calendar.date(byAdding: .day, value: 1, to: start) ?? start : start.addingTimeInterval(stillNext)
     }
 
-    private static func label(_ start: Date, isAllDay: Bool, at now: Date, calendar: Calendar) -> String? {
+    private static func label(_ start: Date, calendar: Calendar) -> String {
         let locale = calendar.locale ?? .current
-        let isToday = calendar.isDate(start, inSameDayAs: now)
-        let weekday = start.formatted(Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).weekday(.abbreviated))
-        if isAllDay {
-            return isToday ? nil : weekday
-        }
         // The locale's own short time, "9:00" rather than "9:00 AM", as the card's lines are
         // short: the morning or afternoon is plain from the rest of the day around it.
-        let time = start.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar, timeZone: calendar.timeZone))
+        return start.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar, timeZone: calendar.timeZone))
             .replacingOccurrences(of: calendar.amSymbol, with: "")
             .replacingOccurrences(of: calendar.pmSymbol, with: "")
             .trimmingCharacters(in: .whitespaces)
-        return isToday ? time : "\(weekday) \(time)"
     }
 }

@@ -901,8 +901,6 @@ final class RoomModelTests: XCTestCase {
         await connected(gateway)
         let room = makeModel(gateway)
         await room.refresh()
-        XCTAssertEqual(room.summary(.family).latestAuthor, "gia")
-        XCTAssertEqual(room.summary(.family).previewSymbol, "waveform", "Rosa's voice note, which has no words")
         XCTAssertEqual(room.summary(.family).unread, 2)
         nonisolated(unsafe) var isTold = false
         withObservationTracking {
@@ -921,9 +919,6 @@ final class RoomModelTests: XCTestCase {
         XCTAssertTrue(isTold)
         XCTAssertTrue(typing.isTyping)
         let summary = room.summary(.family)
-        XCTAssertEqual(summary.latestId, "m-7")
-        XCTAssertEqual(summary.latestAuthor, "denise")
-        XCTAssertEqual(summary.preview, "On my way")
         XCTAssertEqual(summary.unread, 3)
         XCTAssertEqual(room.kept(.family).messages.last?.id, "m-7")
         room.reset()

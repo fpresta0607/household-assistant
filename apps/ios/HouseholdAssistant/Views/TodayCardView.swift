@@ -1,11 +1,7 @@
-// The day at a glance above the pins on Chats (CFO notes section 21c): the assistant's face
-// in its gold ring and "Corey · Today", or Tonight in the evening, with that word the one
-// small gold mark; then the day the way the Overlord asked for it on 22 October, clean
-// rather than wordy: the calendar mark of the day, the month in three letters over the day's
-// number, and beside it the next thing and two more at most, each in bold with its time
-// (AgendaDayView); and the day's verse at the bottom, which opens in the Bible app. A tap
-// anywhere else opens the whole day, with each thing's helping line. Absent when nothing is left to show. Each person's comes from
-// their own assistant, kept on the phone so it shows offline too (TodayModel).
+// The daily snapshot above the pins on Chats: the next thing and two more at most, grouped
+// under Today or Tonight, Tomorrow, or a later weekday, each with its own calendar mark.
+// The day's verse opens in the Bible app; the rest opens the full schedule and helping
+// lines. Each person's comes from their own assistant and stays available offline.
 //
 // Whole the first time each day. Once seen, as its person leaves Chats or the app with it on
 // screen, or checked off with the tick in its corner, it is a slim banner at the top for the
@@ -140,7 +136,7 @@ struct TodayCardView: View {
                 HStack(spacing: 0) {
                     Text("\(model.assistantName) · ")
                         .foregroundStyle(Palette.secondaryText)
-                    Text(heading(glance))
+                    Text("Daily snapshot")
                         .foregroundStyle(Palette.goldText)
                 }
                 .font(.caption.weight(.bold))
@@ -153,7 +149,14 @@ struct TodayCardView: View {
                     .font(.subheadline)
                     .foregroundStyle(Palette.secondaryText)
             } else {
-                AgendaDayView(day: glance.agendaDay(at: Date(), calendar: .current))
+                ForEach(glance.sections, id: \.date) { section in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(section.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Palette.secondaryText)
+                        AgendaDayView(day: section.day)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -161,27 +164,30 @@ struct TodayCardView: View {
     }
 
     private func heading(_ glance: TodayGlance) -> String {
-        glance.heading == .tonight ? "Tonight" : "Today"
+        glance.sections.first?.title ?? (glance.heading == .tonight ? "Tonight" : "Today")
     }
 
-    /// "School drop off at 7:45", or with the day's name when it is another day's.
+    /// "School drop off at 7:45", under the heading for its day.
     private func sentence(_ line: TodayGlance.Line) -> String {
         guard let time = line.time else {
             return line.title
         }
-        return Calendar.current.isDateInToday(line.start) ? "\(line.title) at \(time)" : "\(line.title), \(time)"
+        return "\(line.title) at \(time)"
     }
 
     private func spoken(_ glance: TodayGlance) -> String {
-        var words = ["\(model.assistantName), \(heading(glance))."]
-        if let next = glance.next {
-            words.append("Next, \(sentence(next)).")
-            if let detail = next.detail {
-                words.append(detail)
+        var words = ["\(model.assistantName), Daily snapshot."]
+        for section in glance.sections {
+            words.append("\(section.title).")
+            for line in section.lines {
+                words.append(line == glance.next ? "Next, \(sentence(line))." : "Then \(sentence(line)).")
+                if line == glance.next, let detail = line.detail {
+                    words.append(detail)
+                }
             }
         }
-        for line in glance.more {
-            words.append("Then \(line.title)\(line.time.map { " at \($0)" } ?? "").")
+        if glance.sections.isEmpty {
+            words.append(glance.heading == .tonight ? "Nothing else tonight." : "Nothing else today.")
         }
         return words.joined(separator: " ")
     }
