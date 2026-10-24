@@ -93,6 +93,7 @@ def node_or_skip() -> str:
         "household_openrouter_video.test.mjs",
         "household_pictures.test.mjs",
         "household_scripture.test.mjs",
+        "push_relay.test.mjs",
         "steward_cards_skill.test.mjs",
     ],
 )

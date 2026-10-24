@@ -1,0 +1,39 @@
+# The app publisher's push relay: deploy/push-relay/server.mjs, which holds the app's
+# Apple push key so that no household's box does, and passes each household's sealed
+# notifications on to Apple. docs/deploy/push-relay.md.
+#
+# It listens on loopback only; HTTPS in front of it is Tailscale Funnel or a reverse
+# proxy. It runs as a user systemd makes for it, with nothing of the box it may write,
+# and reads its key from the root-only env file before it drops to that user.
+#
+# Lives at /etc/systemd/system/push-relay.service on the publisher's box, and
+# scripts/push-relay-install.sh puts it there.
+
+[Unit]
+Description=Push relay for the Steward app's households
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/push-relay/push-relay.env
+ExecStart=/usr/bin/node /opt/push-relay/release/deploy/push-relay/server.mjs
+Restart=on-failure
+RestartSec=5
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

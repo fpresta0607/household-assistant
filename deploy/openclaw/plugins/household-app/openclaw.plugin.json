@@ -145,7 +145,17 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "topic": { "type": "string", "pattern": "^[A-Za-z0-9.-]+$" }
+              "topic": { "type": "string", "pattern": "^[A-Za-z0-9.-]+$" },
+              "relay": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["url", "household"],
+                "description": "The app publisher's push relay, for a box that does not hold the app's Apple push key: notifications go there, already sealed, signed with the household's own key from HOUSEHOLD_PUSH_RELAY_KEY. Unused when the Apple key is in the environment.",
+                "properties": {
+                  "url": { "type": "string", "pattern": "^https://[a-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._/-]*)?$" },
+                  "household": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" }
+                }
+              }
             }
           },
           "phoneUrl": {

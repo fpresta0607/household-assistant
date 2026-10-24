@@ -123,7 +123,7 @@ import {
 import { phoneMetricsLine } from "./phone-metrics.js";
 import { PEER_SHARE, createPeerLink } from "./peer-link.js";
 import { createPhones, removeThroughOpenClaw } from "./phones.js";
-import { createHttp2Transport, createPush } from "./push.js";
+import { createPhonePush } from "./push.js";
 import { REACT_TOOL, createReactTool } from "./react-tool.js";
 import { createRoom } from "./room.js";
 import { SEND_TOOL, createSendTool, createSends, refuseDirectSend } from "./send-tool.js";
@@ -407,17 +407,7 @@ function startRoom(ctx) {
       peer: conversation === FAMILY || conversation === PAIR ? { kind: "group", id: conversation } : { kind: "direct", id: owner.id },
     }).route;
 
-  const apns = process.env.HOUSEHOLD_APNS_KEY_ID && process.env.HOUSEHOLD_APNS_TEAM_ID && process.env.HOUSEHOLD_APNS_PRIVATE_KEY
-    ? createPush({
-        keyId: process.env.HOUSEHOLD_APNS_KEY_ID,
-        teamId: process.env.HOUSEHOLD_APNS_TEAM_ID,
-        privateKey: process.env.HOUSEHOLD_APNS_PRIVATE_KEY.replaceAll("\\n", "\n"),
-        topic: config.push?.topic ?? "com.siqstack.stewardai",
-        transport: createHttp2Transport(),
-      })
-    : null;
-  if (!apns) log.info(`${PLUGIN_ID}: no Apple push key in the environment, so phones are not notified`);
-  const push = apns ?? { notify: async () => [] };
+  const push = createPhonePush({ config, environment: process.env, log }) ?? { notify: async () => [] };
 
   // A voice note's file is named by its hash alone, so its mime is what tells the speech
   // model how to read it.

@@ -358,6 +358,74 @@ def test_a_room_without_the_apps_google_client_is_reported_and_given_it(
     assert app.patched(done, again)["channels"]["household"]["googleClientId"] == GOOGLE_CLIENT_ID
 
 
+RELAY = {"url": "https://push.example.com", "household": "marina-steve"}
+
+
+def test_a_household_with_the_apple_key_names_no_push_relay(app: ModuleType) -> None:
+    """The first household's box sends to Apple itself, so its channel says nothing of a relay."""
+    assert app.PUSH_RELAY is None
+    done = done_on_the_box(app)
+    assert "push" not in done["channels"]["household"]
+
+
+def test_a_household_on_the_publishers_relay_is_given_it_and_checked_for_it(
+    app: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app, "PUSH_RELAY", RELAY)
+    config = done_on_the_box(app)
+    config["channels"]["household"].pop("push", None)
+    config["channels"]["household"]["push"] = {"topic": "com.siqstack.stewardai"}
+    assert app.problems(config, app.GATEWAYS[0]) == [
+        "the phones are not notified through the household's push relay"
+    ]
+
+    again = app.household_patch(
+        config, app.GATEWAYS[0], app.GATEWAYS[1], owner_keys=[], peer_keys=[], peer_identity={}
+    )
+    done = app.patched(config, again)
+
+    assert done["channels"]["household"]["push"] == {
+        "topic": "com.siqstack.stewardai",
+        "relay": RELAY,
+    }
+    assert app.problems(done, app.GATEWAYS[0]) == []
+
+
+def test_a_relay_the_household_file_no_longer_names_is_taken_out(app: ModuleType) -> None:
+    done = done_on_the_box(app)
+    done["channels"]["household"]["push"] = {"topic": "com.siqstack.stewardai", "relay": RELAY}
+    assert app.problems(done, app.GATEWAYS[0]) == [
+        "the channel names a push relay the household file does not"
+    ]
+
+    again = app.household_patch(
+        done, app.GATEWAYS[0], app.GATEWAYS[1], owner_keys=[], peer_keys=[], peer_identity={}
+    )
+    assert again["channels"]["household"]["push"] == {"relay": None}
+    result = app.patched(done, again)
+    assert result["channels"]["household"]["push"] == {"topic": "com.siqstack.stewardai"}
+    assert app.problems(result, app.GATEWAYS[0]) == []
+
+
+def test_the_relay_the_patch_names_is_one_the_plugin_accepts(app: ModuleType) -> None:
+    import household_file
+
+    manifest = json.loads(
+        (ROOT / "deploy/openclaw/plugins/household-app/openclaw.plugin.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    channel = manifest["channelConfigs"]["household"]["schema"]["properties"]
+    relay_schema = channel["push"]["properties"]["relay"]
+    relay = household_file.load_household(ROOT / "deploy/household.new.example.json").push_relay
+    assert relay is not None
+    assert sorted(relay_schema["required"]) == ["household", "url"]
+    assert re.fullmatch(relay_schema["properties"]["url"]["pattern"].strip("^$"), relay.url)
+    assert re.fullmatch(
+        relay_schema["properties"]["household"]["pattern"].strip("^$"), relay.household
+    )
+
+
 def test_the_example_google_client_is_the_one_the_app_builds_with(app: ModuleType) -> None:
     """The placeholders stay one client: the household file's and the app's xcconfig's."""
     xcconfig = (ROOT / "apps" / "ios" / "Household.xcconfig").read_text(encoding="utf-8")
