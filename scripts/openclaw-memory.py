@@ -2,8 +2,11 @@
 """What a family member asks an assistant to keep lasts, and older chats are found.
 
 Each gateway gets the household-memory plugin, `recall` and `forget` in its owner's
-private chat, and chat transcripts named as a memory source. What the plugin does and
-how this was rolled out are in docs/deploy/openclaw.md under "The memory backend".
+private chat, and chat transcripts named as a memory source. The plugin knows the family
+by their household person ids, as the app's channel does; a gateway whose plugin config
+still holds the Telegram ids it was first given has them taken out, since the plugin
+refuses them. What the plugin does and how this was rolled out are in
+docs/deploy/openclaw.md under "The memory backend".
 """
 
 from __future__ import annotations
@@ -26,7 +29,6 @@ from gateway_config import (
     backup,
     config_patch,
     field,
-    load_household,
     patched,
     read_config,
 )
@@ -38,12 +40,14 @@ PLUGIN_PATH = f"/opt/household-plugins/{PLUGIN}"
 PLUGIN_ON_HOST = Path(f"/opt/household-assistant/plugins/{PLUGIN}/openclaw.plugin.json")
 TOOLS = ["recall", "forget"]
 
-# The family group and who is in it, from the box's household file. A request kept in
-# the group is kept under the sender's name, so the plugin needs both.
-IDENTIFIERS = load_household()
-FAMILY_GROUP = IDENTIFIERS.family_group
-HOUSEHOLD = IDENTIFIERS.telegram_ids
+# Who is in the family, by household person id, and the name a request of theirs is kept
+# under: the ids and names openclaw-household-app.py gives the app's channel. A request
+# kept in the family room is kept under the sender's name, so the plugin needs both.
 NAMES = {"franco": "Franco", "gia": "Gia"}
+
+# What the plugin's config held while the family used Telegram. The plugin refuses a
+# config that still has any of them.
+TELEGRAM_KEYS = ("groupChatId", "ownerTelegramId", "appPeople")
 
 # The PocketPiggies guard rewrites `tools.alsoAllow` as everything else in its order,
 # then these three. Putting the new tools before them leaves the guard nothing to do.
@@ -73,6 +77,10 @@ def _entry(config: dict[str, Any]) -> dict[str, Any]:
     return _dict(_dict(_plugins(config).get("entries")).get(PLUGIN))
 
 
+def _settings(config: dict[str, Any]) -> dict[str, Any]:
+    return _dict(_entry(config).get("config"))
+
+
 def _load_paths(config: dict[str, Any]) -> list[Any]:
     return _list(_dict(_plugins(config).get("load")).get("paths"))
 
@@ -92,13 +100,42 @@ def _person(persona: str) -> str:
 
 def expected_settings(persona: str) -> dict[str, Any]:
     return {
-        "groupChatId": FAMILY_GROUP,
-        "ownerTelegramId": HOUSEHOLD[_person(persona)],
-        "people": {HOUSEHOLD[person]: NAMES[person] for person in HOUSEHOLD},
-        # The same people by their household app ids, as openclaw-household-app.py
-        # names them, so the app's thread and family room share what is kept.
-        "appPeople": {HOUSEHOLD[person]: person for person in HOUSEHOLD},
+        "ownerPersonId": _person(persona),
+        "people": {gateway.person: NAMES[gateway.person] for gateway in GATEWAYS},
     }
+
+
+def settings_patch(config: dict[str, Any], persona: str) -> dict[str, Any]:
+    """The plugin's settings, with every key it does not take set to null.
+
+    A patch merges objects, so the Telegram ids `people` was keyed by would stay beside
+    the person ids, and the Telegram keys beside the new ones, unless each is taken out:
+    a null in a patch is how a key is deleted.
+    """
+    held = _settings(config)
+    expected = expected_settings(persona)
+    people = _dict(held.get("people"))
+    return {
+        **dict.fromkeys(key for key in held if key not in expected),
+        **expected,
+        "people": {
+            **dict.fromkeys(person for person in people if person not in expected["people"]),
+            **expected["people"],
+        },
+    }
+
+
+def keeps_for(config: dict[str, Any]) -> str:
+    """Whose requests the plugin's config keeps, as `check` reports it."""
+    settings = _settings(config)
+    if any(key in settings for key in TELEGRAM_KEYS):
+        return "nobody: it still has the Telegram settings, which the plugin refuses"
+    owner = settings.get("ownerPersonId")
+    people = _dict(settings.get("people"))
+    if not isinstance(owner, str) or owner not in people:
+        return "nobody"
+    others = [f"{person} ({people[person]})" for person in people if person != owner]
+    return f"{owner} ({people[owner]})" + (f", with {', '.join(others)}" if others else "")
 
 
 def _normalized_sources(sources: list[Any] | None, has_sessions: bool) -> list[str]:
@@ -166,7 +203,17 @@ def problems(config: dict[str, Any], persona: str) -> list[str]:
     if _dict(entry.get("hooks")).get("allowConversationAccess") is not True:
         wrong.append(f"the {PLUGIN} plugin may not read the turn, so it keeps and shows nothing")
     if entry.get("config") != expected_settings(persona):
-        wrong.append(f"the {PLUGIN} plugin is not set up for The Fam and {_person(persona)}")
+        stale = [key for key in TELEGRAM_KEYS if key in _settings(config)]
+        if stale:
+            wrong.append(
+                f"the {PLUGIN} plugin still has its Telegram settings ({', '.join(stale)}), "
+                "which it refuses, so it keeps and shows nothing"
+            )
+        else:
+            wrong.append(
+                f"the {PLUGIN} plugin is not set up for {_person(persona)} and the family "
+                "by their household person ids"
+            )
     allowed = _also_allowed(config)
     if any(tool not in allowed for tool in TOOLS):
         wrong.append("the assistant is not handed recall and forget in its private chat")
@@ -188,7 +235,7 @@ def memory_patch(config: dict[str, Any], persona: str) -> dict[str, Any]:
             PLUGIN: {
                 "enabled": True,
                 "hooks": {"allowConversationAccess": True},
-                "config": expected_settings(persona),
+                "config": settings_patch(config, persona),
             }
         }
     }
@@ -232,6 +279,7 @@ def report(gateway: Gateway) -> bool:
         print()
         return False
     wrong = problems(config, gateway.persona)
+    field("keeps for", keeps_for(config))
     field("indexes", ", ".join(indexed_sources(config)) or "nothing")
     field("verdict", "; ".join(wrong) if wrong else "kept requests and older chats are covered")
     print()

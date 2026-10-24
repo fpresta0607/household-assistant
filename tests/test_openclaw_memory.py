@@ -10,6 +10,10 @@ plugin, and checks both, without touching what the PocketPiggies guard holds.
 The config below is Corey's shape on 14 October, read from the box, cut to the keys
 that matter here. The apply tests replace `docker exec` with a runner that applies the
 patch to the file the way `openclaw config patch` does.
+
+Since the family stopped using Telegram the plugin knows them by their household person
+ids alone, and a gateway still on the Telegram settings it was first given is moved off
+them.
 """
 
 from __future__ import annotations
@@ -48,6 +52,14 @@ GROUP_TOOLS = [
     "household_note",
 ]
 MEMORY = "/opt/household-plugins/household-memory"
+PEOPLE = {"franco": "Franco", "gia": "Gia"}
+# The plugin's config as openclaw-memory.py wrote it while the family used Telegram.
+TELEGRAM_SETTINGS = {
+    "groupChatId": GROUP,
+    "ownerTelegramId": FRANCO,
+    "people": {FRANCO: "Franco", GIA: "Gia"},
+    "appPeople": {FRANCO: "franco", GIA: "gia"},
+}
 
 
 def load(name: str, path: Path) -> ModuleType:
@@ -145,7 +157,8 @@ def test_todays_gateway_is_named_on_every_count(memory: ModuleType) -> None:
         f"the household-memory plugin is not loaded from {MEMORY}",
         "the household-memory plugin is not enabled",
         "the household-memory plugin may not read the turn, so it keeps and shows nothing",
-        "the household-memory plugin is not set up for The Fam and franco",
+        "the household-memory plugin is not set up for franco and the family by their "
+        "household person ids",
         "the assistant is not handed recall and forget in its private chat",
         "chat transcripts are not a memory source, so memory search leaves out older chats "
         "and pauses whenever the session setting changes",
@@ -164,10 +177,10 @@ def test_transcripts_stay_indexed_whatever_the_dm_scope(memory: ModuleType, dm_s
 
 
 @pytest.mark.parametrize(
-    ("persona", "owner", "name"), [("corey", FRANCO, "Franco"), ("denise", GIA, "Gia")]
+    ("persona", "owner", "person"), [("corey", FRANCO, "franco"), ("denise", GIA, "gia")]
 )
 def test_the_patch_leaves_nothing_and_keeps_what_was_there(
-    memory: ModuleType, persona: str, owner: str, name: str
+    memory: ModuleType, persona: str, owner: str, person: str
 ) -> None:
     config = as_on_the_box(owner, persona)
     result = memory.patched(config, memory.memory_patch(config, persona))
@@ -179,13 +192,7 @@ def test_the_patch_leaves_nothing_and_keeps_what_was_there(
     assert search["remote"] == {"baseUrl": "https://openrouter.ai/api/v1"}
     assert result["memory"] == {"search": {"provider": "none"}}
     entry = result["plugins"]["entries"]["household-memory"]
-    assert entry["config"] == {
-        "groupChatId": GROUP,
-        "ownerTelegramId": owner,
-        "people": {FRANCO: "Franco", GIA: "Gia"},
-        "appPeople": {FRANCO: "franco", GIA: "gia"},
-    }
-    assert entry["config"]["people"][owner] == name
+    assert entry["config"] == {"ownerPersonId": person, "people": PEOPLE}
     assert result["tools"]["alsoAllow"] == ["speak", "family_history", "recall", "forget", *FINANCE]
 
 
@@ -202,18 +209,62 @@ def test_the_pocketpiggies_guard_finds_nothing_to_put_back(
     assert result["session"] == config["session"]
 
 
-def test_a_plugin_that_does_not_know_the_app_is_reported(memory: ModuleType) -> None:
+def on_telegram_settings(memory: ModuleType, owner: str, persona: str) -> dict[str, Any]:
+    """A gateway that had the plugin while the family used Telegram."""
+    before = as_on_the_box(owner, persona)
+    config: dict[str, Any] = memory.patched(before, memory.memory_patch(before, persona))
+    config["plugins"]["entries"]["household-memory"]["config"] = {
+        **TELEGRAM_SETTINGS,
+        "ownerTelegramId": owner,
+    }
+    return config
+
+
+@pytest.mark.parametrize(
+    ("persona", "owner", "person"), [("corey", FRANCO, "franco"), ("denise", GIA, "gia")]
+)
+def test_a_gateway_on_the_telegram_settings_is_moved_to_household_person_ids(
+    memory: ModuleType, persona: str, owner: str, person: str
+) -> None:
+    config = on_telegram_settings(memory, owner, persona)
+    assert memory.problems(config, persona) == [
+        "the household-memory plugin still has its Telegram settings "
+        "(groupChatId, ownerTelegramId, appPeople), which it refuses, so it keeps and shows nothing"
+    ]
+    assert memory.keeps_for(config).startswith("nobody")
+
+    patch = memory.memory_patch(config, persona)
+    # Each Telegram key and id goes, by a null, since a patch merges objects.
+    assert patch["plugins"]["entries"]["household-memory"]["config"] == {
+        "groupChatId": None,
+        "ownerTelegramId": None,
+        "appPeople": None,
+        "ownerPersonId": person,
+        "people": {FRANCO: None, GIA: None, **PEOPLE},
+    }
+    result = memory.patched(config, patch)
+    entry = result["plugins"]["entries"]["household-memory"]
+    assert entry["config"] == memory.expected_settings(persona)
+    for telegram_id in (GROUP, FRANCO, GIA):
+        assert telegram_id not in json.dumps(entry)
+    assert memory.problems(result, persona) == []
+    assert memory.patched(result, memory.memory_patch(result, persona)) == result
+
+
+def test_telegram_ids_left_beside_the_person_ids_are_taken_out(memory: ModuleType) -> None:
     config = as_on_the_box()
     config = memory.patched(config, memory.memory_patch(config, "corey"))
-    del config["plugins"]["entries"]["household-memory"]["config"]["appPeople"]
+    settings = config["plugins"]["entries"]["household-memory"]["config"]
+    settings["people"] = {**settings["people"], FRANCO: "Franco"}
 
     assert memory.problems(config, "corey") == [
-        "the household-memory plugin is not set up for The Fam and franco"
+        "the household-memory plugin is not set up for franco and the family by their "
+        "household person ids"
     ]
-    patch = memory.memory_patch(config, "corey")
-    assert patch["plugins"]["entries"]["household-memory"]["config"]["appPeople"] == {
-        FRANCO: "franco",
-        GIA: "gia",
+    result = memory.patched(config, memory.memory_patch(config, "corey"))
+    assert result["plugins"]["entries"]["household-memory"]["config"] == {
+        "ownerPersonId": "franco",
+        "people": PEOPLE,
     }
 
 
@@ -296,6 +347,31 @@ def test_apply_backs_up_and_writes_one_gateway_and_leaves_the_other(
     assert list(denise.state.glob("openclaw.json.pre-memory-*")) == []
     assert memory.apply([corey], run=fake, dry_run=False) == 0
     assert fake.writes == ["openclaw-gateway"]
+
+
+@needs_nofollow_open
+def test_apply_moves_a_gateway_off_the_telegram_settings_and_check_says_whose_it_keeps(
+    memory: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state = write_state(tmp_path / "openclaw", on_telegram_settings(memory, FRANCO, "corey"))
+    corey = memory.Gateway("corey", "openclaw-gateway", state, "franco")
+    fake = FakeGateways(memory, {corey.container: corey.state})
+
+    assert memory.check([corey]) == 1
+    before = capsys.readouterr().out
+    assert "  keeps for    nobody: it still has the Telegram settings" in before
+    assert "still has its Telegram settings (groupChatId, ownerTelegramId, appPeople)" in before
+
+    assert memory.apply([corey], run=fake, dry_run=False) == 0
+
+    after = capsys.readouterr().out
+    assert "  keeps for    franco (Franco), with gia (Gia)\n" in after
+    assert "  verdict      kept requests and older chats are covered\n" in after
+    written = json.loads(corey.config_path.read_text())
+    assert written["plugins"]["entries"]["household-memory"]["config"] == {
+        "ownerPersonId": "franco",
+        "people": PEOPLE,
+    }
 
 
 @needs_nofollow_open

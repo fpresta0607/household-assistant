@@ -4,7 +4,7 @@
 // The assistants run on a small flash model, and on 13 and 14 October it lost what it
 // was asked to keep in two ways: it wrote nothing at all, or it wrote to a dated note
 // that search then ranked down month by month. Finding an older chat meant choosing a
-// tool and phrasing a query that matched every word, and in the family group it has no
+// tool and phrasing a query that matched every word, and in the family room it has no
 // search tool at all. So this plugin does three things before the model answers, in
 // the turn's own prompt-build hook:
 //
@@ -17,17 +17,21 @@
 // - Find. A question about the past gets the best few lines from that chat's own
 //   history, from OpenClaw's transcript index.
 //
-// In the private chat the model also has `recall`, which takes only the words to look
-// for, and `forget`, which marks a kept item done. The family group's tool list is left
-// alone: the PocketPiggies guard holds it to a fixed set, and this needs no tool there.
+// The chats are the household app's: the owner's own thread is the private chat, and the
+// app's family room is the family group. Everyone is named by their household person id,
+// as the app's channel names them, and `people` gives the name a request is kept under.
 //
-// The household app is the same two chats on another channel: the owner's own thread is
-// the private chat, and the app's family room is the family group. With `appPeople` set,
-// both share the one kept list and the one history with Telegram. A turn the owner started
-// in the app's family room, which runs in the owner's own session of the room, also has
-// `recall` and `forget`, reaching what the private chat would, so a question the owner asks
-// there works as in their thread; what a family-room turn starts with stays what the family
-// group sees, so the owner's private items reach that room only when the owner asks for them.
+// In the private chat the model also has `recall`, which takes only the words to look
+// for, and `forget`, which marks a kept item done. The family room's tool list is left
+// alone, and this needs no tool there. A turn the owner started in the family room, which
+// runs in the owner's own session of the room, also has `recall` and `forget`, reaching
+// what the private chat would, so a question the owner asks there works as in their
+// thread; what a family-room turn starts with stays what the room sees, so the owner's
+// private items reach that room only when the owner asks for them.
+//
+// The family no longer uses Telegram, and this plugin no longer knows it: a config that
+// still names a Telegram id is refused, and chats held only on Telegram are not searched.
+// What was kept from them stays kept and shown.
 //
 // What is kept lives in kept.json in this plugin's own directory under the gateway's
 // state, beside everything else a backup of that state carries. OpenClaw 2026.9.4 refuses its SQLite plugin
@@ -51,43 +55,41 @@ const TIME_ZONE = "America/Chicago";
 const CONFIG_SCHEMA = JSON.parse(
   readFileSync(new URL("./openclaw.plugin.json", import.meta.url), "utf8"),
 ).configSchema;
-const GROUP_CHAT_ID = new RegExp(CONFIG_SCHEMA.properties.groupChatId.pattern);
-const TELEGRAM_USER = new RegExp(CONFIG_SCHEMA.properties.ownerTelegramId.pattern);
+const PERSON_ID = new RegExp(CONFIG_SCHEMA.properties.ownerPersonId.pattern);
 const PERSON_NAME = new RegExp(CONFIG_SCHEMA.properties.people.additionalProperties.pattern);
-const APP_ID = new RegExp(CONFIG_SCHEMA.properties.appPeople.additionalProperties.pattern);
+// What this plugin's config held while the family used Telegram.
+const TELEGRAM_KEYS = ["groupChatId", "ownerTelegramId", "appPeople"];
 const APP_CHANNEL = "household";
-const APP_FAMILY = "family";
+const FAMILY_SESSION = `agent:main:${APP_CHANNEL}:group:family`;
 
 export function parseConfig(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { error: "expected a config object" };
-  const unknown = Object.keys(raw).filter((key) => !(key in CONFIG_SCHEMA.properties));
-  if (unknown.length > 0) return { error: `unknown config keys: ${unknown.join(", ")}` };
-  const { groupChatId, ownerTelegramId, people, appPeople } = raw;
-  if (typeof groupChatId !== "string" || !GROUP_CHAT_ID.test(groupChatId)) {
-    return { error: "groupChatId must be the family group's numeric Telegram chat id, as a string" };
+  const telegram = TELEGRAM_KEYS.filter((key) => Object.hasOwn(raw, key));
+  if (telegram.length > 0) {
+    return {
+      error: `the config still names Telegram (${telegram.join(", ")}); ` +
+        "scripts/openclaw-memory.py apply writes ownerPersonId and people in its place",
+    };
   }
-  if (typeof ownerTelegramId !== "string" || !TELEGRAM_USER.test(ownerTelegramId)) {
-    return { error: "ownerTelegramId must be a numeric Telegram user id, as a string" };
+  const unknown = Object.keys(raw).filter((key) => !Object.hasOwn(CONFIG_SCHEMA.properties, key));
+  if (unknown.length > 0) return { error: `unknown config keys: ${unknown.join(", ")}` };
+  const { ownerPersonId, people } = raw;
+  if (typeof ownerPersonId !== "string" || !PERSON_ID.test(ownerPersonId)) {
+    return { error: "ownerPersonId must be the owner's household person id, such as franco" };
   }
   if (!people || typeof people !== "object" || Array.isArray(people) ||
-    Object.entries(people).some(([id, name]) => !TELEGRAM_USER.test(id) || typeof name !== "string" || !PERSON_NAME.test(name))) {
-    return { error: "people must map each family member's Telegram user id to a plain name" };
+    Object.entries(people).some(([id, name]) => !PERSON_ID.test(id) || typeof name !== "string" || !PERSON_NAME.test(name))) {
+    return { error: "people must map each family member's household person id to a plain name" };
   }
-  if (!(ownerTelegramId in people)) return { error: "people must name the owner" };
-  if (appPeople === undefined) return { value: { groupChatId, ownerTelegramId, people } };
-  if (!appPeople || typeof appPeople !== "object" || Array.isArray(appPeople) ||
-    Object.entries(appPeople).some(([id, appId]) => !(id in people) || typeof appId !== "string" || !APP_ID.test(appId)) ||
-    new Set(Object.values(appPeople)).size !== Object.keys(appPeople).length) {
-    return { error: "appPeople must map family members' Telegram user ids to distinct household app ids" };
-  }
-  if (!(ownerTelegramId in appPeople)) return { error: "appPeople must name the owner" };
-  return { value: { groupChatId, ownerTelegramId, people, appPeople } };
+  if (!Object.hasOwn(people, ownerPersonId)) return { error: "people must name the owner" };
+  return { value: { ownerPersonId, people } };
 }
 
-// The Telegram id of the family member an app id names, or undefined.
-function telegramIdOfApp(appPeople, rawAppId) {
-  const appId = /^(?:household:)?([a-z][a-z0-9-]{0,31})$/.exec(String(rawAppId ?? ""))?.[1];
-  return appId ? Object.keys(appPeople ?? {}).find((id) => appPeople[id] === appId) : undefined;
+// The household person id of the family member a sender id names, or undefined. The
+// app's channel may put its own name in front of it.
+function personOf(people, rawSenderId) {
+  const id = /^(?:household:)?([a-z][a-z0-9-]{0,31})$/.exec(String(rawSenderId ?? ""))?.[1];
+  return id && Object.hasOwn(people, id) ? id : undefined;
 }
 
 const configSchema = {
@@ -153,34 +155,27 @@ export function createMemory(api, config, options = {}) {
   const now = options.now ?? Date.now;
   const stateDirectory = options.stateDirectory ?? api.runtime.state.resolveStateDir(process.env);
   const kept = createKept(path.join(stateDirectory, PLUGIN_ID, "kept.json"), { now });
-  const { groupChatId: group, ownerTelegramId: owner, people, appPeople } = config;
-  const appOwner = appPeople?.[owner];
-  const familySession = `agent:main:telegram:group:${group}`;
-  const ownerSession = new RegExp(`^agent:main:telegram:(?:default:)?direct:(?:telegram:)?${owner}$`);
-  const appFamilySession = appOwner && `agent:main:${APP_CHANNEL}:group:${APP_FAMILY}`;
+  const { ownerPersonId: owner, people } = config;
   // The owner's family-room turns run in the owner's own session of the room, which no
   // other sender's turn reads (household-app's turn.js).
-  const appOwnersFamilySession = appOwner && `${appFamilySession}:sender:${appOwner}`;
-  const appOwnerSession = appOwner && `agent:main:${APP_CHANNEL}:direct:${appOwner}`;
+  const ownersFamilySession = `${FAMILY_SESSION}:sender:${owner}`;
+  const ownerSession = `agent:main:${APP_CHANNEL}:direct:${owner}`;
   // A key with one segment after the agent is the old shared main session or one the
   // operator opened through the gateway, and both are the owner's.
   const operatorSession = /^agent:main:[^:]+$/;
 
+  // Which chat a turn is in and whose turn it is, by household person id, or null for a
+  // turn this plugin leaves alone.
   function chatOf(sessionKey, rawSenderId) {
-    if (sessionKey === familySession) {
-      const senderId = /^(?:(?:telegram|tg):)?([1-9]\d*)$/i.exec(String(rawSenderId ?? ""))?.[1];
-      return senderId && senderId in people ? { isPrivate: false, whoId: senderId } : null;
+    if (sessionKey === FAMILY_SESSION) {
+      const person = personOf(people, rawSenderId);
+      return person ? { isPrivate: false, person } : null;
     }
-    if (appFamilySession && sessionKey === appFamilySession) {
-      const senderId = telegramIdOfApp(appPeople, rawSenderId);
-      return senderId ? { isPrivate: false, whoId: senderId, isApp: true } : null;
+    if (sessionKey === ownersFamilySession) {
+      return personOf(people, rawSenderId) === owner ? { isPrivate: false, person: owner, isOwnersTurn: true } : null;
     }
-    if (appOwnersFamilySession && sessionKey === appOwnersFamilySession) {
-      return telegramIdOfApp(appPeople, rawSenderId) === owner ? { isPrivate: false, whoId: owner, isOwnersTurn: true, isApp: true } : null;
-    }
-    if (typeof sessionKey === "string" &&
-      (ownerSession.test(sessionKey) || operatorSession.test(sessionKey) || sessionKey === appOwnerSession)) {
-      return { isPrivate: true, whoId: owner };
+    if (typeof sessionKey === "string" && (sessionKey === ownerSession || operatorSession.test(sessionKey))) {
+      return { isPrivate: true, person: owner };
     }
     return null;
   }
@@ -192,7 +187,7 @@ export function createMemory(api, config, options = {}) {
   function history(chat, query, limit) {
     try {
       return searchHistory(stateDirectory, {
-        group, owner, appOwner, ownersFamilySession: appOwnersFamilySession, isPrivate: chat.isPrivate, query, now: now(), limit,
+        owner, ownersFamilySession, isPrivate: chat.isPrivate, query, now: now(), limit,
       });
     } catch (error) {
       if (error.code !== "ERR_SQLITE_ERROR") throw error;
@@ -244,8 +239,8 @@ export function createMemory(api, config, options = {}) {
     const sections = [];
     if (isKeepRequest(message)) {
       const outcome = await kept.keep({
-        who: people[chat.whoId],
-        whoId: chat.whoId,
+        who: people[chat.person],
+        person: chat.person,
         where: chat.isPrivate ? "a private chat" : "the family group",
         scope: chat.isPrivate ? "private" : "family",
         text: message,
@@ -255,9 +250,9 @@ export function createMemory(api, config, options = {}) {
         sections.push("This request could not be kept: the kept list is full. Tell them so, plainly.");
       } else {
         // What is kept for the family on this gateway is this assistant's alone, so in the
-        // app's family room it goes into the household note too, the one record both
-        // assistants answer from (household-app's notes.js).
-        const forBoth = chat.isApp ? " It is for the family, so also add it to the household note with household_note, where the other assistant reads it too." : "";
+        // family room it goes into the household note too, the one record both assistants
+        // answer from (household-app's notes.js).
+        const forBoth = chat.isPrivate ? "" : " It is for the family, so also add it to the household note with household_note, where the other assistant reads it too.";
         sections.push(outcome.isNew
           ? `You have just kept this as #${outcome.kept.id} for ${outcome.kept.who}. Confirm briefly that you will remember it.${forBoth}`
           : `This is already kept as #${outcome.kept.id}.`);
@@ -352,11 +347,11 @@ export function createMemory(api, config, options = {}) {
   return { beforePromptBuild, recall: privateTool(recallTool), forget: privateTool(forgetTool) };
 }
 
-// Once, at rollout: every earlier message in the family group or the owner's private
-// chat that the same rule would have kept, kept with who sent it and when. Running it
+// Once, at rollout: every earlier message in the app's family room or the owner's own
+// thread that the same rule would have kept, kept with who sent it and when. Running it
 // again keeps nothing twice.
 export async function backfillKept(stateDirectory, config) {
-  const { groupChatId: group, ownerTelegramId: owner, people, appPeople } = config;
+  const { ownerPersonId: owner, people } = config;
   const database = new DatabaseSync(path.join(stateDirectory, "agents", "main", "agent", "openclaw-agent.sqlite"), {
     readOnly: true,
   });
@@ -364,7 +359,7 @@ export async function backfillKept(stateDirectory, config) {
   try {
     database.exec("PRAGMA query_only = ON; PRAGMA busy_timeout = 1000");
     rows = database.prepare(`
-      SELECT event.event_json AS json, event.created_at AS at, chat.kind AS kind, chat.channel AS channel
+      SELECT event.event_json AS json, event.created_at AS at, chat.kind AS kind
       FROM transcript_events AS event
       JOIN session_conversations AS link ON link.session_id = event.session_id
       JOIN conversations AS chat ON chat.conversation_id = link.conversation_id
@@ -373,7 +368,7 @@ export async function backfillKept(stateDirectory, config) {
         AND ${VISIBLE_CHATS}
         AND (SELECT COUNT(*) FROM session_conversations AS other WHERE other.session_id = event.session_id) = 1
       ORDER BY event.created_at, event.session_id, event.seq
-    `).all(...visibleChats({ group, owner, appOwner: appPeople?.[owner], isPrivate: true }));
+    `).all(...visibleChats({ owner, isPrivate: true }));
   } finally {
     database.close();
   }
@@ -383,13 +378,11 @@ export async function backfillKept(stateDirectory, config) {
     const message = JSON.parse(row.json)?.message;
     const sender = message?.__openclaw?.senderIdentity;
     if (message?.role !== "user") continue;
-    // Telegram marks a person as human. The app's channel names its sender by app id
-    // and does not say, and only family members can write there.
-    const senderId = row.channel === APP_CHANNEL
-      ? sender?.pluginId === APP_CHANNEL ? telegramIdOfApp(appPeople, sender.id) : undefined
-      : sender?.senderKind === "human" && sender.id in people ? sender.id : undefined;
-    if (!senderId) continue;
-    if (row.kind === "direct" && senderId !== owner) continue;
+    // The app's channel names its sender by household person id and does not say whether
+    // they are human, and only family members can write there.
+    const person = sender?.pluginId === APP_CHANNEL ? personOf(people, sender.id) : undefined;
+    if (!person) continue;
+    if (row.kind === "direct" && person !== owner) continue;
     const parts = Array.isArray(message.content) ? message.content : [];
     const content = typeof message.content === "string" ? message.content
       : parts.filter((part) => part?.type === "text" && typeof part.text === "string").map((part) => part.text).join("\n");
@@ -397,7 +390,7 @@ export async function backfillKept(stateDirectory, config) {
     if (!isKeepRequest(words)) continue;
     const isPrivate = row.kind === "direct";
     const outcome = await kept.keep({
-      who: people[senderId], whoId: senderId, at: Number(row.at),
+      who: people[person], person, at: Number(row.at),
       where: isPrivate ? "a private chat" : "the family group", scope: isPrivate ? "private" : "family", text: words,
     });
     if (outcome.full) throw new Error("the kept list is full");
