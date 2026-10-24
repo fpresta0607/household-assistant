@@ -1,12 +1,4 @@
-// The daily snapshot above the pins on Chats: the next thing and two more at most, grouped
-// under Today or Tonight, Tomorrow, or a later weekday, each with its own calendar mark.
-// The day's verse opens in the Bible app; the rest opens the full schedule and helping
-// lines. Each person's comes from their own assistant and stays available offline.
-//
-// Whole the first time each day. Once seen, as its person leaves Chats or the app with it on
-// screen, or checked off with the tick in its corner, it is a slim banner at the top for the
-// rest of the day: the assistant's face, the word Today and the next thing, which a tap
-// opens back into the whole card.
+// Snapshot display rules: docs/deploy/openclaw.md#the-household-apps-family-room.
 
 import SwiftUI
 

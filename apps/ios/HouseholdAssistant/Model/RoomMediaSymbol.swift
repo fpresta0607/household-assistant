@@ -1,5 +1,4 @@
-// The SF Symbol for each kind of attachment, used wherever one is named without words:
-// a conversation's latest line in Chats, a reply's quote, and a line in a widget.
+// The SF Symbol for each kind of attachment, used wherever one is named without words.
 
 import Foundation
 

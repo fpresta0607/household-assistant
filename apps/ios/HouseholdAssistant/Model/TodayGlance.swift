@@ -40,7 +40,7 @@ struct TodayGlance: Equatable, Sendable {
     /// How long after it starts something is still what is next: a dentist at 9:00 is still
     /// what is on at 9:10.
     static let stillNext: TimeInterval = 15 * 60
-    /// From this hour the card says Tonight.
+    /// From this hour, today's section and the empty-state label say Tonight.
     static let eveningHour = 17
     /// First opening from 5 AM is the morning's, even after a visit past midnight.
     static let morningHour = 5
