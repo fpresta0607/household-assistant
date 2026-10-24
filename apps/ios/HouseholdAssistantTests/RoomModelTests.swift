@@ -159,9 +159,9 @@ final class RoomModelTests: XCTestCase {
         await connected(gateway)
         let online = makeModel(gateway, archive: archive)
         await online.refresh()
-        await eventually("the archive is written") {
-            archive.read(.family) != nil && archive.read(.direct).map { !$0.changes.isEmpty } == true
-        }
+        await online.waitForArchive()
+        XCTAssertNotNil(archive.read(.family))
+        XCTAssertEqual(archive.read(.direct).map { !$0.changes.isEmpty }, true)
 
         // Act
         let offline = makeModel(Gateway(), archive: archive)
@@ -193,25 +193,29 @@ final class RoomModelTests: XCTestCase {
         // Assert
         XCTAssertFalse(room.thread(.family).messages.contains { $0.id == "m-kept" })
         XCTAssertEqual(room.thread(.family).messages.map(\.author), ["franco", "corey", "gia"])
+        await room.waitForArchive()
     }
 
     func testForgettingTheAssistantForgetsWhatThePhoneKept() async {
         // Arrange
         let archive = temporaryArchive()
+        defer { archive.forget() }
         let gateway = Gateway()
         standardAnswers(gateway)
         await connected(gateway)
         let room = makeModel(gateway, archive: archive)
         await room.refresh()
-        await eventually("the archive is written") { archive.read(.family) != nil }
+        await room.waitForArchive()
+        XCTAssertNotNil(archive.read(.family))
+        XCTAssertNotNil(archive.read(.direct))
 
         // Act
+        await room.refresh()
         room.reset()
+        await room.waitForArchive()
 
         // Assert: gone, and still gone once a write that was under way has ended, which put
         // a conversation back after it was forgotten when the forgetting did not wait for it.
-        await eventually("the archive is forgotten") { archive.read(.family) == nil && archive.read(.direct) == nil }
-        try? await Task.sleep(for: .seconds(1.5))
         XCTAssertNil(archive.read(.family))
         XCTAssertNil(archive.read(.direct))
     }
@@ -293,8 +297,10 @@ final class RoomModelTests: XCTestCase {
         let earlier = Gateway()
         standardAnswers(earlier)
         await connected(earlier)
-        await makeModel(earlier, archive: archive).refresh()
-        await eventually("the archive is written") { archive.read(.family) != nil }
+        let online = makeModel(earlier, archive: archive)
+        await online.refresh()
+        await online.waitForArchive()
+        XCTAssertNotNil(archive.read(.family))
         let gateway = Gateway()
         standardAnswers(gateway)
         let room = makeModel(gateway, archive: archive)
@@ -305,6 +311,7 @@ final class RoomModelTests: XCTestCase {
         let waited = room.thread(.family).messages.last?.status
         await connected(gateway)
         await room.refresh()
+        await room.waitForArchive()
 
         // Assert
         XCTAssertFalse(isKept)
@@ -321,12 +328,15 @@ final class RoomModelTests: XCTestCase {
         let earlier = Gateway()
         standardAnswers(earlier)
         await connected(earlier)
-        await makeModel(earlier, archive: archive).refresh()
-        await eventually("the archive is written") { archive.read(.family) != nil }
+        let online = makeModel(earlier, archive: archive)
+        await online.refresh()
+        await online.waitForArchive()
+        XCTAssertNotNil(archive.read(.family))
         let closed = makeModel(Gateway(), archive: archive)
         await closed.restore()
         await closed.send("Picked up the milk", in: .family, waitsForLink: true)
-        await eventually("the waiting message is kept") { archive.readWaiting().map(\.text) == ["Picked up the milk"] }
+        await closed.waitForArchive()
+        XCTAssertEqual(archive.readWaiting().map(\.text), ["Picked up the milk"])
 
         // Act
         let gateway = Gateway()
@@ -336,13 +346,14 @@ final class RoomModelTests: XCTestCase {
         let shown = reopened.thread(.family).messages.last
         await connected(gateway)
         await reopened.refresh()
+        await reopened.waitForArchive()
 
         // Assert
         XCTAssertEqual(shown?.text, "Picked up the milk")
         XCTAssertEqual(shown?.status, .waiting)
         XCTAssertEqual(gateway.requests("household-app.send").map { $0.params["text"]?.stringValue }, ["Picked up the milk"])
         XCTAssertEqual(reopened.thread(.family).messages.last?.status, .sent)
-        await eventually("nothing waits any more") { archive.readWaiting().isEmpty }
+        XCTAssertTrue(archive.readWaiting().isEmpty)
     }
 
     func testMessagesThatWaitedGoOutInTheOrderTheyWereSaid() async {

@@ -1195,6 +1195,11 @@ final class RoomModel {
         }
     }
 
+    func waitForArchive() async {
+        await keeping?.value
+        await waitingWrite?.value
+    }
+
     /// Keeps a conversation's newest page, and writes the archive a moment later.
     private func keep(_ page: RoomArchive.Kept, for conversation: RoomConversation) {
         guard archive != nil else {
