@@ -5,40 +5,39 @@
 // assistant's mention is a link, which the room opens as that assistant's page.
 
 import SwiftUI
+import UIKit
 
 struct MentionedText: View {
     let text: String
     let spans: [Mention.Span]
     /// Drawn on the person's own royal bubble rather than a light one.
     let isOnOwnBubble: Bool
+    @Environment(\.readingStyle) private var style
 
     var body: some View {
-        // SwiftUI draws a link in the tint, and the only links here are assistants' names.
-        Text(attributed)
-            .tint(assistantColor)
+        InlineMessageText(text: attributed, tint: assistantColor)
     }
 
-    private var attributed: AttributedString {
-        var result = AttributedString()
+    private var attributed: NSAttributedString {
+        let font = style.selectionFont
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor(isOnOwnBubble ? Palette.userBubbleText : Palette.otherBubbleText)
+        ]
+        let result = NSMutableAttributedString(string: "")
         var cursor = text.startIndex
         for span in spans {
-            result += AttributedString(String(text[cursor..<span.range.lowerBound]))
-            result += mention(span)
+            result.append(NSAttributedString(string: String(text[cursor..<span.range.lowerBound]), attributes: attributes))
+            var mention = attributes
+            mention[.font] = style.config.paragraphStyle.textFonts.bold ?? font
+            mention[.foregroundColor] = UIColor(span.participant.kind == .assistant
+                ? assistantColor : (isOnOwnBubble ? Palette.userBubbleText : Palette.highlight))
+            if span.participant.kind == .assistant { mention[.link] = Mention.url(for: span.participant) }
+            result.append(NSAttributedString(string: span.shown, attributes: mention))
             cursor = span.range.upperBound
         }
-        return result + AttributedString(String(text[cursor...]))
-    }
-
-    private func mention(_ span: Mention.Span) -> AttributedString {
-        var mention = AttributedString(span.shown)
-        mention.font = Font.body.weight(.semibold)
-        if span.participant.kind == .assistant {
-            mention.foregroundColor = assistantColor
-            mention.link = Mention.url(for: span.participant)
-        } else {
-            mention.foregroundColor = isOnOwnBubble ? Palette.userBubbleText : Palette.highlight
-        }
-        return mention
+        result.append(NSAttributedString(string: String(text[cursor...]), attributes: attributes))
+        return result
     }
 
     private var assistantColor: Color {

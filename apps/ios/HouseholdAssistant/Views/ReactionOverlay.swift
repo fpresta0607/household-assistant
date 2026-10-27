@@ -39,7 +39,6 @@ struct ReactionOverlay<Lifted: View>: View {
     let onReply: () -> Void
     /// Asks this phone's assistant about the message; nil where the menu does not offer it.
     let onAsk: (() -> Void)?
-    let onSelectText: (String) -> Void
     let onDismiss: () -> Void
     let lifted: Lifted
 
@@ -63,7 +62,6 @@ struct ReactionOverlay<Lifted: View>: View {
         onReact: @escaping (String) -> Void,
         onReply: @escaping () -> Void,
         onAsk: (() -> Void)?,
-        onSelectText: @escaping (String) -> Void,
         onDismiss: @escaping () -> Void,
         @ViewBuilder lifted: () -> Lifted
     ) {
@@ -75,7 +73,6 @@ struct ReactionOverlay<Lifted: View>: View {
         self.onReact = onReact
         self.onReply = onReply
         self.onAsk = onAsk
-        self.onSelectText = onSelectText
         self.onDismiss = onDismiss
         self.lifted = lifted()
     }
@@ -165,7 +162,7 @@ struct ReactionOverlay<Lifted: View>: View {
     }
 
     private var menuCount: Int {
-        1 + (hasText ? 3 : 0) + (hasText || hasMedia ? 1 : 0) + (onAsk == nil ? 0 : 1)
+        1 + (hasText ? 2 : 0) + (hasText || hasMedia ? 1 : 0) + (onAsk == nil ? 0 : 1)
     }
 
     /// The words as a person reads them.
@@ -276,9 +273,6 @@ struct ReactionOverlay<Lifted: View>: View {
                 menuRow("Copy", symbol: "doc.on.doc") {
                     UIPasteboard.general.string = words
                     onDismiss()
-                }
-                menuRow("Select Text", symbol: "text.cursor") {
-                    onSelectText(words)
                 }
                 menuRow(isSpeaking ? "Stop Speaking" : "Speak", symbol: isSpeaking ? "stop.fill" : "speaker.wave.2", action: speak)
                     .disabled(!isSpeaking && (speaker == nil || spokenWords.isEmpty || model.call != nil || message.status == .streaming))

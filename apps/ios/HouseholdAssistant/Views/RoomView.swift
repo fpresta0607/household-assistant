@@ -71,11 +71,6 @@ struct RoomView: View {
     @State private var assistantPage: AssistantPageKind?
     /// The call whose words are open.
     @State private var openedCall: RoomMessage?
-    private struct Selection: Identifiable {
-        let id = UUID()
-        let text: String
-    }
-    @State private var selection: Selection?
     /// Older pages are a bounded reading window, separate from live arrivals.
     @State private var history: RoomThread?
     @State private var historyGeneration = 0
@@ -164,10 +159,6 @@ struct RoomView: View {
                         self.reacting = nil
                     },
                     onAsk: askAction(about: reacting),
-                    onSelectText: { words in
-                        selection = Selection(text: words)
-                        self.reacting = nil
-                    },
                     onDismiss: { self.reacting = nil }
                 ) {
                     liftedBubble(reacting, in: thread)
@@ -199,9 +190,6 @@ struct RoomView: View {
             if let call = message.call {
                 CallTranscriptSheet(call: call, sentAt: message.sentAt)
             }
-        }
-        .sheet(item: $selection) { selected in
-            MessageSelectionSheet(text: selected.text)
         }
         .alert("Couldn't speak message", isPresented: Binding(
             get: { model.messageSpeech.failure != nil },

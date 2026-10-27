@@ -54,6 +54,8 @@ struct ReadingStyle: Hashable {
                 foregroundColor: standard.codeBlockConfig.foregroundColor,
                 codeTextFonts: code, chromeTextFonts: small
             ),
+            // Disable the library's "Select more text" sheet only. Its paragraphs
+            // remain native selectable UITextViews, including double-tap selection.
             textSelectionConfig: TextSelectionConfig(isEnabled: false)
         )
     }

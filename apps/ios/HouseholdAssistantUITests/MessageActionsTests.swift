@@ -103,7 +103,7 @@ final class MessageActionsTests: XCTestCase {
         return app
     }
 
-    func testSelectTextCopiesOnlyThePassageAndWholeMessageCopyStillWorks() {
+    func testDoubleTapCopiesTheTappedWordAndWholeMessageCopyStillWorks() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-StewardDemo", "YES", "-StewardMessageActionsDemo", "YES"]
         app.launch()
@@ -115,15 +115,14 @@ final class MessageActionsTests: XCTestCase {
         let message = thread.descendants(matching: .any).matching(identifier: "room.message")
             .matching(NSPredicate(format: "label CONTAINS %@", "Everything is ready for the walk.")).firstMatch
         XCTAssertTrue(message.waitForExistence(timeout: 10))
-        message.press(forDuration: 0.6)
-        XCTAssertTrue(app.buttons["Select Text"].waitForExistence(timeout: 5))
-        app.buttons["Select Text"].tap()
-        let selection = app.textViews["message.selectable-text"]
-        XCTAssertTrue(selection.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.navigationBars.staticTexts["Select Text"].exists)
-        let copy = app.buttons["message.copy-selection"]
+        // Select a word in the middle, not the first word of a separate sheet.
+        try word("ready", in: message).doubleTap()
+        let copy = app.menuItems["Copy"]
         XCTAssertTrue(copy.waitForExistence(timeout: 5))
-        XCTAssertTrue(copy.isEnabled)
+        XCTAssertFalse(app.buttons["Select Text"].exists)
+        XCTAssertFalse(app.buttons["message.copy-selection"].exists)
+        XCTAssertFalse(app.buttons["Reply"].exists)
+        keepScreenshot(app, named: "inline-word-selection")
         copy.tap()
         let field = app.descendants(matching: .any).matching(identifier: "composer.field").firstMatch
         field.tap()
@@ -131,7 +130,7 @@ final class MessageActionsTests: XCTestCase {
         field.press(forDuration: 0.8)
         XCTAssertTrue(app.menuItems["Paste"].waitForExistence(timeout: 5))
         app.menuItems["Paste"].tap()
-        let partial = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "Everything"), object: field)
+        let partial = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "ready"), object: field)
         XCTAssertEqual(XCTWaiter.wait(for: [partial], timeout: 5), .completed)
         XCTAssertTrue(message.label.contains("Everything is ready for the walk."))
         app.navigationBars.buttons.element(boundBy: 0).tap()
@@ -140,6 +139,7 @@ final class MessageActionsTests: XCTestCase {
         XCTAssertTrue(message.waitForExistence(timeout: 10))
         message.press(forDuration: 0.6)
         XCTAssertTrue(app.buttons["Copy"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Select Text"].exists)
         app.buttons["Copy"].tap()
         field.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
@@ -148,6 +148,49 @@ final class MessageActionsTests: XCTestCase {
         app.menuItems["Paste"].tap()
         let whole = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "Everything is ready for the walk."), object: field)
         XCTAssertEqual(XCTWaiter.wait(for: [whole], timeout: 5), .completed)
+    }
+
+    func testDoubleTapSelectsAssistantTextInDirectAndFamilyChats() throws {
+        for conversation in ["direct", "family"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["-StewardDemo", "YES", "-StewardMessageActionsDemo", "YES"]
+            app.launch()
+            let pin = app.buttons["pin.\(conversation)"]
+            XCTAssertTrue(pin.waitForExistence(timeout: 30))
+            pin.tap()
+            let message = app.collectionViews["room.thread"].descendants(matching: .any)
+                .matching(identifier: "room.message")
+                .matching(NSPredicate(format: "label CONTAINS %@", "I will bring the garden notebook.")).firstMatch
+            XCTAssertTrue(message.waitForExistence(timeout: 10))
+            try word("garden", in: message).doubleTap()
+            XCTAssertTrue(app.menuItems["Copy"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["Reply"].exists)
+            app.menuItems["Copy"].tap()
+            let field = app.textViews["composer.field"]
+            field.tap()
+            field.press(forDuration: 0.8)
+            XCTAssertTrue(app.menuItems["Paste"].waitForExistence(timeout: 5))
+            app.menuItems["Paste"].tap()
+            let pasted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "garden"), object: field)
+            XCTAssertEqual(XCTWaiter.wait(for: [pasted], timeout: 5), .completed)
+            app.terminate()
+        }
+    }
+
+    private func word(_ word: String, in message: XCUIElement) throws -> XCUICoordinate {
+        let image = try XCTUnwrap(message.screenshot().image.cgImage)
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["en-US"]
+        try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+        for observation in request.results ?? [] {
+            guard let text = observation.topCandidates(1).first,
+                  let range = text.string.range(of: word),
+                  let box = try text.boundingBox(for: range)?.boundingBox else { continue }
+            return message.coordinate(withNormalizedOffset: CGVector(dx: box.midX, dy: 1 - box.midY))
+        }
+        throw NSError(domain: "MessageActionsTests", code: 1,
+                      userInfo: [NSLocalizedDescriptionKey: "Could not locate \(word) in the rendered message"])
     }
 
     func testSpeakReadsTheSelectedMessageAndCanBeStoppedWithoutPostingAReply() {

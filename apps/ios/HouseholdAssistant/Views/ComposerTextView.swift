@@ -8,6 +8,7 @@ struct ComposerTextView: UIViewRepresentable {
     @Binding var text: String
     @Binding var isFocused: Bool
     let maxLines: Int
+    var resetGeneration: Int = 0
     let onPasteImages: ([NSItemProvider]) -> Void
     @Environment(\.readingStyle) private var readingStyle
 
@@ -29,12 +30,27 @@ struct ComposerTextView: UIViewRepresentable {
     func updateUIView(_ view: ImagePasteTextView, context: Context) {
         context.coordinator.parent = self
         view.onPasteImages = onPasteImages
-        view.font = readingStyle.selectionFont
+        if view.font != readingStyle.selectionFont {
+            view.font = readingStyle.selectionFont
+            view.revealCaretAfterLayout()
+        }
         view.textColor = UIColor(Palette.text)
         view.tintColor = UIColor(Palette.highlight)
-        // Do not rewrite UIKit's text on every keystroke: that loses selection and IME.
-        if view.text != text, view.markedTextRange == nil {
+        if context.coordinator.resetGeneration != resetGeneration {
+            // Clear a sent draft in the existing field, including marked dictation/IME
+            // text. Recreating the view drops keyboard focus and flickers its height.
+            context.coordinator.isResetting = true
+            view.unmarkText()
             view.text = text
+            view.selectedRange = NSRange(location: (text as NSString).length, length: 0)
+            view.setContentOffset(.zero, animated: false)
+            context.coordinator.resetGeneration = resetGeneration
+            context.coordinator.isResetting = false
+            view.revealCaretAfterLayout()
+        } else if view.text != text, view.markedTextRange == nil {
+            // Ordinary keystrokes must not rewrite UIKit's text: that loses selection/IME.
+            view.text = text
+            view.revealCaretAfterLayout()
         }
         view.placeholder.font = view.font
         view.placeholder.textColor = UIColor(Palette.secondaryText)
@@ -54,25 +70,41 @@ struct ComposerTextView: UIViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: ImagePasteTextView, context: Context) -> CGSize? {
-        guard let width = proposal.width, width > 0 else { return nil }
+        guard let width = proposal.width, width > 0, width.isFinite else { return nil }
         let line = uiView.font?.lineHeight ?? 21
         let needed = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
         let ceiling = ceil(line * CGFloat(maxLines))
-        uiView.isScrollEnabled = needed > ceiling
+        // SwiftUI can ask about several widths before choosing one. Scrolling is
+        // decided in layoutSubviews, using the bounds it actually assigns.
         return CGSize(width: width, height: min(max(needed, ceil(line)), ceiling))
     }
 
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: ComposerTextView
-        init(_ parent: ComposerTextView) { self.parent = parent }
+        var resetGeneration: Int
+        var isResetting = false
+        init(_ parent: ComposerTextView) {
+            self.parent = parent
+            resetGeneration = parent.resetGeneration
+        }
 
         func textViewDidChange(_ textView: UITextView) {
+            guard !isResetting else { return }
             parent.text = textView.text
             (textView as? ImagePasteTextView)?.placeholder.isHidden = !textView.text.isEmpty
             textView.invalidateIntrinsicContentSize()
+            (textView as? ImagePasteTextView)?.revealCaretAfterLayout()
         }
 
-        func textViewDidBeginEditing(_ textView: UITextView) { parent.isFocused = true }
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            guard !isResetting else { return }
+            (textView as? ImagePasteTextView)?.revealCaretAfterLayout()
+        }
+
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            parent.isFocused = true
+            (textView as? ImagePasteTextView)?.revealCaretAfterLayout()
+        }
         func textViewDidEndEditing(_ textView: UITextView) { parent.isFocused = false }
     }
 }
@@ -80,6 +112,8 @@ struct ComposerTextView: UIViewRepresentable {
 final class ImagePasteTextView: UITextView {
     var onPasteImages: (([NSItemProvider]) -> Void)?
     let placeholder = UILabel()
+    private var needsCaretReveal = false
+    private var lastLayoutSize = CGSize.zero
 
     override init(frame: CGRect, textContainer: NSTextContainer?) {
         super.init(frame: frame, textContainer: textContainer)
@@ -95,6 +129,38 @@ final class ImagePasteTextView: UITextView {
     override func layoutSubviews() {
         super.layoutSubviews()
         placeholder.frame = CGRect(x: 0, y: 0, width: bounds.width, height: font?.lineHeight ?? 21)
+        guard bounds.width > 0, bounds.height > 0 else { return }
+
+        let resized = bounds.size != lastLayoutSize
+        lastLayoutSize = bounds.size
+        let needed = sizeThatFits(CGSize(width: bounds.width, height: .greatestFiniteMagnitude)).height
+        let shouldScroll = needed > bounds.height + 0.5
+        if isScrollEnabled != shouldScroll {
+            isScrollEnabled = shouldScroll
+            needsCaretReveal = true
+            setNeedsLayout()
+            // Let UITextView finish enabling its scroll geometry before revealing
+            // the caret. The next layout keeps the request even at the same size.
+            if shouldScroll { return }
+        }
+        if !shouldScroll, contentOffset != .zero {
+            setContentOffset(.zero, animated: false)
+        }
+
+        // Follow edits and cursor moves after wrapping and the capped frame settle.
+        // Merely scrolling back to read the draft must not snap it to the cursor.
+        guard needsCaretReveal || resized else { return }
+        needsCaretReveal = false
+        guard isFirstResponder, shouldScroll, !isDragging, !isDecelerating,
+              let selection = selectedTextRange, selection.isEmpty else { return }
+        let caret = caretRect(for: selection.end)
+        guard !caret.isNull, !caret.isInfinite else { return }
+        scrollRectToVisible(caret.insetBy(dx: 0, dy: -2), animated: false)
+    }
+
+    func revealCaretAfterLayout() {
+        needsCaretReveal = true
+        setNeedsLayout()
     }
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {

@@ -191,7 +191,9 @@ struct RoomComposer: View {
                     }
                     HStack(alignment: .bottom, spacing: 8) {
                         leading
+                            .animation(nil, value: draftGeneration)
                         trailingButton
+                            .animation(.easeOut(duration: reduceMotion ? 0.08 : 0.12), value: hasSomethingToSend)
                     }
                 }
             }
@@ -210,8 +212,6 @@ struct RoomComposer: View {
             }
         }
         .animation(Motion.press(reduced: reduceMotion), value: gesture.phase)
-        // Without it the send button's transition has nothing to run on.
-        .animation(Motion.press(reduced: reduceMotion), value: hasSomethingToSend)
         // The plus turns into a cross as the drawer springs out of it.
         .animation(Motion.springOut(reduced: reduceMotion), value: isDrawerOpen)
         .animation(Motion.springOut(reduced: reduceMotion), value: isLocationMenuOpen)
@@ -489,10 +489,10 @@ struct RoomComposer: View {
             }
             HStack(alignment: .bottom, spacing: 4) {
                 ComposerTextView(text: text, isFocused: $isFocused,
-                    maxLines: textSize.isAccessibilitySize ? 3 : 6) { providers in
+                    maxLines: textSize.isAccessibilitySize ? 3 : 6,
+                    resetGeneration: generation) { providers in
                     pasteImages(providers)
                 }
-                    .id(generation)
                     .frame(maxWidth: .infinity)
                     .accessibilityIdentifier("composer.field")
                     .foregroundStyle(Palette.text)
@@ -558,7 +558,7 @@ struct RoomComposer: View {
                 .glassMorph("voice", in: glass)
         }
         .buttonStyle(.plain)
-        .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
+        .transition(.opacity)
         .accessibilityLabel(label)
     }
 
@@ -627,7 +627,7 @@ struct RoomComposer: View {
             }
         ))
         .disabled(!canSend)
-        .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
+        .transition(.opacity)
         .accessibilityLabel("Record a voice note")
         .accessibilityHint("Hold and let go to send, or tap to record hands-free")
         .accessibilityIdentifier("composer.microphone")
@@ -880,20 +880,13 @@ struct RoomComposer: View {
         ChatTiming.sent(isVoiceNote: false)
         let text = draft
         let attachments = staged.map(\.attachment)
-        let wasFocused = isFocused
         draftGeneration += 1
-        let generation = draftGeneration
         draft = ""
         staged = []
         isDrawerOpen = false
         send(text: text, attachments: attachments)
-        if wasFocused {
-            Task { @MainActor in
-                await Task.yield()
-                guard generation == draftGeneration else { return }
-                isFocused = true
-            }
-        }
+        // Clearing the same UIKit field preserves focus as-is: an open keyboard stays
+        // open, and a deliberately dismissed one is never reopened by a delayed task.
     }
 
     private func send(text: String, attachments: [RoomAttachment]) {

@@ -52,20 +52,32 @@ final class ComposerGesturesTests: XCTestCase {
 
     func testSendingClearsTheFieldAndKeepsTheNextDraft() throws {
         for pin in ["pin.direct", "pin.family"] {
-            let thread = openThread(pin)
-            let field = thread.app.textFields["composer.field"].exists
-                ? thread.app.textFields["composer.field"] : thread.app.textViews["composer.field"]
-            XCTAssertTrue(field.waitForExistence(timeout: 10))
-            field.tap()
-            field.typeText("Hello from the composer")
-            thread.app.buttons["Send"].tap()
-            let cleared = XCTNSPredicateExpectation(
-                predicate: NSPredicate(format: "value == %@ OR value == %@", "", "Message"), object: field)
-            XCTAssertEqual(XCTWaiter.wait(for: [cleared], timeout: 5), .completed)
-            field.tap()
-            field.typeText("My next draft")
-            XCTAssertEqual(field.value as? String, "My next draft")
-            thread.app.terminate()
+            for keepKeyboard in [true, false] {
+                let thread = openThread(pin)
+                let field = thread.app.textViews["composer.field"]
+                XCTAssertTrue(field.waitForExistence(timeout: 10))
+                field.tap()
+                field.typeText("Hello from the composer\nA second line to clear when sent")
+                XCTAssertTrue(thread.app.keyboards.firstMatch.waitForExistence(timeout: 5))
+                if !keepKeyboard {
+                    thread.app.collectionViews["room.thread"].swipeDown(velocity: .slow)
+                    XCTAssertTrue(thread.app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+                }
+                thread.app.buttons["Send"].tap()
+                let cleared = XCTNSPredicateExpectation(
+                    predicate: NSPredicate(format: "value == %@ OR value == %@", "", "Message"), object: field)
+                XCTAssertEqual(XCTWaiter.wait(for: [cleared], timeout: 5), .completed)
+                XCTAssertTrue(thread.app.descendants(matching: .any)["composer.microphone"].waitForExistence(timeout: 2))
+                XCTAssertEqual(thread.app.keyboards.firstMatch.exists, keepKeyboard)
+                let attachment = XCTAttachment(screenshot: thread.app.screenshot())
+                attachment.name = "sent-reset-\(pin)-keyboard-\(keepKeyboard)"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+                field.tap()
+                field.typeText("My next draft")
+                XCTAssertEqual(field.value as? String, "My next draft")
+                thread.app.terminate()
+            }
         }
     }
 

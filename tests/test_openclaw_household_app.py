@@ -165,6 +165,7 @@ def test_the_patch_names_the_plugin_and_the_room_and_keeps_every_list(app: Modul
             "household_wish",
             "household_vault",
             "household_meals",
+            "message",
         ]
     }
 
@@ -273,9 +274,36 @@ def test_the_location_tool_goes_before_the_finance_tools_so_the_guard_finds_noth
         "household_wish",
         "household_vault",
         "household_meals",
+        "message",
         *FINANCE,
     ]
     assert installer.configured(result, "corey", "7100000001") == result
+
+
+@pytest.mark.parametrize("index", [0, 1], ids=["corey", "denise"])
+def test_coding_profile_can_post_to_family_without_widening_group_policy(
+    app: ModuleType, index: int
+) -> None:
+    gateway, peer = app.GATEWAYS[index], app.GATEWAYS[1 - index]
+    config = as_on_the_box(gateway.persona)
+    config["tools"] = {"profile": "coding", "alsoAllow": ["speak"], "deny": ["browser"]}
+    patch = app.household_patch(
+        config, gateway, peer, owner_keys=[], peer_keys=[], peer_identity={}
+    )
+    result = app.patched(config, patch)
+    assert result["tools"]["profile"] == "coding"
+    assert result["tools"]["alsoAllow"].count("message") == 1
+    assert result["tools"]["deny"] == ["browser"]
+    assert result["channels"]["household"]["familyTools"] == THE_FAMS_TOOLS
+    assert app.problems(result, gateway) == []
+    assert "tools" not in app.plugin_patch(result)
+
+    # An already-installed gateway needs only the missing tool added on reapply.
+    result["tools"]["alsoAllow"].remove("message")
+    assert app.problems(result, gateway) == ["the assistant is not handed message"]
+    repaired = app.patched(result, app.plugin_patch(result))
+    assert repaired["tools"]["alsoAllow"].count("message") == 1
+    assert app.problems(repaired, gateway) == []
 
 
 def test_a_gateway_without_the_apps_tools_is_told_so(app: ModuleType) -> None:
@@ -300,6 +328,7 @@ def test_a_gateway_without_the_apps_tools_is_told_so(app: ModuleType) -> None:
         "the assistant is not handed household_wish",
         "the assistant is not handed household_vault",
         "the assistant is not handed household_meals",
+        "the assistant is not handed message",
     ]
 
 
@@ -325,6 +354,7 @@ def test_a_gateway_that_has_the_location_tool_gets_the_cart_and_the_brief_beside
         "household_wish",
         "household_vault",
         "household_meals",
+        "message",
     ]
 
 

@@ -25,6 +25,8 @@ the plugin mount; nothing loads it until this names it in a gateway's config:
   on a person's message in the app, sparingly;
 - the plugin's `household_note` tool beside them, the household note both assistants keep
   for what the family tracks together, which every app turn starts with;
+- the built-in `message` tool beside them, so either assistant can post to the app's
+  family room from an owner's turn even under OpenClaw's coding profile;
 - the plugin's turn hook allowed (`hooks.allowConversationAccess`), which OpenClaw asks of
   a plugin loaded from a path: it adds the assistant's name and how its person asked it to
   talk, from the app's Settings, to every turn, Telegram's included;
@@ -122,6 +124,9 @@ APP_TOOLS = [
     "household_wish",
     "household_vault",
     "household_meals",
+    # OpenClaw 2026.9.4's coding profile excludes this built-in messaging tool.
+    # The app's routing guidance uses it for explicit posts to the family room.
+    "message",
 ]
 # The PocketPiggies guard rewrites `tools.alsoAllow` as everything else in its order,
 # then these three. Putting the new tool before them leaves the guard nothing to do.

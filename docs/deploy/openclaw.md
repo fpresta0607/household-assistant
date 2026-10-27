@@ -1884,43 +1884,33 @@ A person's voice note in the app is heard once, on each gateway that answers to 
 
 ### A post to The Fam goes to the app first
 
-On 17 October Denise posted to The Fam with `conversations_send` from a turn in Gia's own app thread, and the app never showed it, because nothing copied a Telegram post into the family room.
-The family room is now the first home of such a post, and Telegram, while the household still uses it, gets the same words after the room has them.
+Telegram is retired. Both assistants receive routing guidance to send explicit family
+posts with `message(action=send, channel=household, target=family)`. Ordinary replies
+stay in the conversation that asked; private owner messages stay in the owner's thread.
+The household channel keeps the post, pushes its owner's phones, and relays it to the
+other gateway. A failed send must not be described as delivered.
 
-- household-app's `before_tool_call` hook (`family-posts.js`) sees each call to `conversations_send` and `message` before it runs, from any session.
-  A call that posts words to The Fam is kept as this assistant's family-room message, through the same send the channel uses for anything the assistant posts there on its own.
-  That pushes the owner's phones under the family thread, and the relay carries the message to the other gateway, which keeps it and pushes its own owner's phones.
-  The tool then runs as before and sends Telegram the same words.
-- In the room it is any other post of this assistant's: one that @mentions the other assistant hands it a request, and one a handed-over turn makes is marked `handedOver` and starts nothing.
-- A call posts to The Fam when `conversations_send` names The Fam's `conversationRef`, or when `message` with the `send` or `broadcast` action sends on Telegram to The Fam's chat id, bare or after `telegram:`, `tg:` or `group:`.
-  Telegram means `channel: "telegram"`, or no channel from a turn in a Telegram session, since OpenClaw then sends on the session's own channel; from an app turn a send that names no channel would fail, so the room keeps nothing for it.
-  The target is the one the tool sends to, the first of `target`, `to` and `channelId` that holds anything (`resolveMessageToolTarget`), or each of a broadcast's `targets`, so The Fam named in a field the tool does not use posts nothing.
-- `conversations_turn` is left alone: it hands The Fam a turn's input rather than posting it, and what reaches the group is the reply.
-- The Fam's chat id is household-family-room's `groupChatId`, which household-pictures and household-speech read the same way.
-  On a gateway where that plugin is not switched on, a post reaches Telegram alone, as before.
-- A `conversationRef` is opaque to a plugin, so the hook builds The Fam's the way OpenClaw 2026.9.4 builds one (`buildConversationRef`), a hash of Telegram, the default account, a group and the chat id.
-  Both gateways' conversation registries held exactly that ref for The Fam, `conv_42423b3d2ab2219f114fdbc28e6c1b92`, on 17 October, and 27 `conversations_send` posts had gone to it between them since 19 September.
-  An OpenClaw upgrade that builds refs differently would leave these posts on Telegram alone, so compare The Fam's row in the registry's `conversations` table with `familyConversationRef` whenever the pinned version changes.
-- OpenClaw blocks a tool whose `before_tool_call` handler fails or runs past fifteen seconds, so the hook never fails, and Telegram's copy waits at most five seconds for the room and the owner's push.
-  When the room cannot take the post, as on a gateway whose household channel is not running, the log says so and the post reaches Telegram alone.
-- `conversations_send` refuses a sender OpenClaw knows is not the owner, and the hook keeps nothing for one either, from either tool.
-- A call is kept once however often OpenClaw hands it to the hook, by its call id within its run and session, as OpenClaw sends a conversation tool's retry to Telegram once.
-- The room keeps the post before the tool runs, so a send Telegram then refuses, for a bot no longer in the group, a rate limit or OpenClaw's own send policy, leaves the words in the room with no Telegram copy, and a model that tries again posts them twice.
-  Catching it after the tool succeeded would need a hook on what is sent, which turns off Telegram's draft previews (below), so the room keeping a post Telegram missed is the side this errs on.
-- The log line is `a family post from <tool> was kept in the app room before Telegram's copy`, never the words.
+`family-posts.js` translates known legacy family targets and `conversations_send` refs
+to the app's family destination before the tool runs. Unknown Telegram targets, mixed
+broadcasts, and non-owner legacy sends are blocked. It no longer sends a Telegram copy.
 
-The hook catches the call on its way in rather than the message on its way out, because while any plugin has a `message_sending` hook, OpenClaw 2026.9.4 shows no draft preview in any Telegram chat (`allowProviderPreview` in the Telegram extension's `bot-message-dispatch.ts`).
+`openclaw-household-app.py apply` explicitly adds `message` to `tools.alsoAllow` on
+both Corey and Denise. OpenClaw 2026.9.4's coding profile does not include that built-in
+tool, so routing instructions alone cannot make it available. Existing tool denies and
+the restricted family allowlist stay intact; this does not grant shared family turns
+any additional tools. `check` reports an installation missing `message`.
 
-What still reaches Telegram alone, or the app only after Telegram:
+Reapply the channel configuration on each gateway under the rollout lock, Corey first:
 
-- An assistant's own reply to a message someone sent in The Fam on Telegram, since the question was only ever on Telegram.
-- A scheduled run's announcement to Telegram, which [Scheduled messages in the app](#scheduled-messages-in-the-app) copies into the app whatever Telegram did with it; since 22 October every job announces to the app itself ([Telegram off](#telegram-off)).
-- A post with no session, which is how the coordination relay posts a crossing and the planner posts a proposal, so the planner's web-derived venue prose stays out of the app room and the other assistant's prompt, as [the coordination design](../plan/coordination-between-assistants.md#each-sees-what-the-other-said-in-the-group) requires.
-- A picture or file the `message` tool sends, with or without words beside it: the words come to the app, the attachment does not.
-- `sessions_send` to The Fam's session, whose reply goes out as that session's own.
+```sh
+python3 scripts/openclaw-household-app.py apply --gateway corey --dry-run
+python3 scripts/openclaw-household-app.py apply --gateway corey
+python3 scripts/openclaw-household-app.py check
+```
 
-It needs no config change.
-The plugin goes to the box like any household-app update: `bash scripts/household-app-install.sh`, then `docker restart` one gateway at a time, Corey first, with the checks in [Bringing it to the box](#bringing-it-to-the-box-one-gateway-at-a-time-1) above between them.
+Verify Corey's channel and effective owner tools before repeating for `--gateway denise`.
+This requires a gateway configuration update; an iOS TestFlight upload alone does not
+activate the correction.
 
 ### What is left before Telegram can be retired
 
