@@ -135,6 +135,10 @@ final class ImagePasteTextView: UITextView {
         lastLayoutSize = bounds.size
         let needed = sizeThatFits(CGSize(width: bounds.width, height: .greatestFiniteMagnitude)).height
         let shouldScroll = needed > bounds.height + 0.5
+        // With zero text-container padding, UIKit's final-line caret can extend
+        // below contentSize. Leave scrollable room for it and its selection loupe.
+        let bottomInset: CGFloat = shouldScroll ? 8 : 0
+        if contentInset.bottom != bottomInset { contentInset.bottom = bottomInset }
         if isScrollEnabled != shouldScroll {
             isScrollEnabled = shouldScroll
             needsCaretReveal = true
