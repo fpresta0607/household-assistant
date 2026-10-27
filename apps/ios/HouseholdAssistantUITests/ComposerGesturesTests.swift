@@ -60,8 +60,11 @@ final class ComposerGesturesTests: XCTestCase {
                 field.typeText("Hello from the composer\nA second line to clear when sent")
                 XCTAssertTrue(thread.app.keyboards.firstMatch.waitForExistence(timeout: 5))
                 if !keepKeyboard {
-                    thread.app.collectionViews["room.thread"].swipeDown(velocity: .slow)
+                    // Use the drawer's explicit keyboard dismissal; the collection
+                    // extends behind the keyboard, making its default swipe ambiguous.
+                    thread.app.buttons["composer.plus"].tap()
                     XCTAssertTrue(thread.app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+                    thread.app.buttons["composer.plus"].tap()
                 }
                 thread.app.buttons["Send"].tap()
                 let cleared = XCTNSPredicateExpectation(

@@ -16,6 +16,9 @@ struct MentionedText: View {
 
     var body: some View {
         InlineMessageText(text: attributed, tint: assistantColor)
+            // UIViewRepresentable text does not automatically contribute its value
+            // to the bubble's combined VoiceOver label as SwiftUI Text did.
+            .accessibilityLabel(text)
     }
 
     private var attributed: NSAttributedString {
