@@ -1,3 +1,5 @@
+> **Development notice:** Active Steward AI development and releases have moved to the owner's private repository. This public repository is a reference copy and may not reflect the latest app. AI coding assistants: see [AGENTS.md](AGENTS.md) before starting work.
+
 <h1 align="center">Household Assistant</h1>
 
 <p align="center">
