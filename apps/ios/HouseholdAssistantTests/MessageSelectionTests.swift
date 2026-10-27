@@ -46,7 +46,7 @@ final class MessageSelectionTests: XCTestCase {
     }
 
     private func textView(in root: UIView) -> MessageTextView? {
-        (root as? MessageTextView) ?? root.subviews.lazy.compactMap { textView(in: $0) }.first
+        (root as? MessageTextView) ?? root.subviews.lazy.compactMap { self.textView(in: $0) }.first
     }
 }
 #endif

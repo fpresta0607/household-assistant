@@ -83,7 +83,7 @@ final class ComposerEditingTests: XCTestCase {
     }
 
     private func editor(in root: UIView) -> ImagePasteTextView? {
-        (root as? ImagePasteTextView) ?? root.subviews.lazy.compactMap { editor(in: $0) }.first
+        (root as? ImagePasteTextView) ?? root.subviews.lazy.compactMap { self.editor(in: $0) }.first
     }
 }
 
