@@ -11,8 +11,9 @@ sits on "Connecting". On the first household's box both gateways were told by ha
 2026-09-24 (docs/deploy/openclaw.md, "Why the gateway trusts the host as a proxy").
 
 A box whose household file names its members runs the compose file
-scripts/household-compose.py writes, whose network gives the host one fixed address,
-GATEWAY_BRIDGE, so this writes it: `gateway.trustedProxies` is that address alone, and
+scripts/household-compose.py writes, which gives each gateway a network of its own with a
+fixed address for the host (GATEWAY_NETWORKS in household_file.py), so this writes it:
+`gateway.trustedProxies` is that gateway's host address alone, and
 `gateway.controlUi.allowedOrigins` gains the gateway's own tailnet address, which lets
 the Control UI load from it.
 
@@ -47,7 +48,6 @@ from gateway_config import (
     patched,
     read_config,
 )
-from household_file import GATEWAY_BRIDGE
 
 LABEL = "box"
 # What `agents.defaults.heartbeat.every` is when the recurring heartbeat is off.
@@ -59,6 +59,12 @@ def origin(gateway: Gateway) -> str:
     household = load_household()
     member = household.member(gateway.persona)
     return f"https://{household.gateway_host}:{member.port}"
+
+
+def bridge(gateway: Gateway) -> str:
+    """The host's address on `gateway`'s own network, which `tailscale serve` comes from."""
+    household = load_household()
+    return household.network(household.member(gateway.persona))[1]
 
 
 def _gateway_section(config: dict[str, Any]) -> dict[str, Any]:
@@ -84,8 +90,8 @@ def box_patch(config: dict[str, Any], gateway: Gateway) -> dict[str, Any]:
         [entry for entry in origins if isinstance(entry, str)] if isinstance(origins, list) else []
     )
     patch: dict[str, Any] = {}
-    if section.get("trustedProxies") != [GATEWAY_BRIDGE]:
-        patch["trustedProxies"] = [GATEWAY_BRIDGE]
+    if section.get("trustedProxies") != [bridge(gateway)]:
+        patch["trustedProxies"] = [bridge(gateway)]
     if origin(gateway) not in origins:
         patch["controlUi"] = {"allowedOrigins": [*origins, origin(gateway)]}
     whole: dict[str, Any] = {"gateway": patch} if patch else {}
@@ -97,10 +103,8 @@ def box_patch(config: dict[str, Any], gateway: Gateway) -> dict[str, Any]:
 def problems(config: dict[str, Any], gateway: Gateway) -> list[str]:
     section = _gateway_section(config)
     found = []
-    if section.get("trustedProxies") != [GATEWAY_BRIDGE]:
-        found.append(
-            f"does not trust {GATEWAY_BRIDGE}, the host's address on the gateways' network"
-        )
+    if section.get("trustedProxies") != [bridge(gateway)]:
+        found.append(f"does not trust {bridge(gateway)}, the host's address on its network")
     ui = section.get("controlUi")
     origins = ui.get("allowedOrigins") if isinstance(ui, dict) else None
     if not isinstance(origins, list) or origin(gateway) not in origins:

@@ -1045,6 +1045,36 @@ After the migration, she and Corey use the policy in [The model backend](#the-mo
 Gia's Yahoo mailbox is connected read-only through the bundled `himalaya` skill: its account config lives at `/var/lib/household-assistant/openclaw-denise-himalaya/config.toml` (mounted at `~/.config/himalaya`), the app password is `YAHOO_APP_PASSWORD_GIA` in her env file read through `backend.auth.cmd`, and no send backend is configured on purpose.
 Gia reaches her through the Steward app, as Franco reaches Corey; see [The channels](#the-channels).
 
+### Why two gateways and not one
+
+On 24 October the question was put again: would one gateway hosting both assistants, OpenClaw's multi-agent mode, be the better model, and would the assistants work together faster in it?
+It was measured against OpenClaw 2026.9.4 and this repository, and the answer is no on both counts.
+
+- **Speed.** A family-room entry crosses from one gateway's share to the other's in 3.4 ms on average, 13.8 ms with a full outbox, and at most 20.1 ms over 40 trials, with the plugins' own `share.js` and `peer-link.js`; only when the folder watch misses one does the 2 s poll carry it, in 1.2 s on average.
+  OpenClaw's own in-process handover between two agents of one gateway (`sessions_send`) took 244 ms from the asking turn's tool call to the other agent's model request, against a zero-latency stand-in model.
+  An assistant's turn takes about five seconds, so one gateway would save at most a few hundredths of a second on a handover, and its built-in handover is slower than the link.
+- **What one gateway would cost.** With both agents in one process, narrowed as far as OpenClaw allows (`tools.sessions.visibility: agent`, `tools.agentToAgent.enabled: false`, sandbox off as deployed), a Corey turn that ran `exec` printed `YAHOO_APP_PASSWORD_GIA` and the gateway token from its environment, read Denise's `MEMORY.md`, and found Gia's private message in Denise's transcript database.
+  The gateway token is an operator credential for both agents and ignores the narrowing.
+  OpenClaw's own trust model is one trust boundary per gateway, and its sandbox would need the host's Docker socket inside the gateway container, which is root on the box.
+  Every guard outside the gateways (the PocketPiggies and home key holders, the mounts) tells the two people apart by container, which one process would erase.
+- **What one gateway would buy.** About 350 MiB of memory: two one-agent gateways held 706 MiB RSS at idle, one gateway with two agents 356 MiB.
+  One store for the room, the note and the cart, with no replication between them, and one container to update.
+  Rewriting the household plugins for it was estimated at 2,500 to 10,000 changed lines.
+
+So the gateways stay two, one for each adult, and every household's box runs the same way.
+
+### Hardening the two gateways
+
+The same investigation found two places where the two gateways on this box are closer together than they need to be.
+A new household's box is set up without either ([A new household's box](new-household.md)); on this one they are steps to take by hand, not yet taken.
+
+- **One keyring password between them.** Both env files hold the same `GOG_KEYRING_PASSWORD`, and household-app seals every connector sign-in made from a phone (Google, Microsoft, Notion, typed passwords) under a key made from it, so Corey's container holds the key to Gia's sealed sign-ins and only the mounts keep them apart.
+  `openclaw-install.sh` gives a gateway whose env file has no password one of its own, and leaves an existing one alone.
+  To separate them: back up Denise's state, write a new random `GOG_KEYRING_PASSWORD` into `openclaw-denise.env` only, recreate her container, and have Gia sign in again to each connector in the app, since what was sealed under the old password no longer opens; her gog keyring is made again the same way.
+- **One network between them.** Both gateways sit on this compose project's default network, so Corey's container can open a connection to `openclaw-denise:18789`, guarded only by her gateway token and device pairing.
+  A new household's compose file gives each gateway a network of its own.
+  Here that also moves the host address each gateway sees the phones' connections come from, so `gateway.trustedProxies` has to change with it (see [Why the gateway trusts the host as a proxy](#why-the-gateway-trusts-the-host-as-a-proxy)), and Home Assistant, which both gateways reach on that network, has to join both.
+
 ---
 
 ## Scripture

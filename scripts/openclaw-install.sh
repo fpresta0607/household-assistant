@@ -90,14 +90,22 @@ install -m 0644 "${compose_src}" "${APP_DIR}/docker-compose.yml"
 # Generated here, stored at 0600, referenced from openclaw.json as an env ref
 # so no plaintext token ever reaches the config file. Never printed.
 # A household's setup may have written the env file first, with its OpenRouter key, so
-# what is looked for is the token, not the file.
+# what is looked for is each value, not the file.
+#
+# GOG_KEYRING_PASSWORD seals everything a person signs in to from the app (household-app's
+# sealed-file.js) and gog's own keyring; without it no connector can be signed in to. Each
+# gateway gets one of its own, so neither assistant holds the key to the other's sign-ins.
+# The first household's two gateways were given one password between them by hand, which
+# this leaves as it is (docs/deploy/openclaw.md, "Hardening the two gateways").
 while IFS=$'\t' read -r _ assistant _ _ _ _ env_file _; do
-  if ! grep -q '^OPENCLAW_GATEWAY_TOKEN=.' "${env_file}" 2>/dev/null; then
-    echo "generating ${assistant}'s gateway token"
-    token="$(openssl rand -hex 32)"
-    [[ -n ${token} ]] || { echo "openssl produced an empty token" >&2; exit 1; }
-    (umask 077 && printf 'OPENCLAW_GATEWAY_TOKEN=%s\n' "${token}" >>"${env_file}")
-  fi
+  for name in OPENCLAW_GATEWAY_TOKEN GOG_KEYRING_PASSWORD; do
+    if ! grep -q "^${name}=." "${env_file}" 2>/dev/null; then
+      echo "generating ${assistant}'s ${name}"
+      value="$(openssl rand -hex 32)"
+      [[ -n ${value} ]] || { echo "openssl produced an empty value" >&2; exit 1; }
+      (umask 077 && printf '%s=%s\n' "${name}" "${value}" >>"${env_file}")
+    fi
+  done
   chmod 600 "${env_file}"
 done <<<"${members}"
 

@@ -93,7 +93,8 @@ PocketPiggies, for the family's budget, is optional and connects the same way on
 
 - The first household's box also runs Home Assistant, its mailbox reader and a web site, and its household file names no members, so its compose file is [`deploy/openclaw/docker-compose.yml`](../../deploy/openclaw/docker-compose.yml) as the repository holds it.
   Every other box's compose file is written from its household file, and `household-converge.sh` refuses to run on the first household's box, which is brought up to a release by hand.
-- A new household's gateways share a network on `172.31.240.0/24`, so the address each gateway trusts as its tailnet proxy, `172.31.240.1`, is fixed; `openclaw-box.py` gives each gateway that address, its own tailnet address for the Control UI, and the heartbeat switched off, as the first household's gateways were given them by hand.
+- Each gateway gets a keyring password of its own, which seals every sign-in its person makes from the app, so neither assistant holds the key to the other's; the first household's two share one ([Hardening the two gateways](openclaw.md#hardening-the-two-gateways)).
+- Each of a new household's gateways has a network of its own, so neither container can open a connection to the other's gateway, on a fixed subnet (`172.31.240.0/28` and `172.31.240.16/28`), so the address each trusts as its tailnet proxy (`172.31.240.1` and `172.31.240.17`) is known; `openclaw-box.py` gives each gateway its address, its own tailnet address for the Control UI, and the heartbeat switched off, as the first household's gateways were given them by hand.
 - Its verification expects nothing listening to the internet and only SSH through ufw, and skips the first household's iCloud calendar library: a new household's calendars come through the app.
 - The scheduled jobs that read a shared iCloud calendar (`openclaw-scheduled-jobs.py`) are not set up; they need `sharedCalendar` in the household file.
 

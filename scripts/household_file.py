@@ -40,12 +40,13 @@ MEMBERS = 2
 # 4 GB box room for both and the system.
 MEMORY = "1536M"
 TIMEZONE = "America/Chicago"
-# The network a household's gateways share on a box whose file names its members, on a fixed
-# subnet so the host's address on it, which each gateway trusts as the tailnet proxy in front
-# of it, is known before they start. Docker's default pools reach it only after a dozen other
-# networks, which a box that holds the household's gateways alone never has.
-GATEWAY_SUBNET = "172.31.240.0/24"
-GATEWAY_BRIDGE = "172.31.240.1"
+# On a box whose file names its members, each gateway has a network of its own, so neither
+# container can open a connection to the other's gateway: they share only the family room's
+# read-only folders. Each network's subnet is fixed, so the host's address on it, which that
+# gateway trusts as the tailnet proxy in front of it, is known before it starts. Docker's
+# default pools reach them only after a dozen other networks, which a box that holds the
+# household's gateways alone never has. One subnet and host address for each member, in order.
+GATEWAY_NETWORKS = (("172.31.240.0/28", "172.31.240.1"), ("172.31.240.16/28", "172.31.240.17"))
 
 ID = re.compile(r"[a-z][a-z0-9-]{0,31}")
 # A person's or an assistant's name as it is shown: a letter in any script, then letters,
@@ -147,6 +148,10 @@ class Household:
     # Whether the file names its members. One written before it did is the first
     # household's, whose box runs the compose file the repository holds.
     names_members: bool = False
+
+    def network(self, member: Member) -> tuple[str, str]:
+        """The subnet of `member`'s gateway's own network, and the host's address on it."""
+        return GATEWAY_NETWORKS[self.members.index(member)]
 
     def member(self, persona: str) -> Member:
         """The member whose assistant is `persona`."""

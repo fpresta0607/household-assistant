@@ -125,3 +125,9 @@ def test_the_first_households_box_is_left_as_it_was_set_by_hand(
     assert box.apply([gateway], run=run, dry_run=False) == 1
     assert run.patches == []
     assert box.check([gateway]) == 0
+
+
+def test_each_gateway_trusts_the_host_address_of_its_own_network(box: ModuleType) -> None:
+    corey, denise = box.GATEWAYS
+    assert box.bridge(corey) == "172.31.240.1"
+    assert box.bridge(denise) == "172.31.240.17"

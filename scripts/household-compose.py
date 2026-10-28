@@ -10,10 +10,12 @@ only the other's family-room share, read-only, and nothing else of its state.
 The image is the one deploy/openclaw/docker-compose.yml pins, so a household is always on
 the gateway the first one runs, and a release that moves the pin moves both.
 
-The gateways share a network whose subnet is fixed, so the address the host reaches them
-from, which each gateway must trust as its tailnet proxy, is known before they start:
-GATEWAY_BRIDGE. The output is YAML in the narrow form `emit` writes, every string quoted
-the way JSON quotes it, so the box needs no YAML library to write it, and the shell checks
+Each gateway has a network of its own, so neither container can reach the other's gateway,
+on a fixed subnet, so the address the host reaches it from, which it must trust as its
+tailnet proxy, is known before it starts (GATEWAY_NETWORKS in household_file.py).
+
+The output is YAML in the narrow form `emit` writes, every string quoted the way JSON
+quotes it, so the box needs no YAML library to write it, and the shell checks
 that read one service's `image:` or `memory:` out of the deployed file read it as they read
 the first household's.
 
@@ -33,8 +35,6 @@ from pathlib import Path
 from typing import Any
 
 from household_file import (
-    GATEWAY_BRIDGE,
-    GATEWAY_SUBNET,
     HOUSEHOLD_FILE,
     Household,
     Member,
@@ -71,6 +71,10 @@ def pinned_image(source: Path = PINNED) -> str:
     return images.pop()
 
 
+def network_name(member: Member) -> str:
+    return f"gateway-{member.assistant}"
+
+
 def gateway(member: Member, peer: Member, household: Household, image: str) -> dict[str, Any]:
     return {
         "image": image,
@@ -105,7 +109,7 @@ def gateway(member: Member, peer: Member, household: Household, image: str) -> d
         ],
         # Loopback only; `tailscale serve` carries the port onto the household's tailnet.
         "ports": [f"127.0.0.1:{member.port}:18789"],
-        "networks": ["household"],
+        "networks": [network_name(member)],
         "cap_drop": ["NET_RAW", "NET_ADMIN"],
         "security_opt": ["no-new-privileges:true"],
         "init": True,
@@ -136,9 +140,9 @@ def compose(household: Household, image: str) -> dict[str, Any]:
             second.container: gateway(second, first, household, image),
         },
         "networks": {
-            "household": {
-                "ipam": {"config": [{"subnet": GATEWAY_SUBNET, "gateway": GATEWAY_BRIDGE}]}
-            },
+            network_name(member): {"ipam": {"config": [{"subnet": subnet, "gateway": bridge}]}}
+            for member in household.members
+            for subnet, bridge in [household.network(member)]
         },
     }
 

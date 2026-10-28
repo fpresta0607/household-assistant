@@ -277,3 +277,45 @@ def test_a_household_file_that_cannot_be_read_changes_nothing(tmp_path: Path) ->
     assert "cannot be read" in result.stderr
     assert "first household" not in result.stderr
     assert logged(tmp_path) == []
+
+
+def test_each_gateway_gets_a_token_and_a_keyring_password_of_its_own(tmp_path: Path) -> None:
+    """Without GOG_KEYRING_PASSWORD no connector can be signed in to from the app
+    (household-app's sealed-file.js), and one shared between the gateways would hand each
+    assistant the key to the other person's sign-ins. The install's own section runs here,
+    against scratch env files, one already holding a token and an OpenRouter key."""
+    bash = shutil.which("bash")
+    assert bash is not None
+    script = (ROOT / "scripts" / "openclaw-install.sh").read_text(encoding="utf-8")
+    section = script[script.index("# --- gateway token") : script.index("# --- image")]
+    first, second = tmp_path / "openclaw-ada.env", tmp_path / "openclaw-rex.env"
+    first.write_text("OPENROUTER_API_KEY=sk-or-x\nOPENCLAW_GATEWAY_TOKEN=kept\n", encoding="utf-8")
+    members = "\n".join(
+        f"p\t{name}\tc\ts\t1\t/s\t{path}\t/x\t/y\t/z"
+        for name, path in (("ada", first), ("rex", second))
+    )
+    subprocess.run(
+        [bash, "-c", f"set -euo pipefail\nmembers=$'{members}'\n{section}"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    def values(path: Path) -> dict[str, str]:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        return dict(line.split("=", 1) for line in lines)
+
+    ada, rex = values(first), values(second)
+    assert ada["OPENCLAW_GATEWAY_TOKEN"] == "kept" and ada["OPENROUTER_API_KEY"] == "sk-or-x"
+    assert len(ada["GOG_KEYRING_PASSWORD"]) == 64 and len(rex["OPENCLAW_GATEWAY_TOKEN"]) == 64
+    assert ada["GOG_KEYRING_PASSWORD"] != rex["GOG_KEYRING_PASSWORD"]
+    assert stat.S_IMODE(first.stat().st_mode) == 0o600
+    # A second run changes nothing.
+    before = first.read_text(encoding="utf-8")
+    subprocess.run(
+        [bash, "-c", f"set -euo pipefail\nmembers=$'{members}'\n{section}"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert first.read_text(encoding="utf-8") == before

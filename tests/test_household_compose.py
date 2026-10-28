@@ -80,9 +80,11 @@ def test_a_new_household_gets_a_gateway_for_each_member_on_its_own_clock() -> No
     assert ada["environment"]["TZ"] == "America/New_York"
     assert "/var/lib/household-assistant/codex-ada:/home/node/.codex" in ada["volumes"]
     assert ada["deploy"]["resources"]["limits"]["memory"] == "1536M"
-    assert compose["networks"]["household"]["ipam"]["config"] == [
-        {"subnet": household_compose.GATEWAY_SUBNET, "gateway": household_compose.GATEWAY_BRIDGE}
-    ]
+    assert ada["networks"] == ["gateway-ada"] and rex["networks"] == ["gateway-rex"]
+    assert {name: net["ipam"]["config"] for name, net in compose["networks"].items()} == {
+        "gateway-ada": [{"subnet": "172.31.240.0/28", "gateway": "172.31.240.1"}],
+        "gateway-rex": [{"subnet": "172.31.240.16/28", "gateway": "172.31.240.17"}],
+    }
 
 
 @pytest.mark.parametrize("example", [EXAMPLE, NEW_EXAMPLE])
